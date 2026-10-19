@@ -1,0 +1,1 @@
+../../../.specify/extensions/walkaway/.specify-dev/agent-commands/claude/speckit-walkaway-define/SKILL.md

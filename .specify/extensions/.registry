@@ -32,6 +32,21 @@
       },
       "registered_skills": [],
       "installed_at": "2026-10-19T20:41:03.475834+00:00"
+    },
+    "walkaway": {
+      "version": "0.1.0",
+      "source": "local",
+      "manifest_hash": "sha256:618854b16106f033e9550a9fa8fc357bb5c8111961eb53ab0da2093e6cad69fa",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.walkaway.define",
+          "speckit.walkaway.prepare"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-19T21:46:44.405965+00:00"
     }
   }
 }

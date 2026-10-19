@@ -1,0 +1,36 @@
+schema_version: "1.0"
+
+extension:
+  id: walkaway
+  name: "Walkaway"
+  version: "0.1.0"
+  description: "Run Spec Kit phases from chat: define, walk away, return to a review point"
+  author: "<author>"
+  repository: "https://github.com/<owner>/spec-kit-walkaway"
+  homepage: "https://github.com/<owner>/spec-kit-walkaway"
+  license: "MIT"
+  category: "process"
+  effect: "read-write"
+
+requires:
+  speckit_version: ">=0.12.17"
+  commands:
+    - speckit.specify
+    - speckit.clarify
+    - speckit.plan
+    - speckit.tasks
+    - speckit.analyze
+
+provides:
+  commands:
+    - name: speckit.walkaway.define
+      file: commands/define.md
+      description: "Phase 1: create and clarify a feature spec, then stop for review"
+    - name: speckit.walkaway.prepare
+      file: commands/prepare.md
+      description: "Phase 2: plan, tasks and analyze unattended, then optional bounded fixes"
+
+tags:
+  - workflow
+  - orchestration
+  - review

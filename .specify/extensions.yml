@@ -1,6 +1,7 @@
 installed:
 - branch-convention
 - bug
+- walkaway
 settings:
   auto_execute_hooks: true
 hooks:
