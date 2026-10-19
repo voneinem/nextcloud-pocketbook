@@ -1,0 +1,25 @@
+# Build trees
+build/
+build-*/
+dist/
+
+# Local runtime data of the desktop build
+pbcloud-data/
+
+# Database backups (may contain the account password)
+*.bak
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Static libcurl for the reader, built by scripts/build-curl-arm.sh
+build-curl-arm/
+
+# Python bytecode of the helper scripts
+__pycache__/
+*.pyc

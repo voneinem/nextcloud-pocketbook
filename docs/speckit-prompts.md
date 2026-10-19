@@ -25,7 +25,7 @@ Features 001 browse + download | 002 upload + manage | 003 folder sync | 004 sha
 ## A. Bootstrap the baseline (plain prompt)
 
 ```text
-Bootstrap this repository from /home/voneinem/Projekte/office-pocketbook, the same way office-pocketbook was bootstrapped
+Bootstrap this repository from ../office-pocketbook, the same way office-pocketbook was bootstrapped
 from notes-pocketbook (see `git show 76aca5a` in that repository for the pattern).
 
 1. Copy the baseline of office-pocketbook (its current HEAD, version 0.3.0) into this repository. Do NOT copy:
@@ -63,7 +63,7 @@ Documentation is English only.
 ## B. Reference analysis of the Android app and the Nextcloud APIs (plain prompt)
 
 ```text
-Create two reference documents, in the same style as /home/voneinem/Projekte/notes-pocketbook/docs/notes-android-features.md.
+Create two reference documents, in the same style as ../notes-pocketbook/docs/notes-android-features.md.
 
 1. `docs/reference/nextcloud-android-features.md`: a feature and sync analysis of https://github.com/nextcloud/android.
    Clone it read-only with `git clone --depth 1` into a NEW EMPTY directory outside this repository (use the session
