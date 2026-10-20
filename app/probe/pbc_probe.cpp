@@ -3,6 +3,8 @@
 // directory, account or network address. Every answer is labelled with what was observed, not guessed.
 //
 //   pbc-probe [data-dir]       data-dir defaults to /mnt/ext1/system/pbcloud
+//   PBC_PROBE_URL=https://...  an https address of any plain file server (a file of at least 1 MiB): the probe then tests Range, If-Range,
+//                              the progress callback and the redirect rule of the bundled libcurl; the address is never printed
 #include <curl/curl.h>
 #include <dirent.h>
 #include <iconv.h>
@@ -11,6 +13,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -190,6 +193,129 @@ void probe_system() {
     }
 }
 
+// ---- downloads (specs/001-nextcloud-files-client research R-8, R-13; device checks DT-NC-1, DT-NC-3, DT-NC-9) ----
+
+// Can a file of 4 GiB or more exist here? On FAT it cannot; the app refuses such files before writing a byte.
+void probe_big_file(const std::string& dir) {
+    section("downloads: file size limit");
+    const std::string file = dir + "/.pbc-probe-big." + std::to_string(static_cast<long>(getpid()));
+    FILE* f = std::fopen(file.c_str(), "wb");
+    if (!f) {
+        std::printf("4 GiB file: not tested (directory not writable)\n");
+        return;
+    }
+    const long long five_gib = 5ll << 30;
+    const int rc = ftruncate(fileno(f), static_cast<off_t>(five_gib));
+    struct stat st {};
+    const bool ok = rc == 0 && fstat(fileno(f), &st) == 0 && static_cast<long long>(st.st_size) == five_gib;
+    std::printf("5 GiB sparse file: %s\n", ok ? "can be created (this file system has no 4 GiB limit)" : "cannot be created (4 GiB limit, as on FAT)");
+    std::fclose(f);
+    std::remove(file.c_str());
+}
+
+struct RangeCapture {
+    long status = 0;
+    std::string content_range;
+    long long bytes = 0;
+};
+
+size_t range_header(char* data, size_t size, size_t n, void* user) {
+    auto* c = static_cast<RangeCapture*>(user);
+    const std::string line(data, size * n);
+    if (line.compare(0, 5, "HTTP/") == 0) {
+        const size_t sp = line.find(' ');
+        c->status = sp == std::string::npos ? 0 : std::atol(line.c_str() + sp + 1);
+        c->content_range.clear();
+    } else if (line.size() > 14 && (line[0] == 'C' || line[0] == 'c') && line.compare(0, 14, "Content-Range:") == 0) {
+        c->content_range = line.substr(14);
+        while (!c->content_range.empty() && (c->content_range.back() == '\r' || c->content_range.back() == '\n')) c->content_range.pop_back();
+    }
+    return size * n;
+}
+size_t discard_body(char*, size_t size, size_t n, void* user) {
+    static_cast<RangeCapture*>(user)->bytes += static_cast<long long>(size * n);
+    return size * n;
+}
+int cancel_after_64k(void*, curl_off_t, curl_off_t now, curl_off_t, curl_off_t) { return now >= 64 * 1024 ? 1 : 0; }
+
+std::string first_ca_file() {
+    for (const char* b : {"/etc/ssl/certs/ca-certificates.crt", "/etc/ssl/cert.pem", "/etc/ssl/certs/ca-bundle.crt"}) {
+        std::string text;
+        if (read_file(b, text, 1 << 16)) return b;
+    }
+    return std::string();
+}
+
+CURL* probe_handle(const char* url, const std::string& ca, RangeCapture* cap) {
+    CURL* c = curl_easy_init();
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, "https");
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYHOST, 2L);
+    if (!ca.empty()) curl_easy_setopt(c, CURLOPT_CAINFO, ca.c_str());
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 15L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(c, CURLOPT_HEADERFUNCTION, range_header);
+    curl_easy_setopt(c, CURLOPT_HEADERDATA, cap);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, discard_body);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, cap);
+    curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "identity");
+    return c;
+}
+
+// Needs PBC_PROBE_URL. Prints one result line per test and never the address.
+void probe_range_url() {
+    section("downloads: ranged requests (bundled libcurl)");
+    const char* url = std::getenv("PBC_PROBE_URL");
+    if (!url || std::strncmp(url, "https://", 8) != 0) {
+        std::printf("range: skipped (PBC_PROBE_URL is not set to an https address)\n");
+        std::printf("if-range: skipped\ncancel: skipped\nredirect: skipped\n");
+        return;
+    }
+    const std::string ca = first_ca_file();
+    {
+        RangeCapture cap;
+        CURL* c = probe_handle(url, ca, &cap);
+        curl_easy_setopt(c, CURLOPT_RANGE, "1024-");
+        const CURLcode rc = curl_easy_perform(c);
+        std::printf("range: %s (status %ld, content-range \"%s\")\n", rc == CURLE_OK && cap.status == 206 ? "206 honoured" : (rc == CURLE_OK && cap.status == 200 ? "NOT honoured (200)" : "failed"),
+                    cap.status, cap.content_range.c_str());
+        curl_easy_cleanup(c);
+    }
+    {
+        RangeCapture cap;
+        CURL* c = probe_handle(url, ca, &cap);
+        curl_easy_setopt(c, CURLOPT_RANGE, "1024-");
+        struct curl_slist* h = curl_slist_append(nullptr, "If-Range: \"pbc-probe-no-such-etag\"");
+        curl_easy_setopt(c, CURLOPT_HTTPHEADER, h);
+        const CURLcode rc = curl_easy_perform(c);
+        std::printf("if-range: %s (status %ld)\n", rc == CURLE_OK && cap.status == 200 ? "a wrong validator gives the whole file (200), as required"
+                                                   : (rc == CURLE_OK && cap.status == 206 ? "a wrong validator was ignored (206): resume would not be safe" : "failed"), cap.status);
+        curl_slist_free_all(h);
+        curl_easy_cleanup(c);
+    }
+    {
+        RangeCapture cap;
+        CURL* c = probe_handle(url, ca, &cap);
+        curl_easy_setopt(c, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(c, CURLOPT_XFERINFOFUNCTION, cancel_after_64k);
+        curl_easy_setopt(c, CURLOPT_XFERINFODATA, &cap);
+        curl_easy_setopt(c, CURLOPT_BUFFERSIZE, 65536L);
+        const CURLcode rc = curl_easy_perform(c);
+        std::printf("cancel: %s (received %lld bytes)\n", rc == CURLE_ABORTED_BY_CALLBACK ? "the progress callback stops the transfer" : "did not stop", cap.bytes);
+        curl_easy_cleanup(c);
+    }
+    {
+        RangeCapture cap;
+        CURL* c = probe_handle(url, ca, &cap);
+        curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 0L);
+        curl_easy_setopt(c, CURLOPT_RANGE, "0-0");
+        const CURLcode rc = curl_easy_perform(c);
+        std::printf("redirect: %s\n", rc != CURLE_OK ? "not tested (request failed)" : (cap.status >= 300 && cap.status < 400 ? "the address redirects; the app checks every redirect target" : "none"));
+        curl_easy_cleanup(c);
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -200,6 +326,8 @@ int main(int argc, char** argv) {
     probe_charsets();
     probe_ca_files();
     probe_data_dir(data_dir);
+    probe_big_file(data_dir);
+    probe_range_url();
     probe_system();
     curl_global_cleanup();
     return 0;

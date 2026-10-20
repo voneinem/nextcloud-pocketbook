@@ -29,6 +29,11 @@ foreach(src ${PBC_TEST_SOURCES})
     endif()
 endforeach()
 
+# A fake Nextcloud over HTTPS for trying the host app by hand (scripts/run-host-demo.sh); not a test.
+add_executable(pbc_fake_nextcloud tools/pbc_fake_nextcloud.cpp)
+target_link_libraries(pbc_fake_nextcloud PRIVATE pbc_core OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+target_include_directories(pbc_fake_nextcloud PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
+
 # Mechanical anonymization check of the fixtures, and a self-test proving the checker works.
 add_test(NAME check_fixtures
     COMMAND ${CMAKE_SOURCE_DIR}/scripts/check-fixtures.sh ${CMAKE_CURRENT_SOURCE_DIR}/fixtures)
@@ -57,7 +62,7 @@ set_tests_properties(check_fake_markers check_fake_markers_selftest PROPERTIES L
 if(TARGET pbc_bridge)
     find_package(Qt6 QUIET COMPONENTS Test)
     if(Qt6Test_FOUND)
-        foreach(t test_about_bridge test_table_translator test_settings_bridge)
+        foreach(t test_about_bridge test_table_translator test_settings_bridge test_connection_bridge test_browse_bridge test_transfer_bridge test_space_bridge test_no_background_network)
             add_executable(${t} bridge/${t}.cpp)
             target_link_libraries(${t} PRIVATE pbc_bridge Qt6::Core Qt6::Test OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
             target_include_directories(${t} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
@@ -71,7 +76,7 @@ if(TARGET pbc_bridge)
 endif()
 
 if(PBC_SANITIZE)
-    foreach(t test_about_bridge test_table_translator test_settings_bridge probe_script)
+    foreach(t test_about_bridge test_table_translator test_settings_bridge test_connection_bridge test_browse_bridge test_transfer_bridge test_space_bridge test_no_background_network probe_script)
         if(TEST ${t})
             set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/lsan.supp:print_suppressions=0")
         endif()

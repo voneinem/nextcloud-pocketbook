@@ -1,0 +1,52 @@
+# US1 connect, US2 browse, US3 download and open, US4 keep offline and the first Update (specs/001-nextcloud-files-client)
+size 1404 1872
+wait 600
+shot @OUT@/01-home-not-connected.png
+tap homeSettings
+wait 600
+shot @OUT@/02-settings-empty.png
+tap settingsAddress
+type @ADDRESS@
+tap settingsUser
+type @USER@
+tap settingsPassword
+type @PASSWORD@
+shot @OUT@/03-settings-filled.png
+tap settingsTest
+waitfor settingsResult The connection works.
+shot @OUT@/04-settings-tested.png
+tap settingsBack
+wait 500
+expect homeState Connected to Example Cloud
+shot @OUT@/05-home-connected.png
+# browse: the root, then Books
+tap homeFiles
+waitfor folderAge Updated just now
+shot @OUT@/06-root.png
+tap folderRow 1
+waitfor folderPath Books
+waitfor folderAge Updated just now
+waitfor folderRow
+shot @OUT@/07-books.png
+# the details of Moby Dick.epub (rows: Novels, Emma, Moby Dick, Notes)
+tap folderRow 2
+wait 800
+expect detailsOnReader No
+shot @OUT@/08-details-not-downloaded.png
+tap detailsDownload
+waitfor detailsJob Downloaded
+shot @OUT@/09-details-downloaded.png
+tap detailsKeep
+wait 500
+expect detailsKept Yes
+shot @OUT@/10-details-kept.png
+tap detailsBack
+wait 600
+shot @OUT@/11-books-after-download.png
+# keep the whole folder and Update
+tap folderKeep
+wait 600
+shot @OUT@/12-books-kept.png
+tap folderUpdate
+waitfor updateStatus finished
+shot @OUT@/13-update-report.png

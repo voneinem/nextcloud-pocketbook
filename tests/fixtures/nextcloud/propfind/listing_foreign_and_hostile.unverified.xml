@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response><d:href>/remote.php/dav/files/demo/Books/</d:href><d:propstat><d:prop><d:getetag>"b"</d:getetag><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/ok.epub</d:href><d:propstat><d:prop><d:getetag>"1"</d:getetag><d:resourcetype/><d:getcontentlength>5</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/other/Books/theirs.epub</d:href><d:propstat><d:prop><d:getetag>"2"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/index.php/apps/files/hidden.epub</d:href><d:propstat><d:prop><d:getetag>"3"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Elsewhere/stray.epub</d:href><d:propstat><d:prop><d:getetag>"4"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/..%2F..%2Fescape.epub</d:href><d:propstat><d:prop><d:getetag>"5"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/%2e%2e/escape2.epub</d:href><d:propstat><d:prop><d:getetag>"6"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/bad%00name.epub</d:href><d:propstat><d:prop><d:getetag>"7"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/bad%zzname.epub</d:href><d:propstat><d:prop><d:getetag>"8"</d:getetag><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  <d:response><d:href>/remote.php/dav/files/demo/Books/second.epub</d:href><d:propstat><d:prop><d:getetag>"9"</d:getetag><d:resourcetype/><d:getcontentlength>6</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>

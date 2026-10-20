@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/My%20Story%20%C3%A4.epub</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Sun, 18 Oct 2026 07:15:30 GMT</d:getlastmodified>
+      <d:getetag>"a1b2c3d4"</d:getetag>
+      <d:getcontenttype>application/epub+zip</d:getcontenttype>
+      <d:getcontentlength>152000</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>5001</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+      <oc:favorite>1</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Work/Reports/</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Mon, 19 Oct 2026 10:30:00 GMT</d:getlastmodified>
+      <d:getetag>"b2c3d4e5"</d:getetag>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>5002</oc:fileid>
+      <oc:permissions>RGDNVCK</oc:permissions>
+      <oc:size>9000</oc:size>
+      <oc:favorite>1</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/notes.txt</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Tue, 20 Oct 2026 08:00:00 GMT</d:getlastmodified>
+      <d:getetag>"c3d4e5f6"</d:getetag>
+      <d:getcontenttype>text/plain</d:getcontenttype>
+      <d:getcontentlength>120</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>5003</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+      <oc:favorite>1</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/other/Secret.pdf</d:href>
+    <d:propstat><d:prop>
+      <d:getetag>"zz"</d:getetag>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Evil/%2e%2e/passwd</d:href>
+    <d:propstat><d:prop>
+      <d:getetag>"ee"</d:getetag>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Private/shared-secret.docx</d:href>
+    <d:propstat><d:prop>
+      <d:getetag>"dd"</d:getetag>
+      <d:resourcetype/>
+      <oc:permissions>S</oc:permissions>
+      <oc:favorite>1</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

@@ -1,5 +1,5 @@
 // T097: the HTTP seam for WebDAV: PROPFIND, REPORT and OPTIONS with a body, multi-valued case-insensitive response headers, the
-// 8 MiB cap for in-memory responses, redirects that keep method and body (and still do not forward credentials). Needs `openssl`.
+// 8 MiB cap for in-memory responses, redirects that keep method and body, and the refusal of a redirect to another host. Needs `openssl`.
 #include <string>
 
 #include "pbc/curl_transport.h"
@@ -148,7 +148,7 @@ PB_TEST(a_redirect_keeps_the_method_and_the_body_of_a_propfind) {
     PB_CHECK(lower(seen[1]).find("\r\ndepth: 0\r\n") != std::string::npos);
 }
 
-PB_TEST(a_redirect_of_a_propfind_to_another_host_does_not_forward_the_credentials) {
+PB_TEST(a_redirect_of_a_propfind_to_another_host_is_refused_and_the_credentials_go_nowhere) {
     Fixture f;
     TlsTestServer b(f.leaf.cert, f.leaf.key, [](const std::string&) { return TlsTestServer::http_response(207, "<other/>"); });
     const std::string target = b.url("/dav/");
@@ -161,8 +161,11 @@ PB_TEST(a_redirect_of_a_propfind_to_another_host_does_not_forward_the_credential
     req.username = "alice";
     req.password = "app-secret";
     const auto resp = transport.perform(req);
-    PB_CHECK_EQ(resp.status, 207L);
+    // constitution Principle IV: a redirect to another host is refused, not followed
+    PB_CHECK(resp.error == ErrorClass::Tls);
+    PB_CHECK_EQ(resp.error_key, std::string("redirect_other_host"));
     PB_CHECK(a.saw_authorization());
+    PB_CHECK(b.requests().empty());
     PB_CHECK(!b.saw_authorization());
 }
 

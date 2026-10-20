@@ -170,7 +170,7 @@ Result<std::unique_ptr<Store>> Store::open(const std::string& dir, Clock& clock,
     }
 
     Result<std::unique_ptr<Store>> r;
-    r.value.reset(new Store(db, dir, clock));
+    r.value.reset(new Store(db, dir, clock, options.max_cached_entries, options.max_cached_folders));
     return r;
 }
 

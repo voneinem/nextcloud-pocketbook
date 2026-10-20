@@ -92,7 +92,8 @@ OpenSSL (Apache-2.0)
 https://www.openssl.org/source/license.html
 
 libcurl uses OpenSSL, provided by the reader's system software and not redistributed by this
-project, to encrypt and verify connections. Licensed under the Apache License 2.0; the text is
+project, to encrypt and verify connections; the app itself uses its digest functions (SHA-256, SHA-1,
+MD5) to check the checksum of a downloaded file. Licensed under the Apache License 2.0; the text is
 shown in the app and in licenses/Apache-2.0.txt.
 
 Copyright (c) The OpenSSL Project Authors.

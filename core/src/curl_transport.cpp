@@ -12,7 +12,9 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <mutex>
+#include <string>
 
 namespace pbc {
 
@@ -25,6 +27,41 @@ bool iequals(const std::string& a, const char* b) {
     for (; i < a.size() && b[i]; ++i)
         if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i]))) return false;
     return i == a.size() && b[i] == '\0';
+}
+
+std::string lower_copy(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+// "https://Host:8443/path" -> scheme "https", host "host", port 8443 (443 when absent). false when there is no authority.
+bool parse_origin(const std::string& url, std::string* scheme, std::string* host, int* port) {
+    const size_t sep = url.find("://");
+    if (sep == std::string::npos) return false;
+    *scheme = lower_copy(url.substr(0, sep));
+    size_t start = sep + 3;
+    size_t end = url.find_first_of("/?#", start);
+    std::string authority = url.substr(start, end == std::string::npos ? std::string::npos : end - start);
+    const size_t at = authority.rfind('@');
+    if (at != std::string::npos) authority = authority.substr(at + 1);
+    int default_port = *scheme == "http" ? 80 : 443;
+    *port = default_port;
+    std::string h = authority;
+    if (!authority.empty() && authority[0] == '[') {   // [::1]:8443
+        const size_t close = authority.find(']');
+        if (close == std::string::npos) return false;
+        h = authority.substr(0, close + 1);
+        if (close + 1 < authority.size() && authority[close + 1] == ':') *port = std::atoi(authority.c_str() + close + 2);
+    } else {
+        const size_t colon = authority.rfind(':');
+        if (colon != std::string::npos) {
+            h = authority.substr(0, colon);
+            *port = std::atoi(authority.c_str() + colon + 1);
+        }
+    }
+    if (h.empty()) return false;
+    *host = lower_copy(h);
+    return true;
 }
 
 // State of one transfer shared by the header and the body callbacks.
@@ -40,9 +77,44 @@ struct Transfer {
     long long total = 0;   // body bytes of a 2xx answer received so far
     bool too_large = false;
     bool storage_full = false;
+    // resume (Request::save_append)
+    bool append = false;
+    long long resume_from = 0;
+    // redirects stay on the origin of the request (constitution Principle IV)
+    std::string origin_host;
+    int origin_port = 443;
+    bool redirect_refused = false;
+    // progress and cancel
+    const std::function<bool(long long, long long)>* progress = nullptr;
+    bool cancelled = false;
 
     bool to_file() const { return !save_to.empty() && status >= 200 && status < 300; }
+    // bytes that are already in the file and belong to this answer: only a 206 continues the file
+    long long base() const { return append && status == 206 ? resume_from : 0; }
+    const char* file_mode() const { return append && status == 206 ? "ab" : "wb"; }
+    // true if `location` (the value of a Location header) leads to another origin or to a scheme other than https
+    bool leaves_origin(const std::string& location) const {
+        if (location.empty() || (location[0] == '/' && (location.size() < 2 || location[1] != '/'))) return false;   // relative to this origin
+        std::string url = location;
+        if (url.compare(0, 2, "//") == 0) url = "https:" + url;
+        std::string scheme, host;
+        int port = 0;
+        if (!parse_origin(url, &scheme, &host, &port)) return location.find("://") != std::string::npos;   // "x://": no authority; plain paths are relative
+        return scheme != "https" || host != origin_host || port != origin_port;
+    }
 };
+
+int xferinfo(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, curl_off_t) {
+    auto* t = static_cast<Transfer*>(clientp);
+    if (!t->progress || !*t->progress) return 0;
+    const long long base = t->base();
+    const long long total = dltotal > 0 ? base + static_cast<long long>(dltotal) : 0;
+    if (!(*t->progress)(base + static_cast<long long>(dlnow), total)) {
+        t->cancelled = true;
+        return 1;   // aborts the transfer (CURLE_ABORTED_BY_CALLBACK)
+    }
+    return 0;
+}
 
 size_t write_body(char* data, size_t size, size_t nmemb, void* userdata) {
     auto* t = static_cast<Transfer*>(userdata);
@@ -56,12 +128,12 @@ size_t write_body(char* data, size_t size, size_t nmemb, void* userdata) {
         return n;
     }
     t->total += static_cast<long long>(n);
-    if (t->max_bytes > 0 && t->total > t->max_bytes) {
+    if (t->max_bytes > 0 && t->base() + t->total > t->max_bytes) {
         t->too_large = true;
         return 0;  // aborts the transfer
     }
     if (!t->file) {
-        t->file = std::fopen(t->save_to.c_str(), "wb");
+        t->file = std::fopen(t->save_to.c_str(), t->file_mode());
         if (!t->file) {
             t->storage_full = errno == ENOSPC || errno == EDQUOT || errno == EFBIG;
             return 0;
@@ -93,7 +165,11 @@ size_t write_header(char* data, size_t size, size_t nmemb, void* userdata) {
             const size_t b = value.find_first_not_of(" \t");
             value = b == std::string::npos ? std::string() : value.substr(b);
             // a declared length over the cap stops the download before the body
-            if (t->to_file() && t->max_bytes > 0 && iequals(name, "Content-Length") && std::atoll(value.c_str()) > t->max_bytes) {
+            if (iequals(name, "Location") && t->status >= 300 && t->status < 400 && t->leaves_origin(value)) {
+                t->redirect_refused = true;   // curl would follow it: stop before it does
+                return 0;
+            }
+            if (t->to_file() && t->max_bytes > 0 && iequals(name, "Content-Length") && t->base() + std::atoll(value.c_str()) > t->max_bytes) {
                 t->too_large = true;
                 return 0;
             }
@@ -144,7 +220,8 @@ Response CurlTransport::perform(const Request& request) {
 
     curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
-    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, request.identity_encoding ? "identity" : "");
+    if (request.buffer_size > 0) curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, request.buffer_size);
 
     // TLS: verification is mandatory and not configurable; the whole policy lives in curl_session.
     if (!apply_tls_policy(curl, ca_file_, Protocol::Http, Security::Tls).ok()) {
@@ -198,6 +275,18 @@ Response CurlTransport::perform(const Request& request) {
         transfer.max_bytes = request.max_body_bytes;
         transfer.max_memory = request.max_response_bytes;
     }
+    transfer.append = request.save_append && !request.save_body_to.empty();
+    transfer.resume_from = request.resume_from;
+    transfer.progress = &request.progress;
+    {
+        std::string scheme;
+        parse_origin(request.url, &scheme, &transfer.origin_host, &transfer.origin_port);
+    }
+    if (request.progress) {
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &transfer);
+    }
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_body);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &transfer);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_header);
@@ -210,7 +299,7 @@ Response CurlTransport::perform(const Request& request) {
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
     if (rc == CURLE_OK && !transfer.save_to.empty() && transfer.to_file() && !transfer.file && request.method != "HEAD") {
-        transfer.file = std::fopen(transfer.save_to.c_str(), "wb");  // an empty 2xx body is an empty file
+        transfer.file = std::fopen(transfer.save_to.c_str(), transfer.file_mode());  // an empty 2xx body is an empty file
         if (!transfer.file) transfer.storage_full = errno == ENOSPC || errno == EDQUOT || errno == EFBIG;
     }
     if (transfer.file) {
@@ -218,8 +307,22 @@ Response CurlTransport::perform(const Request& request) {
         transfer.file = nullptr;
     }
     const bool file_failed = transfer.too_large || transfer.storage_full || rc != CURLE_OK;
-    if (!transfer.save_to.empty() && (file_failed || !(status >= 200 && status < 300))) std::remove(transfer.save_to.c_str());
-    if (transfer.too_large) {
+    // a plain download leaves nothing behind; in append mode the partial file belongs to the caller
+    if (!transfer.save_to.empty() && !transfer.append && (file_failed || !(status >= 200 && status < 300))) std::remove(transfer.save_to.c_str());
+    if (transfer.redirect_refused) {
+        out.error = ErrorClass::Tls;
+        out.error_key = "redirect_other_host";
+        out.error_detail = "refusing a redirect to another host";
+    } else if (transfer.cancelled) {
+        out.cancelled = true;
+        out.error = ErrorClass::Cancelled;
+        out.error_key = "cancelled";
+        out.error_detail = "cancelled by the user";
+        if (transfer.append && status > 0) {
+            out.status = status;
+            out.headers = std::move(headers);
+        }
+    } else if (transfer.too_large) {
         out.status = status;
         out.headers = std::move(headers);
         out.body_too_large = true;
@@ -240,6 +343,10 @@ Response CurlTransport::perform(const Request& request) {
         out.error = mapped.cls;
         out.error_key = mapped.key;
         out.error_detail = mapped.detail;
+        if (transfer.append && status > 0) {   // the caller needs to know which version the partial bytes belong to
+            out.status = status;
+            out.headers = std::move(headers);
+        }
     }
     curl_slist_free_all(header_list);
     curl_easy_cleanup(curl);

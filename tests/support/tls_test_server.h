@@ -82,6 +82,8 @@ private:
 class TlsTestServer {
 public:
     using Handler = std::function<std::string(const std::string& request)>;
+    // For answers too large to build in memory: the handler writes the response in pieces through `write` (false = the client went away).
+    using StreamHandler = std::function<void(const std::string& request, const std::function<bool(const char*, size_t)>& write)>;
 
     TlsTestServer(const std::string& cert, const std::string& key, Handler handler) : handler_(std::move(handler)) {
         ::signal(SIGPIPE, SIG_IGN);  // a client that aborts the handshake must not kill the test
@@ -102,6 +104,9 @@ public:
         port_ = ntohs(addr.sin_port);
         thread_ = std::thread([this] { loop(); });
         running_ = true;
+    }
+    TlsTestServer(const std::string& cert, const std::string& key, StreamHandler stream) : TlsTestServer(cert, key, Handler()) {
+        stream_ = std::move(stream);
     }
     ~TlsTestServer() {
         stop_ = true;
@@ -187,6 +192,20 @@ private:
             std::lock_guard<std::mutex> l(mu_);
             requests_.push_back(req);
         }
+        if (stream_) {
+            stream_(req, [&](const char* p, size_t n) {
+                while (n > 0) {
+                    const int w = SSL_write(ssl, p, static_cast<int>(n > (1u << 20) ? (1u << 20) : n));
+                    if (w <= 0) return false;
+                    p += w;
+                    n -= static_cast<size_t>(w);
+                }
+                return true;
+            });
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            return;
+        }
         const std::string resp = handler_(req);
         SSL_write(ssl, resp.data(), static_cast<int>(resp.size()));
         SSL_shutdown(ssl);
@@ -194,6 +213,7 @@ private:
     }
 
     Handler handler_;
+    StreamHandler stream_;
     SSL_CTX* ctx_ = nullptr;
     int listen_fd_ = -1;
     int port_ = 0;

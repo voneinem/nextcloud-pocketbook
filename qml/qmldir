@@ -1,8 +1,9 @@
 singleton Style 1.0 Style.qml
+singleton Problems 1.0 Problems.qml
+singleton EntryWords 1.0 EntryWords.qml
+FlatList 1.0 FlatList.qml
 ChoiceDialog 1.0 ChoiceDialog.qml
 ConfirmDialog 1.0 ConfirmDialog.qml
-DateTimePicker 1.0 DateTimePicker.qml
-EmojiPicker 1.0 EmojiPicker.qml
 PageButtons 1.0 PageButtons.qml
 SelectableText 1.0 SelectableText.qml
 SelectionHandle 1.0 SelectionHandle.qml
@@ -23,7 +24,5 @@ InkSlider 1.0 InkSlider.qml
 InkSwitch 1.0 InkSwitch.qml
 InkRow 1.0 InkRow.qml
 ModelPager 1.0 ModelPager.qml
-EventRow 1.0 EventRow.qml
-ContactRow 1.0 ContactRow.qml
 SelectionMenu 1.0 SelectionMenu.qml
 TextMenu 1.0 TextMenu.qml

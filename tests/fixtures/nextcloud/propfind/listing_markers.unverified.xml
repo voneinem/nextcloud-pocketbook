@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/</d:href>
+    <d:propstat><d:prop><d:getetag>"root-etag"</d:getetag><d:resourcetype><d:collection/></d:resourcetype><oc:fileid>1</oc:fileid></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Vault/</d:href>
+    <d:propstat><d:prop><d:getetag>"e-1"</d:getetag><d:resourcetype><d:collection/></d:resourcetype><oc:fileid>11</oc:fileid><oc:permissions>RGDNVCK</oc:permissions><nc:is-encrypted>1</nc:is-encrypted></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Shared%20without%20reading/</d:href>
+    <d:propstat><d:prop><d:getetag>"e-2"</d:getetag><d:resourcetype><d:collection/></d:resourcetype><oc:fileid>12</oc:fileid><oc:permissions>SRD</oc:permissions></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Broken%20mount/</d:href>
+    <d:propstat><d:prop><d:getlastmodified>Tue, 20 Oct 2026 08:00:00 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Locked%20away/</d:href>
+    <d:propstat><d:prop><d:getetag/></d:prop><d:status>HTTP/1.1 403 Forbidden</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/fine.txt</d:href>
+    <d:propstat><d:prop><d:getetag>"e-5"</d:getetag><d:resourcetype/><d:getcontentlength>7</d:getcontentlength><oc:fileid>15</oc:fileid><oc:permissions>RGDNVW</oc:permissions></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

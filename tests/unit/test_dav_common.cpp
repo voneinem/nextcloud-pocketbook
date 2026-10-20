@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fake_transport.h"
+#include "pbc/clock_check.h"
 #include "pbc/dav_common.h"
 #include "test_support.h"
 
@@ -84,8 +85,11 @@ PB_TEST(status_error_maps_the_http_status_to_the_stable_keys) {
     PB_CHECK_EQ(key(403), std::string("forbidden"));
     PB_CHECK_EQ(key(404), std::string("not_found"));
     PB_CHECK_EQ(key(500), std::string("server_error"));
-    PB_CHECK_EQ(key(503), std::string("server_error"));
-    PB_CHECK_EQ(key(429), std::string("server_error"));
+    PB_CHECK_EQ(key(502), std::string("server_error"));
+    PB_CHECK_EQ(key(504), std::string("server_error"));
+    PB_CHECK_EQ(key(503), std::string("maintenance"));   // the caller may refine it with status.php
+    PB_CHECK_EQ(key(429), std::string("rate_limited"));
+    PB_CHECK_EQ(key(423), std::string("locked"));
     PB_CHECK_EQ(key(408), std::string("server_error"));
     PB_CHECK_EQ(key(418), std::string("protocol_error"));
     PB_CHECK(s.status_error(FakeTransport::status(207)).ok());
@@ -137,6 +141,44 @@ PB_TEST(prop_in_ok_propstat_ignores_a_propstat_with_a_failure_status) {
     PB_CHECK(name != nullptr);
     PB_CHECK_EQ(pbc::dav::trim(name->text), std::string("Work"));
     PB_CHECK(pbc::dav::ok_prop_set(*resp) != nullptr);
+}
+
+PB_TEST(the_owncloud_and_nextcloud_properties_are_read_through_their_namespaces) {
+    const char* xml =
+        "<d:multistatus xmlns:d=\"DAV:\" xmlns:oc=\"http://owncloud.org/ns\" xmlns:nc=\"http://nextcloud.org/ns\"><d:response>"
+        "<d:propstat><d:prop><oc:size>1234</oc:size><nc:is-encrypted>1</nc:is-encrypted></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>"
+        "</d:response></d:multistatus>";
+    const auto ms = pbc::dav::parse_multistatus(FakeTransport::status(207, xml));
+    PB_CHECK(ms.ok());
+    const pbc::XmlNode* resp = ms.value.child(pbc::dav::kNsDav, "response");
+    PB_CHECK(resp != nullptr);
+    PB_CHECK_EQ(std::string(pbc::dav::kNsOc), std::string("http://owncloud.org/ns"));
+    PB_CHECK_EQ(std::string(pbc::dav::kNsNc), std::string("http://nextcloud.org/ns"));
+    const pbc::XmlNode* size = pbc::dav::prop_in_ok_propstat(*resp, pbc::dav::kNsOc, "size");
+    PB_CHECK(size != nullptr);
+    PB_CHECK_EQ(size->text, std::string("1234"));
+    const pbc::XmlNode* enc = pbc::dav::prop_in_ok_propstat(*resp, pbc::dav::kNsNc, "is-encrypted");
+    PB_CHECK(enc != nullptr);
+    PB_CHECK_EQ(enc->text, std::string("1"));
+}
+
+PB_TEST(retry_after_is_read_as_seconds_or_a_date_and_capped_at_fifteen_minutes) {
+    const int64_t now = 1792000000;   // 2026-10-14 ... any fixed instant
+    auto with = [](const std::string& v) { return pbc::Headers{{"Retry-After", v}}; };
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("30"), now), int64_t(30));
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("0"), now), int64_t(0));
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("  120 "), now), int64_t(120));
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("900"), now), int64_t(900));
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("86400"), now), int64_t(900));   // capped
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("99999999999999999999"), now), int64_t(900));   // absurdly long: still just the cap
+    // an HTTP date 90 seconds ahead, and one in the past
+    const auto ahead = pbc::parse_http_date("Wed, 14 Oct 2026 12:00:00 GMT");
+    PB_CHECK(ahead.has_value());
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("Wed, 14 Oct 2026 12:00:00 GMT"), *ahead - 90), int64_t(90));
+    PB_CHECK_EQ(*pbc::parse_retry_after(with("Wed, 14 Oct 2026 12:00:00 GMT"), *ahead + 500), int64_t(0));
+    PB_CHECK(!pbc::parse_retry_after(pbc::Headers{}, now).has_value());
+    for (const char* bad : {"", "-5", "+5", "abc", "12abc", "1e3", "Wed, 99 Oct 2026 12:00:00 GMT"})
+        PB_CHECK(!pbc::parse_retry_after(with(bad), now).has_value());
 }
 
 PB_TEST(small_helpers_keep_their_behaviour) {

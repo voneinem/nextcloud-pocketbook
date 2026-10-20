@@ -25,11 +25,11 @@ if(TARGET_TYPE STREQUAL "ARM")
     # The ELF is installed as <app>.bin and a shell launcher is installed as <app>.app.
     set_target_properties(pbcloud_app PROPERTIES SUFFIX ".app" OUTPUT_NAME "${PBC_APP_NAME}")
 else()
-    find_package(Qt6 QUIET COMPONENTS Core Gui Qml Quick)
+    find_package(Qt6 QUIET COMPONENTS Core Gui Qml Quick Test)
     if(Qt6Quick_FOUND AND Qt6Qml_FOUND AND TARGET pbc_bridge)
         set(CMAKE_AUTOMOC ON)
         set(CMAKE_AUTORCC ON)
-        add_executable(pbcloud_app ${PBC_APP_SOURCES} ${CMAKE_SOURCE_DIR}/qml/qml.qrc)
+        add_executable(pbcloud_app ${PBC_APP_SOURCES} ui_script.cpp ${CMAKE_SOURCE_DIR}/qml/qml.qrc)
         set_property(SOURCE ${CMAKE_SOURCE_DIR}/qml/qml.qrc PROPERTY OBJECT_DEPENDS ${PBC_QML_FILES})
         target_include_directories(pbcloud_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_definitions(pbcloud_app PRIVATE
@@ -38,7 +38,7 @@ else()
             PBC_ZONEINFO_DIR="${CMAKE_SOURCE_DIR}/third_party/tzdata/zoneinfo"
             PBC_LICENSES_ROOT="${CMAKE_SOURCE_DIR}"
             PBC_EMOJI_FONT="${CMAKE_SOURCE_DIR}/third_party/noto-emoji/NotoEmoji.ttf")
-        target_link_libraries(pbcloud_app PRIVATE pbc_bridge Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+        target_link_libraries(pbcloud_app PRIVATE pbc_bridge Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Test)   # Qt6::Test only for the host walk (ui_script.cpp)
         set_target_properties(pbcloud_app PROPERTIES OUTPUT_NAME "${PBC_APP_NAME}")
         # The UI must load without QML errors (offscreen platform, no display needed).
         add_test(NAME app_self_test COMMAND pbcloud_app --self-test)
@@ -46,6 +46,17 @@ else()
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen" LABELS "bridge" WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         if(PBC_SANITIZE)
             set_property(TEST app_self_test APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")
+        endif()
+        # The scripted walk through the real pages against the fake Nextcloud (scripts/ui-walk.sh): the acceptance walk of the files client.
+        find_program(PBC_OPENSSL_CLI openssl)
+        if(TARGET pbc_fake_nextcloud AND PBC_OPENSSL_CLI)
+            add_test(NAME ui_walk COMMAND ${CMAKE_SOURCE_DIR}/scripts/ui-walk.sh --out ${CMAKE_BINARY_DIR}/walk-out --build ${CMAKE_BINARY_DIR}
+                ${CMAKE_SOURCE_DIR}/tests/walks/01-connect-browse-download.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/02-restart-update-favorites-search-storage.walk)
+            set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 240)
+            if(PBC_SANITIZE)
+                set_property(TEST ui_walk APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")
+            endif()
         endif()
     else()
         message(STATUS "Qt6 Qml/Quick dev packages not found - building the core library and tests only")

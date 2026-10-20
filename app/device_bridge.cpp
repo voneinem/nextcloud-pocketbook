@@ -9,6 +9,10 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <QDesktopServices>
+#include <QUrl>
+
+#include "pbc/local_files.h"
 #include "pbc/log.h"
 
 #ifdef PLATFORM_POCKETBOOK
@@ -125,6 +129,20 @@ bool DeviceBridge::wifiConnected() const {
     return (QueryNetwork() & NET_CONNECTED) != 0;  // 0x203 = connected, 0x003 = Wi-Fi on but not connected
 #else
     return true;
+#endif
+}
+
+bool DeviceBridge::openFile(const QString& absolutePath) {
+    const QString prefix = downloadRoot_ + QLatin1Char('/');
+    if (downloadRoot_.isEmpty() || !absolutePath.startsWith(prefix)) return false;
+    // a regular file inside the download folder, with no link on the way (research R-13)
+    const auto resolved = pbc::resolve_local_file(downloadRoot_.toStdString(), absolutePath.mid(prefix.size()).toStdString());
+    if (!resolved.ok()) return false;
+#ifdef PLATFORM_POCKETBOOK
+    OpenBook(resolved.value.c_str(), "", 0);   // the reader application picks the viewer by file type
+    return true;
+#else
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(resolved.value)));
 #endif
 }
 

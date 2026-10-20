@@ -2,9 +2,31 @@ import QtQuick
 import QtQuick.Controls
 import ".."
 
-// The options of the app: the language, the note on the certificate authority, and the way to About. Changes are saved at once; a value the app does not accept says so.
+// The options of the app: the account (address, user name, app password, the Test and the browser login), the language, the note on the
+// certificate authority, and the way to About. Language changes are saved at once; a value the app does not accept says so.
 Item {
     id: page
+    property bool waitingForLogin: false
+    property bool tested: false   // a Test was started on this page: its result is shown below the fields
+
+    // how the app password is kept, in plain words and measured on this storage (FR-007)
+    function storageText() {
+        switch (connection.credentialsProtection) {
+        case "enforced": return qsTr("The app password is kept as plain text in a file that only this app can read. Anyone who gets the reader's storage could still use it until you remove the app password in Nextcloud (Settings > Security). Your account password is never stored.")
+        case "not_enforced": return qsTr("The app password is kept as plain text in a file, and this reader's storage cannot make that file private: anyone with USB access to the reader can read it and use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.")
+        default: return qsTr("The app password is kept as plain text in a file on the reader; whether the storage keeps that file private is checked when it is saved. Anyone who gets the reader's storage could use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.")
+        }
+    }
+    function quotaText() {
+        if (connection.quotaUnlimited) return qsTr("%1 used, no limit").arg(connection.quotaUsedText)
+        if (connection.quotaTotalText.length > 0) return qsTr("%1 of %2 used").arg(connection.quotaUsedText).arg(connection.quotaTotalText)
+        if (connection.quotaUsedText.length > 0) return qsTr("%1 used").arg(connection.quotaUsedText)
+        return qsTr("unknown")
+    }
+    function scrollTo(item) {
+        var y = item.mapToItem(column, 0, 0).y
+        flick.contentY = Math.max(0, y - 160)
+    }
 
     function push(name) { if (page.StackView.view) page.StackView.view.push(Qt.resolvedUrl(name)) }
     function openChoice() {
@@ -21,8 +43,6 @@ Item {
         }
     }
 
-    Component.onCompleted: settings.refresh()
-
     TopBar {
         id: topBar
         title: qsTr("Settings")
@@ -30,7 +50,8 @@ Item {
     }
 
     Flickable {
-        anchors { left: parent.left; right: parent.right; top: topBar.bottom; bottom: parent.bottom }
+        id: flick
+        anchors { left: parent.left; right: parent.right; top: topBar.bottom; bottom: panel.top }
         contentWidth: width
         contentHeight: column.implicitHeight + 40
         boundsBehavior: Flickable.StopAtBounds
@@ -50,6 +71,85 @@ Item {
                 font.bold: true
                 color: Style.ink
             }
+            Head { text: qsTr("Account") }
+            Item {
+                width: parent.width
+                height: fields.implicitHeight + 20
+                Column {
+                    id: fields
+                    x: 30
+                    width: parent.width - 60
+                    spacing: 18
+                    InkField {
+                        id: addressField
+                        objectName: "settingsAddress"
+                        width: parent.width
+                        label: qsTr("Server address")
+                        placeholderText: "cloud.example.org"
+                        onFieldFocus: function (item, gained) { if (gained) page.scrollTo(addressField) }
+                    }
+                    InkField {
+                        id: userField
+                        objectName: "settingsUser"
+                        width: parent.width
+                        label: qsTr("User name")
+                        onFieldFocus: function (item, gained) { if (gained) page.scrollTo(userField) }
+                    }
+                    InkField {
+                        id: passwordField
+                        objectName: "settingsPassword"
+                        width: parent.width
+                        label: qsTr("App password")
+                        onFieldFocus: function (item, gained) { if (gained) page.scrollTo(passwordField) }
+                        Component.onCompleted: field.echoMode = TextInput.Password
+                    }
+                }
+            }
+            Text {
+                objectName: "settingsStorageText"
+                x: 30
+                width: parent.width - 60
+                wrapMode: Text.Wrap
+                font.pixelSize: Style.captionSize
+                color: Style.ink
+                text: page.storageText()
+            }
+            Text {
+                objectName: "settingsResult"
+                x: 30
+                width: parent.width - 60
+                topPadding: 14
+                wrapMode: Text.Wrap
+                visible: text.length > 0
+                font.pixelSize: Style.bodySize
+                font.bold: true
+                color: Style.ink
+                text: connection.busy ? qsTr("Checking...")
+                    : connection.problemKey.length > 0 ? Problems.title(connection.problemKey) + " " + Problems.action(connection.problemKey)
+                    : (page.tested && connection.state === "ok") ? qsTr("The connection works.") : ""
+            }
+            Column {
+                objectName: "settingsServer"
+                width: parent.width
+                visible: connection.hasAccount
+                Head { text: qsTr("Server") }
+                InkRow { text: qsTr("Name"); value: connection.serverName }
+                InkRow { text: qsTr("Version"); value: connection.serverVersion }
+                InkRow { text: qsTr("Storage space"); value: page.quotaText(); enabled: true }
+                Text {
+                    objectName: "settingsClockWarning"
+                    x: 30
+                    width: parent.width - 60
+                    topPadding: 10
+                    wrapMode: Text.Wrap
+                    visible: connection.clockWarningMinutes > 0
+                    font.pixelSize: Style.bodySize
+                    font.bold: true
+                    color: Style.ink
+                    text: qsTr("The reader's clock differs from the server's by about %n minute(s). Check the date and time in the reader's settings.", "", connection.clockWarningMinutes)
+                }
+            }
+
             Head { text: qsTr("Language") }
             InkRow {
                 objectName: "settingsLanguage"
@@ -86,6 +186,78 @@ Item {
             Head { text: qsTr("About this app") }
             InkRow { objectName: "settingsAbout"; text: qsTr("About, licenses"); chevron: true; onClicked: page.push("AboutPage.qml") }
         }
+    }
+
+    BottomPanel {
+        id: panel
+        anchors.bottom: parent.bottom
+        tools: [
+            ToolButton {
+                objectName: "settingsTest"
+                text: qsTr("Test")
+                icon: "check"
+                enabled: !connection.busy
+                onClicked: {
+                    page.tested = true
+                    Qt.inputMethod.hide()
+                    connection.testConnection(addressField.text, userField.text, passwordField.text)
+                    passwordField.text = ""   // the typed password does not stay on the screen
+                }
+            },
+            ToolButton {
+                objectName: "settingsBrowserLogin"
+                text: qsTr("Browser login")
+                icon: "sync"
+                enabled: !connection.busy
+                onClicked: {
+                    Qt.inputMethod.hide()
+                    page.waitingForLogin = true
+                    connection.startLogin(addressField.text)
+                }
+            },
+            ToolButton {
+                objectName: "settingsSignOut"
+                text: qsTr("Sign out")
+                icon: "close"
+                visible: connection.hasAccount
+                enabled: !connection.busy
+                onClicked: signOutDialog.open()
+            }
+        ]
+    }
+
+    Connections {
+        target: connection
+        function onChanged() {
+            if (!page.waitingForLogin) return
+            if (connection.loginActive) {
+                page.waitingForLogin = false
+                page.push("LoginPage.qml")
+            } else if (!connection.busy) {
+                page.waitingForLogin = false   // the start failed: the reason is shown below the fields
+            }
+        }
+    }
+
+    ConfirmDialog {
+        id: signOutDialog
+        objectName: "settingsSignOutDialog"
+        title: qsTr("Sign out?")
+        text: qsTr("The app password is removed from the reader. The files you downloaded stay on the reader. To make the app password useless on the server too, remove it in Nextcloud under Settings > Security.")
+        acceptText: qsTr("Sign out")
+        onAccepted: {
+            connection.signOut()
+            addressField.text = ""
+            userField.text = ""
+            page.tested = false
+        }
+    }
+
+    Component.onCompleted: {
+        settings.refresh()
+        connection.refresh()
+        addressField.text = connection.address
+        userField.text = connection.loginName
     }
 
     ChoiceDialog {

@@ -172,6 +172,7 @@ Error map_curl_error(CURLcode code, long ssl_verify_result, bool wifi_up) {
         case CURLE_RECV_ERROR:
         case CURLE_SEND_ERROR:
         case CURLE_GOT_NOTHING:
+        case CURLE_PARTIAL_FILE:   // the connection ended before the announced length
             return make_error(ErrorClass::Network, "connection_lost", "the connection was lost");
         case CURLE_REMOTE_FILE_NOT_FOUND:
             return make_error(ErrorClass::Server, "not_found", "the item was not found on the server");

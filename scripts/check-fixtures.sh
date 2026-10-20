@@ -22,6 +22,7 @@ check_dir() {
             case "$host" in
                 example.com|*.example.com|example.org|*.example.org|example.net|*.example.net|localhost|127.0.0.1|*.invalid) ;;
                 calendarserver.org) ;;   # XML namespace URI of the ctag property (a protocol identifier, not a server)
+                owncloud.org|nextcloud.org|sabredav.org) ;;   # XML namespace URIs of the oc:/nc: properties (protocol identifiers, not servers)
                 *) echo "$f: non-anonymized host '$host'" >&2; bad=1 ;;
             esac
         done < <(grep -aoiE 'https?://[A-Za-z0-9._-]+' "$f" | sed -E 's#^https?://##' | tr 'A-Z' 'a-z' | sort -u)
@@ -57,6 +58,8 @@ if [ "${1:-}" = "--self-test" ]; then
     mkdir -p "$tmp/f"
     printf '{"url":"https://cloud.example.com/index.php","mail":"alice@example.com"}' > "$tmp/f/good.json"
     expect pass "anonymized fixture is accepted"
+    printf '<d:propfind xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"/>' > "$tmp/f/ns.xml"
+    expect pass "the oc: and nc: namespace URIs are accepted"; rm "$tmp/f/ns.xml"
     printf '{"url":"https://nextcloud.my-real-host.net/x"}' > "$tmp/f/bad.json"
     expect fail "real host is rejected"; rm "$tmp/f/bad.json"
     printf '{"owner":"someone@gmail.com"}' > "$tmp/f/bad.json"

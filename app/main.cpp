@@ -23,11 +23,22 @@
 #include <vector>
 
 #include "about_bridge.h"
+#include "browse_bridge.h"
+#include "connection_bridge.h"
+#include "qr_image_provider.h"
 #include "settings_bridge.h"
+#include "space_bridge.h"
+#ifndef PLATFORM_POCKETBOOK
+#include "ui_script.h"
+#endif
+#include "transfer_bridge.h"
 #include "table_translator.h"
 #include "device_bridge.h"
 #include "pbc/ca_selector.h"
+#include "pbc/curl_transport.h"
 #include "pbc/log.h"
+#include "pbc/reader_zone.h"
+#include "pbc/storage_info.h"
 #include "pbc/store.h"
 #include "pbc/tz.h"
 #include "pbc/version.h"
@@ -107,6 +118,7 @@ int main(int argc, char** argv) {
     const char* custom_ca_status = "none";   // custom-ca.pem: none | loaded | invalid (shown in Settings)
     int custom_ca_count = 0;
     std::unique_ptr<SettingsBridge> settingsBridge;
+    std::string ca_file;   // the certificate authorities every connection is checked against (device store or bundled, plus custom-ca.pem)
     if (store) {
         // The time zone data (IANA, compact TZif files) comes with the app, never from the device.
 #ifdef PLATFORM_POCKETBOOK
@@ -127,6 +139,7 @@ int main(int argc, char** argv) {
         const pbc::EffectiveCa ca = pbc::build_effective_ca(base.path, data + "/custom-ca.pem", data + "/effective-ca.pem");
         custom_ca_status = ca.custom_status == pbc::CustomCaStatus::Loaded ? "loaded" : (ca.custom_status == pbc::CustomCaStatus::Invalid ? "invalid" : "none");
         custom_ca_count = ca.custom_cert_count;
+        ca_file = ca.path;
         pbc::log::event("ca.selected", {pbc::log::text("source", base.source == pbc::CaSource::Device ? "device" : "bundled"),
                                         pbc::log::count("custom_certificates", ca.custom_cert_count)});
         SettingsBridge::Config stc;
@@ -138,6 +151,92 @@ int main(int argc, char** argv) {
 
     DeviceBridge device;
     app.installEventFilter(&device);  // Back / Escape
+
+    // The connection to the user's Nextcloud. The transport verifies every certificate and accepts only https (constitution IV). It is
+    // declared before the bridge, so the bridge (which waits for the worker) is destroyed first.
+    std::unique_ptr<pbc::CurlTransport> http;
+    std::unique_ptr<ConnectionBridge> connectionBridge;
+    std::unique_ptr<BrowseBridge> browseBridge;
+    std::unique_ptr<TransferBridge> transferBridge;
+    std::unique_ptr<SpaceBridge> spaceBridge;
+    // where the downloads go: a folder the reader's library scans on the device, a throw-away folder on the host
+#ifdef PLATFORM_POCKETBOOK
+    const QString download_root = QStringLiteral("/mnt/ext1/PBCloud");
+#else
+    const QString download_root = QDir(qEnvironmentVariable("PBC_DOWNLOAD_DIR", QStringLiteral("./pbcloud-downloads"))).absolutePath();
+#endif
+    QDir().mkpath(download_root);
+    device.setDownloadRoot(download_root);
+#ifdef PLATFORM_POCKETBOOK
+    pbc::PosixStorageInfo storage(true);   // the card is FAT, and may be reformatted: the 4 GiB limit applies whatever statfs says
+#else
+    pbc::PosixStorageInfo storage(false);
+#endif
+    if (store && !ca_file.empty()) {
+        http = std::make_unique<pbc::CurlTransport>(ca_file);
+        ConnectionBridge::Config cc;
+        cc.store = store.get();
+        cc.worker = &worker;
+        cc.http = http.get();
+        cc.clock = &clock;
+        cc.wifi_up = [&device] { return device.wifiConnected(); };
+        // a tap that needs the network: ask the system to bring Wi-Fi up if it is not, then continue (never at start)
+        cc.ensure_network = [&device](std::function<void(bool)> done) {
+            if (device.wifiConnected()) {
+                done(true);
+                return;
+            }
+            auto link = std::make_shared<QMetaObject::Connection>();
+            *link = QObject::connect(&device, &DeviceBridge::networkResult, &device, [link, done](bool ok) {
+                QObject::disconnect(*link);
+                done(ok);
+            });
+            device.connectNetwork();
+        };
+        connectionBridge = std::make_unique<ConnectionBridge>(cc);
+
+        // the file list: dates in the reader's own zone, read from its configuration (research R-14; the key is unverified, DT-NC-6)
+        std::string reader_config;
+        {
+#ifdef PLATFORM_POCKETBOOK
+            const QString cfg_path = QStringLiteral("/mnt/ext1/system/config/global.cfg");
+#else
+            const QString cfg_path = qEnvironmentVariable("PBC_READER_CONFIG");
+#endif
+            QFile f(cfg_path);
+            if (!cfg_path.isEmpty() && f.open(QIODevice::ReadOnly)) reader_config = f.read(64 * 1024).toStdString();
+        }
+        const auto zone = std::make_shared<pbc::ReaderZone>(pbc::reader_zone(tzdb.get(), reader_config, pbc::read_zone_environment()));
+        BrowseBridge::Config bc;
+        bc.store = store.get();
+        bc.worker = &worker;
+        bc.http = http.get();
+        bc.clock = &clock;
+        bc.ensure_network = cc.ensure_network;
+        bc.format_date = [zone, &tzdb](qint64 t) { return QString::fromStdString(pbc::format_date(t, *zone, tzdb.get())); };
+        bc.download_root = download_root.toStdString();
+        browseBridge = std::make_unique<BrowseBridge>(bc);
+
+        TransferBridge::Config tc;
+        tc.store = store.get();
+        tc.worker = &worker;
+        tc.http = http.get();
+        tc.clock = &clock;
+        tc.storage = &storage;
+        tc.download_root = download_root.toStdString();
+        tc.ensure_network = cc.ensure_network;
+        tc.wifi_up = cc.wifi_up;
+        tc.format_date_time = [zone, &tzdb](qint64 t) { return QString::fromStdString(pbc::format_date_time(t, *zone, tzdb.get())); };
+        tc.open_file = [&device](const QString& path) { return device.openFile(path); };
+        transferBridge = std::make_unique<TransferBridge>(tc);
+
+        SpaceBridge::Config sc;
+        sc.store = store.get();
+        sc.worker = &worker;
+        sc.storage = &storage;
+        sc.download_root = download_root.toStdString();
+        spaceBridge = std::make_unique<SpaceBridge>(sc);
+    }
 
     // About screens: the manifest and the license texts live in pbcloud-licenses/ next to the app on the reader,
     // and in the repository on the host (PBC_LICENSES_ROOT overrides both).
@@ -188,12 +287,29 @@ int main(int argc, char** argv) {
     engine.rootContext()->setContextProperty(QStringLiteral("about"), &about);
     engine.rootContext()->setContextProperty(QStringLiteral("startupError"), startup_error);
     if (store) engine.rootContext()->setContextProperty(QStringLiteral("settings"), settingsBridge.get());
+    if (browseBridge) engine.rootContext()->setContextProperty(QStringLiteral("browse"), browseBridge.get());
+    if (transferBridge) engine.rootContext()->setContextProperty(QStringLiteral("transfer"), transferBridge.get());
+    if (spaceBridge) engine.rootContext()->setContextProperty(QStringLiteral("space"), spaceBridge.get());
+    if (connectionBridge) {
+        engine.rootContext()->setContextProperty(QStringLiteral("connection"), connectionBridge.get());
+        engine.addImageProvider(QStringLiteral("qr"), new QrImageProvider(connectionBridge.get()));   // the engine owns it
+    }
     engine.load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
         std::cerr << "[pbcloud] failed to load QML" << std::endl;
         return 1;
     }
     if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) device.setWindow(window);
+
+    // The one network action at start: a single check that the login still works - only when Wi-Fi is already on, never in the self-test.
+    if (connectionBridge && !self_test) connectionBridge->checkAtStart();
+
+#ifndef PLATFORM_POCKETBOOK
+    // The scripted walk of the host build (app/ui_script.h): taps the real pages and saves pictures of them. Not part of the reader's build.
+    if (const QString walk = qEnvironmentVariable("PBC_UI_SCRIPT"); !walk.isEmpty()) {
+        if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) ui_script::start(window, walk);
+    }
+#endif
 
     if (self_test) {  // CTest: every page compiles and instantiates without QML errors
         QTimer::singleShot(300, &app, [&]() {

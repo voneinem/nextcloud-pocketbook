@@ -36,10 +36,10 @@ mode_t mode_of(const std::string& path) {
 
 }  // namespace
 
-PB_TEST(open_creates_every_table_of_schema_1) {
+PB_TEST(open_creates_every_table_of_the_current_schema) {
     pbtest::TmpDir d;
     auto s = open_store(d);
-    for (const char* t : {"settings", "sync_state"}) {
+    for (const char* t : {"settings", "sync_state", "account", "folders", "entries", "local_files", "offline_marks", "favorites", "downloads"}) {
         const std::string n = s->debug_query("SELECT count(*) FROM sqlite_master WHERE name = '" + std::string(t) + "'");
         PB_CHECK_EQ(n, std::string("1"));
     }
@@ -52,8 +52,8 @@ PB_TEST(open_sets_the_pragmas_and_the_user_version) {
     PB_CHECK_EQ(s->debug_query("PRAGMA synchronous"), std::string("2"));  // FULL
     PB_CHECK_EQ(s->debug_query("PRAGMA foreign_keys"), std::string("1"));
     PB_CHECK_EQ(s->debug_query("PRAGMA secure_delete"), std::string("1"));
-    PB_CHECK_EQ(s->debug_query("PRAGMA user_version"), std::string("1"));
-    PB_CHECK_EQ(s->schema_version(), 1);
+    PB_CHECK_EQ(s->debug_query("PRAGMA user_version"), std::string("2"));
+    PB_CHECK_EQ(s->schema_version(), 2);
     PB_CHECK(s->check_integrity().ok());
 }
 

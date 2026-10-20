@@ -1,0 +1,41 @@
+# After a restart: the stored account, a second Update that finds a changed file, favorites, search (offline and on the server), storage
+# (specs/001-nextcloud-files-client US4, US5, US6). Run it after 01-connect-browse-download.walk with the same server and folders.
+# server touch /Books/Notes.txt
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+shot @OUT@/20-home-after-restart.png
+# Update: exactly the changed file is fetched again
+tap homeUpdate
+waitfor updateStatus finished
+expect updateUpdated 1
+shot @OUT@/21-update-second.png
+tap updateBack
+wait 500
+# favorites
+tap homeFavorites
+waitfor favoritesAge Updated just now
+shot @OUT@/22-favorites.png
+tap favoritesBack
+wait 500
+# search: offline first, then the server on the tap
+tap homeSearch
+wait 800
+tap searchField
+type moby
+wait 500
+shot @OUT@/23-search-offline.png
+tap searchServer
+waitfor flatWhere From the server
+shot @OUT@/24-search-server.png
+tap searchBack
+wait 500
+# storage: the downloaded copies, then remove one
+tap homeStorage
+waitfor spaceRow
+shot @OUT@/25-storage.png
+tap spaceRow 0
+wait 600
+shot @OUT@/26-storage-remove-dialog.png
+tap footerButton 1
+wait 800
+shot @OUT@/27-storage-after-remove.png

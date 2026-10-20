@@ -53,6 +53,21 @@ PB_TEST(sensitive_field_names_are_redacted) {
     PB_CHECK(contains(out, "password=[redacted]"));
 }
 
+PB_TEST(server_data_and_user_input_of_the_files_client_are_redacted) {
+    Capture c;
+    log::event("listing.refresh", {log::text("href", "/remote.php/dav/files/demo/Books/secret.epub"),
+                                   log::text("term", "tax return 2025"), log::text("login", "demo"),
+                                   log::text("query", "q=1"), log::text("search", "private plans"),
+                                   log::text("link", "https://cloud.example.org/s/abc"), log::text("remote_name", "diary.txt")});
+    const std::string out = c.all();
+    for (const char* leaked : {"secret.epub", "tax return", "private plans", "cloud.example.org", "diary.txt", "q=1"})
+        PB_CHECK(!contains(out, leaked));
+    PB_CHECK(contains(out, "href=[redacted]"));
+    PB_CHECK(contains(out, "term=[redacted]"));
+    PB_CHECK(contains(out, "search=[redacted]"));
+    PB_CHECK(contains(out, "link=[redacted]"));
+}
+
 PB_TEST(harmless_text_fields_are_kept) {
     Capture c;
     log::event("sync.finished", {log::text("outcome", "success"), log::text("error_class", "none")});

@@ -130,4 +130,83 @@ std::string sort_key(std::string_view text) {
     return out;
 }
 
+Utf8Char utf8_decode(std::string_view text, size_t pos) {
+    Utf8Char r;
+    r.len = 1;
+    const unsigned char c = static_cast<unsigned char>(text[pos]);
+    if (c < 0x80) {
+        r.cp = c;
+        r.valid = true;
+        return r;
+    }
+    size_t need = 0;
+    uint32_t cp = 0, min = 0;
+    if (c >= 0xC2 && c <= 0xDF) { need = 1; cp = c & 0x1F; min = 0x80; }
+    else if (c >= 0xE0 && c <= 0xEF) { need = 2; cp = c & 0x0F; min = 0x800; }
+    else if (c >= 0xF0 && c <= 0xF4) { need = 3; cp = c & 0x07; min = 0x10000; }
+    else return r;
+    if (pos + need >= text.size()) return r;   // truncated
+    for (size_t k = 1; k <= need; ++k) {
+        const unsigned char cc = static_cast<unsigned char>(text[pos + k]);
+        if ((cc & 0xC0) != 0x80) return r;
+        cp = (cp << 6) | (cc & 0x3F);
+    }
+    if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return r;
+    r.cp = cp;
+    r.len = need + 1;
+    r.valid = true;
+    return r;
+}
+
+void utf8_append(std::string* out, uint32_t cp) {
+    if (cp < 0x80) {
+        out->push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out->push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out->push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out->push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+namespace {
+uint32_t simple_lower(uint32_t cp) {
+    if (cp >= 'A' && cp <= 'Z') return cp + 32;
+    if (cp < 0xC0) return cp;
+    if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) return cp + 32;
+    if (cp >= 0x100 && cp <= 0x137) return (cp % 2 == 0 && cp != 0x130) ? cp + 1 : cp;
+    if (cp >= 0x139 && cp <= 0x148) return cp % 2 == 1 ? cp + 1 : cp;
+    if (cp >= 0x14A && cp <= 0x177) return cp % 2 == 0 ? cp + 1 : cp;
+    if (cp == 0x178) return 0xFF;
+    if (cp >= 0x179 && cp <= 0x17E) return cp % 2 == 1 ? cp + 1 : cp;
+    if (cp >= 0x391 && cp <= 0x3A9 && cp != 0x3A2) return cp + 32;
+    if (cp >= 0x410 && cp <= 0x42F) return cp + 32;
+    if (cp >= 0x400 && cp <= 0x40F) return cp + 80;
+    return cp;
+}
+}  // namespace
+
+std::string case_fold(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (size_t i = 0; i < text.size();) {
+        const Utf8Char c = utf8_decode(text, i);
+        if (!c.valid) {
+            out.push_back(text[i]);
+            ++i;
+            continue;
+        }
+        utf8_append(&out, simple_lower(c.cp));
+        i += c.len;
+    }
+    return out;
+}
+
 }  // namespace pbc

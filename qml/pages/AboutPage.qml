@@ -13,9 +13,9 @@ Item {
     // how the passwords are kept (FR-004): measured on this storage, and the advice is the same in every case
     function passwordText(state) {
         switch (state) {
-        case "enforced": return qsTr("Passwords are kept as plain text in a file that only this app can read. Use app-specific passwords where your provider offers them.")
-        case "not_enforced": return qsTr("Passwords are kept as plain text in a file, and this reader's storage cannot make it private: anyone with USB access to the reader can read it. Use app-specific passwords.")
-        default: return qsTr("Passwords are kept as plain text in a file on this reader; whether the storage keeps it private is checked when you save one. Use app-specific passwords where your provider offers them.")
+        case "enforced": return qsTr("The app password is kept as plain text in a file that only this app can read. Anyone who gets the reader's storage could still use it until you remove it in Nextcloud (Settings > Security). Your account password is never stored.")
+        case "not_enforced": return qsTr("The app password is kept as plain text in a file, and this reader's storage cannot make that file private: anyone with USB access to the reader can read it and use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.")
+        default: return qsTr("The app password is kept as plain text in a file on the reader; whether the storage keeps that file private is checked when it is saved. Anyone who gets the reader's storage could use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.")
         }
     }
 
@@ -59,6 +59,7 @@ Item {
             Line { text: qsTr("Author: %1").arg(page.orUnavailable(about.author)) }
             Line { text: page.orUnavailable(about.copyright); font.pixelSize: Style.labelSize }
             Line { text: qsTr("License: %1").arg(page.orUnavailable(about.licenseName)) }
+            Line { text: qsTr("This is an unofficial app. It is not made by or connected with Nextcloud GmbH."); font.pixelSize: Style.labelSize }
 
             Line { text: qsTr("Time zone data: release %1").arg(about.tzRelease.length > 0 ? about.tzRelease : qsTr("unknown")); font.pixelSize: Style.labelSize }
             Line {
