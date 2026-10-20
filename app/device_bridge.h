@@ -36,6 +36,13 @@ public:
     Q_INVOKABLE void connectNetwork();
     void finishConnect(bool ok);  // internal: result of the system's connect attempt
 
+    // The folder the downloads go to (the reader's library scans it). openFile hands a regular file inside it - and nothing else - to the
+    // reader's own viewer, which the user chose; the app never executes a download.
+    Q_PROPERTY(QString downloadRoot READ downloadRoot CONSTANT)
+    QString downloadRoot() const { return downloadRoot_; }
+    void setDownloadRoot(const QString& root) { downloadRoot_ = root; }
+    Q_INVOKABLE bool openFile(const QString& absolutePath);
+
     // Leaves the app cleanly (device: whiten the panel and hand back to the launcher).
     Q_INVOKABLE void quit();
 
@@ -60,4 +67,5 @@ private:
     int startOrientation_ = 0;
     bool rotating_ = false;
     bool connecting_ = false;
+    QString downloadRoot_;
 };

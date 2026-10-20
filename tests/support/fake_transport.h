@@ -2,6 +2,8 @@
 // Scripted HttpTransport for contract and integration tests (T016). Records every request
 // including credentials and headers. Accepts any URL scheme.
 
+#include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -35,6 +37,11 @@ public:
 
     // Simulates a full device for the next file downloads (Response::storage_full, nothing written).
     bool simulate_storage_full = false;
+    // Simulates a write error that is not "full" (the card pulled, EIO): the download fails with the key write_failed.
+    bool simulate_io_error = false;
+    // The next file download is cut off after this many body bytes, like a Wi-Fi drop: what arrived stays in the file, the answer is a
+    // network error (with the status and headers when the request appends to a partial file, as the real transport does).
+    void drop_next_download_after(int64_t bytes) { drop_after_ = bytes; }
 
     pbc::Response perform(const pbc::Request& request) override {
         pbc::Response r = perform_scripted(request);
@@ -55,9 +62,12 @@ private:
         if (r->body_too_large || r->storage_full) return;
         if (request.method == "HEAD") return;
         const std::string length = pbc::header_value(r->headers, "Content-Length");
+        // only a 206 continues a partial file (Request::save_append); every other 2xx answer rewrites it
+        const bool append = request.save_append && r->status == 206;
+        const long long base = append ? request.resume_from : 0;
         if (request.max_body_bytes > 0) {
             const long long declared = length.empty() ? -1 : std::atoll(length.c_str());
-            if (declared > request.max_body_bytes || static_cast<long long>(r->body.size()) > request.max_body_bytes) {
+            if (base + declared > request.max_body_bytes || base + static_cast<long long>(r->body.size()) > request.max_body_bytes) {
                 r->body_too_large = true;
                 r->body.clear();
                 return;
@@ -68,8 +78,49 @@ private:
             r->body.clear();
             return;
         }
-        std::ofstream f(request.save_body_to, std::ios::binary | std::ios::trunc);
-        f << r->body;
+        if (simulate_io_error) {
+            r->status = 0;
+            r->headers.clear();
+            r->body.clear();
+            r->error = pbc::ErrorClass::Storage;
+            r->error_key = "write_failed";
+            return;
+        }
+        if (drop_after_ >= 0) {
+            const size_t n = static_cast<size_t>(std::min<int64_t>(drop_after_, static_cast<int64_t>(r->body.size())));
+            drop_after_ = -1;
+            {
+                std::ofstream f(request.save_body_to, std::ios::binary | (append ? std::ios::app : std::ios::trunc));
+                f.write(r->body.data(), static_cast<std::streamsize>(n));
+            }
+            r->body.clear();
+            r->error = pbc::ErrorClass::Network;
+            r->error_key = "connection_lost";
+            if (!request.save_append) {   // a plain download leaves nothing behind
+                std::remove(request.save_body_to.c_str());
+                r->status = 0;
+                r->headers.clear();
+            }
+            return;
+        }
+        std::ofstream f(request.save_body_to, std::ios::binary | (append ? std::ios::app : std::ios::trunc));
+        const long long total = base + static_cast<long long>(r->body.size());
+        size_t written = 0;
+        while (written < r->body.size()) {   // in 64 KiB steps, so the progress callback can cancel in the middle
+            if (request.progress && !request.progress(base + static_cast<long long>(written), total)) {
+                f.close();
+                r->cancelled = true;
+                r->error = pbc::ErrorClass::Cancelled;
+                r->error_key = "cancelled";
+                r->body.clear();
+                if (!request.save_append) std::remove(request.save_body_to.c_str());
+                return;
+            }
+            const size_t n = std::min<size_t>(64 * 1024, r->body.size() - written);
+            f.write(r->body.data() + written, static_cast<std::streamsize>(n));
+            written += n;
+        }
+        if (request.progress) request.progress(total, total);
         r->body.clear();
     }
 
@@ -123,6 +174,7 @@ private:
     std::vector<std::pair<size_t, pbc::ErrorClass>> failures_;
     std::vector<pbc::Request> requests_;
     std::vector<std::string> mismatches_;
+    int64_t drop_after_ = -1;
 };
 
 }  // namespace pbtest

@@ -21,7 +21,9 @@ bool is_sensitive_name(const std::string& name) {
     std::string n = name;
     std::transform(n.begin(), n.end(), n.begin(), [](unsigned char c) { return std::tolower(c); });
     static const char* const kFragments[] = {"pass", "secret", "token", "auth", "user", "content", "title",
-                                             "body", "note", "url", "mail", "cookie", "key", "name"};
+                                             "body", "note", "url", "mail", "cookie", "key", "name",
+                                             // the files client: server addresses of entries, search terms, login data
+                                             "href", "term", "login", "query", "search", "link"};
     for (const char* d : kFragments)
         if (n.find(d) != std::string::npos) return true;
     static const char* const kWords[] = {"host",      "folder",   "subject",  "from",    "to",

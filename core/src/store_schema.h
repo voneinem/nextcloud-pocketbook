@@ -1,6 +1,6 @@
 #pragma once
-// Schema 1 of the baseline: the settings table and the sync state row. The tables of the product are added by migrations
-// (store_migrations.cpp): a fresh database is created as schema 1 and then migrated, so there is one path to test.
+// Schema 1: the settings table and the sync state row. The tables of the files client (schema 2) are added by the migration
+// in store_migrations.cpp: a fresh database is created as schema 1 and then migrated, so there is one path to test.
 
 namespace pbc {
 

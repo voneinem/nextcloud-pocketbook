@@ -8,7 +8,7 @@
 #include <cstring>
 
 #include "pbc/log.h"
-#include "secure_wipe.h"
+#include "pbc/secure_wipe.h"
 
 namespace pbc {
 

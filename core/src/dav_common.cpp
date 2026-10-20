@@ -1,5 +1,6 @@
 #include "pbc/dav_common.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 
@@ -125,12 +126,27 @@ Error DavSession::status_error(const Response& r, bool* handled) const {
     if (r.status == 401) return make_error(ErrorClass::Auth, "auth_failed", "the server refused the login");
     if (r.status == 403) return make_error(ErrorClass::Server, "forbidden", "the server refused the request");
     if (r.status == 404) return make_error(ErrorClass::Server, "not_found", "not found on the server");
-    if (r.status >= 500 || r.status == 429 || r.status == 408) return make_error(ErrorClass::Server, "server_error", "the server reported a problem");
+    if (r.status == 423) return make_error(ErrorClass::Server, "locked", "the file is locked on the server");
+    if (r.status == 429) return make_error(ErrorClass::Server, "rate_limited", "the server asks for a pause");
+    if (r.status == 503) return make_error(ErrorClass::Server, "maintenance", "the server is not available (maintenance or overload)");
+    if (r.status >= 500 || r.status == 408) return make_error(ErrorClass::Server, "server_error", "the server reported a problem");
     if (r.status >= 200 && r.status < 300) {
         if (handled) *handled = false;
         return Error();
     }
     return make_error(ErrorClass::Protocol, "protocol_error", "unexpected answer from the server");
+}
+
+std::optional<int64_t> parse_retry_after(const Headers& headers, int64_t now) {
+    constexpr int64_t kCapSeconds = 900;
+    const std::string raw = dav::trim(header_value(headers, "Retry-After"));
+    if (raw.empty()) return std::nullopt;
+    if (raw.find_first_not_of("0123456789") == std::string::npos) {   // delta-seconds
+        if (raw.size() > 9) return kCapSeconds;                        // far beyond the cap, and too long to convert
+        return std::min<int64_t>(std::atoll(raw.c_str()), kCapSeconds);
+    }
+    if (const auto when = parse_http_date(raw)) return std::min<int64_t>(std::max<int64_t>(*when - now, 0), kCapSeconds);
+    return std::nullopt;
 }
 
 }  // namespace pbc

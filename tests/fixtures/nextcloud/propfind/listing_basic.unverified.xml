@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Tue, 20 Oct 2026 08:00:00 GMT</d:getlastmodified>
+      <d:getetag>"folder-etag-1"</d:getetag>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>4711</oc:fileid>
+      <oc:permissions>RGDNVCK</oc:permissions>
+      <oc:size>5000</oc:size>
+      <oc:favorite>0</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/Novels/</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Mon, 19 Oct 2026 10:30:00 GMT</d:getlastmodified>
+      <d:getetag>"folder-etag-2"</d:getetag>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>4712</oc:fileid>
+      <oc:permissions>RGDNVCK</oc:permissions>
+      <oc:size>3000</oc:size>
+      <oc:favorite>0</oc:favorite>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/My%20Story%20%C3%A4.epub</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Sun, 18 Oct 2026 07:15:30 GMT</d:getlastmodified>
+      <d:getcontentlength>1234</d:getcontentlength>
+      <d:resourcetype/>
+      <d:getetag>W/"weak-etag-3"</d:getetag>
+      <d:getcontenttype>application/epub+zip</d:getcontenttype>
+      <oc:fileid>4713</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+      <oc:size>1234</oc:size>
+      <oc:favorite>1</oc:favorite>
+      <oc:checksums><oc:checksum>SHA1:0123456789abcdef0123456789abcdef01234567 MD5:0123456789abcdef0123456789abcdef</oc:checksum></oc:checksums>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+    <d:propstat><d:prop><nc:is-encrypted/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/notes.txt</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>not a date</d:getlastmodified>
+      <d:getcontentlength>12</d:getcontentlength>
+      <d:resourcetype/>
+      <d:getetag>"etag-4"</d:getetag>
+      <d:getcontenttype>text/plain</d:getcontenttype>
+      <oc:fileid>4714</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

@@ -2,6 +2,7 @@
 // UTF-8 helpers for text that may contain emojis (spec 002 FR-018). No Qt.
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -18,5 +19,19 @@ size_t utf8_cluster_end(std::string_view text, size_t pos);
 // A key for ordering names and subjects the way people expect: lower case, accents removed for the Latin letters of Western and Eastern
 // Europe (ä -> a, ß -> ss, ł -> l, ...), Cyrillic and Greek capitals folded; everything else is kept. Invalid UTF-8 bytes are kept as they are.
 std::string sort_key(std::string_view text);
+
+// Simple case folding, as a case-insensitive file system compares names: ASCII, Latin-1, Latin Extended-A, Greek and Cyrillic capitals
+// become lower case. Accents are kept (ä and a stay different names). Invalid UTF-8 bytes are kept as they are.
+std::string case_fold(std::string_view text);
+
+// Decodes one UTF-8 character at `pos`: its code point and length, or 0 for a length when the bytes are not valid (overlong forms,
+// surrogates, values above U+10FFFF and truncated sequences are invalid; an invalid byte counts as length 1).
+struct Utf8Char {
+    uint32_t cp = 0;
+    size_t len = 0;
+    bool valid = false;
+};
+Utf8Char utf8_decode(std::string_view text, size_t pos);
+void utf8_append(std::string* out, uint32_t cp);
 
 }  // namespace pbc

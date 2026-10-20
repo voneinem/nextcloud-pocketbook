@@ -9,11 +9,8 @@ on purpose. Nothing here is a defect of the baseline: it builds, and all tests p
 
 | Item | Why it is a leftover | Suggested decision |
 |------|----------------------|--------------------|
-| `core/include/pbc/sync_scheduler.h`, `core/src/sync_scheduler.cpp`, `tests/unit/test_sync_scheduler.cpp` | Decides when an automatic sync starts. Written for the notes app (inputs `editor_open`, `has_pending`, "note"); nothing calls it. | Keep if the Nextcloud sync wants auto sync; rename the inputs to the new vocabulary |
-| `core/include/pbc/paging.h`, `core/src/paging.cpp`, `qml/PageButtons.qml`, `qml/ModelPager.qml`, `tests/unit/test_paging.cpp` | Page turning for the message reader and the model-paged lists; generic arithmetic, but no page uses it. | Keep for the file list and the viewer |
 | `core/include/pbc/tz.h`, `core/src/tz.cpp`, `core/include/pbc/civil.h`, `third_party/tzdata/`, `scripts/update-tzdata.sh`, `tests/unit/test_tz*.cpp`, `tests/unit/test_user_zone.cpp`, `PBC_ZONEINFO` and the `pbcloud-zoneinfo/` folder in the package, the "Time zone data" line of About | The IANA zone reader exists for calendar events. Only About uses it now (the release name). `civil.h` is still used by `clock_check`. The time zone page and bridge were removed with the calendar. | Remove `tz` and `tzdata` unless a feature shows times that need a zone; keep `civil.h` |
 | `core/include/pbc/utf8.h`, `core/src/utf8.cpp`, the SQL function `pbc_fold` registered in `Store::open`, `tests/unit/test_utf8_cluster.cpp` | Grapheme and sort-key helpers for names and subjects; `pbc_fold` is registered but no query uses it. | Keep if lists are sorted by name, else remove |
-| `SQLITE_ENABLE_FTS5` in `core/CMakeLists.txt`, `tests/unit/test_fts5_available.cpp` | FTS5 was there for the mail search. | Keep only if the file search needs it |
 | `Store::debug_exec`, `Store::debug_query` (test seams) | Used by the store tests only. | Keep |
 | `SyncState` and the `sync_state` table | One row with outcome, problem key, counts and clock skew; the `problem_area` column is free text now. Nothing in the app writes it yet. | Keep as the home of the sync result of the first feature |
 
@@ -30,7 +27,6 @@ on purpose. Nothing here is a defect of the baseline: it builds, and all tests p
 
 | Item | Why |
 |------|-----|
-| `qml/EventRow.qml`, `qml/ContactRow.qml`, `qml/DateTimePicker.qml`, `qml/EmojiPicker.qml` | Row and picker components of the removed pages; independent of any bridge, listed in `qmldir`. |
 | Icons `calendar`, `send`, `reply-all`, `note-plus`, `bubble-pointer`, `star`, `star-filled`, `filter`, … in `qml/icons/` | The whole icon set was kept. |
 | `qml/pages/SettingsPage.qml` | Reduced to language, the certificate authority note and About. The "Sync after my changes" switch, mail and calendar options were removed with their bridges. |
 | `qml/pages/HomePage.qml` | A stub: "PB Cloud", the version, "Not connected". |
@@ -47,6 +43,20 @@ on purpose. Nothing here is a defect of the baseline: it builds, and all tests p
 | `tests/qml/test_qml_pages.cpp`, `tests/qml/stubs.qml` | The QML page test of the notes baseline (also from an older bridge set); not built. `app_self_test` covers the pages today. |
 | `docs/reference/` | Copied unchanged from office-pocketbook: the analyses talk about mail and calendar. `office-pocketbook-constitution.md` is the constitution this project started from. The project's own `.specify/memory/constitution.md` is still the empty Spec Kit template; the scripts under `scripts/` enforce the rules of the copied one (the principles they name are those of that document). |
 
+## Removed by the Nextcloud files feature (specs/001-nextcloud-files-client, research R-18)
+
+- `sync_scheduler` (`core/include/pbc/sync_scheduler.h`, `core/src/sync_scheduler.cpp`, `tests/unit/test_sync_scheduler.cpp`): the app never
+  syncs by itself, so nothing decides when to start. The Update is a tap.
+- `paging` (`core/include/pbc/paging.h`, `core/src/paging.cpp`, `tests/unit/test_paging.cpp`): arithmetic of the message reader. The file lists
+  page in the bridges; `qml/PageButtons.qml` and `qml/ModelPager.qml` stay and are used.
+- FTS5 (`SQLITE_ENABLE_FTS5`, `tests/unit/test_fts5_available.cpp`): the offline search is a case-folded substring match on names
+  (research R-17), which needs no full-text index.
+- `qml/EventRow.qml`, `qml/ContactRow.qml`, `qml/DateTimePicker.qml`, `qml/EmojiPicker.qml` and their lines in `qmldir` and `qml.qrc`:
+  dead components of the removed calendar and contact pages. Their German strings went with them.
+
+Kept on purpose, now with a consumer: `utf8.h` and `pbc_fold` (sorting by name, the collision test of local names, the offline search),
+`SyncState` (the result of the last Update and of the last account check), `civil.h`, `tz`/`tzdata` (the reader's time zone for dates).
+
 ## Removed beyond the plain domain code
 
 - The IMAP self-test of the probe (`--imap-selftest`, `app/probe/imap_selftest.*`, `tests/launcher/test_imap_selftest.sh`,
@@ -58,7 +68,6 @@ on purpose. Nothing here is a defect of the baseline: it builds, and all tests p
 
 ## Missing on purpose
 
-- `README.md`, `CHANGELOG.md` and `specs/` were not written yet.
-- `INSTALL.md` was not copied. `scripts/package-device.sh` needs it and stops without it; write it with the first plan.
+- `README.md`, `INSTALL.md` and `CHANGELOG.md` were written with the Nextcloud files feature (0.1.0).
 - `scripts/check-version-bump.sh` wants a `CHANGELOG.md` entry for every released version once a feature branch changes `VERSION`.
 - The ARM package (`scripts/package-device.sh`) was not assembled in the bootstrap.

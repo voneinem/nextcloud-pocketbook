@@ -128,3 +128,59 @@ Residual points: (a) vCards of real clients differ; the in-house parser is teste
 from memory of other clients, all `.unverified`. (b) A server that ignores `If-Match` on a `PUT` or `DELETE` could overwrite a
 change made between the look and the write; the app cannot detect that (LV-K8). (c) A card kept for "keep both" loses the
 properties the reader never held (photo, birthday): the server's own card, which is kept, still has them.
+
+## 9. Nextcloud files client (feature 001-nextcloud-files-client)
+
+All servers in these tests are fakes (`tests/support/fake_nextcloud_server.h`, `tests/support/tls_test_server.h`): every claim is "fake
+server" until the rows LV-N1 ... of `docs/live-server-checklist.md` and DT-NC-1 ... of `docs/device-test-checklist.md` are done.
+
+| Requirement | Evidence |
+|-------------|----------|
+| TLS is always verified and only https is accepted; an expired, wrong-host or untrusted certificate is refused before any credential is sent | `test_tls_verification`, `test_curl_session`, `test_canonical_url`; the only place that sets `VERIFYPEER`/`VERIFYHOST` is the transport (rule R1) |
+| A redirect to another host, port or scheme is refused and never followed; the credentials go to the entered server only | `test_transport_extensions` (`a_redirect_to_another_host_or_scheme_is_refused_and_never_followed`), `test_login_flow` (links and poll endpoints on another origin are refused) |
+| The account password is never stored; the app password is stored as plain text and the app says so, measured on this storage | `test_credentials_file`, `test_connection_bridge`; the text of Settings (`storageText`) follows `credentialsProtection`; DT-NC-2 |
+| Two refused logins stop all requests until the user signs in again | `test_auth_guard`, `test_browse_cache`, `test_favorites_search` (`without_an_account_or_after_refused_logins_nothing_is_sent`) |
+| The server's answers are untrusted: bounded, total, no recursion; a hostile or foreign address or name is skipped | `test_listing_parse`, `test_listing_hostile`, `test_flat_result_parse`, `test_malformed_xml`, `test_json_min`, `test_remote_path`, `test_name_hostile` |
+| Names from the server are never trusted as local paths: a cleaned, bounded, collision-free local name; no link or file in the way is followed | `test_local_name`, `test_download_basic`, `test_download_conflict`, the open check in `test_transfer_bridge` (`open` refuses a path outside the download root, a directory, a link) |
+| Read-only toward the server: no write method is ever built | rule N2 of `scripts/check-constitution.sh` (self-tested); the fake server implements no method but `PROPFIND`, `REPORT`, `SEARCH` and `GET` (and the Login Flow `POST`s), so a write could not even be tested against it |
+| No background network activity: one account check at start (Wi-Fi already on), everything else on a tap | rule N3; `test_no_background_network` (also: kept items, a search typed offline, the favorites without Wi-Fi) |
+| Downloads never leave a half-written file, never overwrite a changed copy without asking, resume or restart cleanly, and survive being killed | `test_download_basic`, `test_download_resume`, `test_download_conflict`, `test_download_kill`, `test_download_curl`; rule N5 (file removal only in the audited modules) |
+| Removing a copy never contacts the server and needs a confirmation for a changed copy; clearing the cache keeps downloads, marks, favorites and the journal | `test_space`, `test_space_bridge` |
+| Logs hold no addresses, user names, file names, paths, search terms or tokens | rules R8 and N4 (self-tested); `test_log` (every logged code is listed); `test_favorites_search` (`no_log_line_holds_a_search_term_a_name_or_a_path`); the codes of this feature are in `core/src/log_codes.h` |
+| A server search result is held in memory only | `test_store_favorites` (`server_search_results_are_held_in_memory_only_...`): a temporary table of the connection, not part of the database file |
+| The database upgrade (schema 1 to 2) is one-way and loses nothing; the previous build refuses the new file | `test_store_migrations`, `test_store_schema2`; the ARM build and the reader are device items |
+
+### Unverified assumptions of this feature
+
+None of these has been observed on a real server or on the reader. A fake agrees with them because this project wrote it that way.
+
+Server (`docs/live-server-checklist.md`):
+
+- LV-N1 the fields of `status.php` and the capabilities answer, and the "too old" threshold (Nextcloud 30);
+- LV-N2 how a two-factor account answers Basic authentication with the account password;
+- LV-N3 the quota properties and their values for "unlimited" and "unknown";
+- LV-N4 Login Flow v2 end to end (404 until approved, then 200 once; links on the server's own origin);
+- LV-N5 the markers of an encrypted folder, a share without read permission and an unmounted storage in a depth-1 listing;
+- LV-N6 `Range` and `If-Range` on a file `GET` (206, 200 when the ETag differs, 416);
+- LV-N7 the ETag of a folder changes when something changes below it (not relied on);
+- LV-N8 the favorites `REPORT` with `oc:filter-files` (the body shape is inferred from the API notes);
+- LV-N9 the `SEARCH` with `d:like` on `displayname` and the behavior of `%`, `_` and `\` (the body shape is inferred; the app removes the three characters).
+
+Also assumed without an item of its own: the format of `oc:checksums` (a space-separated list of `ALGORITHM:hex`), that a weak ETag
+(`W/...`) is never a valid `If-Range` validator, that `getcontentlength` of a file equals the bytes sent, and that the server limits a
+search to the `nresults` it is given.
+
+Reader (`docs/device-test-checklist.md`):
+
+- DT-NC-1 the bundled libcurl on the reader (HTTPS, same-host redirect, `Range`/`If-Range`, progress callback and cancel);
+- DT-NC-2 the mode and the place of the credentials file, and that the shown text matches;
+- DT-NC-3 the reader's library lists a finished file in `PBCloud/` and never a `.pbc-*.part` file;
+- DT-NC-4 the speed of the checksum pass; DT-NC-5 opening a book in the viewer does not change its size or modified time;
+- DT-NC-6 the source of the reader's time zone; DT-NC-7 the budgets (cold start, memory, a cached folder of 1,000 entries, a page turn);
+- DT-NC-8 a Wi-Fi drop and return during a large download; DT-NC-9 a file of 4 GiB or more is refused before any byte is written;
+- DT-NC-10 the number of e-ink refreshes during a download.
+
+Residual points: (a) the in-house QR encoder was verified against `libqrencode` and `libzbar` on the host, not by scanning the reader's
+screen (DT-NC-1 does not cover it; scan it once with a phone). (b) A server that ignores `If-Range` and answers `200` to a ranged request
+makes the download restart from zero; that case is tested with the fake, not with a real server. (c) The reader's storage is FAT: the
+credentials file is readable by anyone with USB access, which the app says in Settings and in `INSTALL.md`.

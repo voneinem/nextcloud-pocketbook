@@ -52,6 +52,24 @@ value) · **F** failed (what happened).
 | DT-RES-2 | Idle battery: app open, nothing to do, 1 hour | no network use; battery drop noted | U | | |
 | DT-RES-3 | Wi-Fi reconnect, sleep and wake during a sync | the sync ends in a state the user sees; nothing is lost | U | | |
 
+## Nextcloud files client (feature 001)
+
+Added by `specs/001-nextcloud-files-client/`. Same legend as above.
+
+| ID | Item | Expected | Status | Date | Value / note |
+|----|------|----------|--------|------|--------------|
+| DT-NC-1 | The bundled libcurl on the reader: HTTPS to a test server, same-host redirect, `Range`/`If-Range`, progress callback and cancel, 64 KiB buffer (probe with `PBC_PROBE_URL`) | all work; if `Range` does not, the app restarts a download cleanly | U | | |
+| DT-NC-2 | The credentials file: its mode and place on the reader, and the text shown in Settings and About | the text matches the measured protection | U | | |
+| DT-NC-3 | The download folder `PBCloud`: finished files appear in the reader's library; a `.pbc-*.part` file never does | listed within the time the library needs; no partial file listed | U | | |
+| DT-NC-4 | Speed of the checksum pass on a 500 MB file | note MB/s | U | | |
+| DT-NC-5 | Opening a downloaded book in the viewer does not change the file's size or modified time | unchanged (so it is not reported "changed on the reader") | U | | |
+| DT-NC-6 | Source of the reader's time zone (`global.cfg` key) and the UTC fallback | dates in the reader's zone, or "UTC" shown | U | | |
+| DT-NC-7 | Cold start; peak `VmHWM`; a cached folder of 1,000 entries; a page turn; the first page of an uncached 1,000-entry folder over home Wi-Fi | ≤ 5 s; ≤ 150 MB; ≤ 2 s; ≤ 1 s; ≤ 10 s | U | 2026-10-20 (host only) | HOST ONLY, not the device (0.1.0 development build, desktop, offscreen): start of the app with all pages instantiated 0.75 s wall including 0.6 s of fixed waits of the self-test, peak 77 MB; cached folder of 1,000 entries opens in 0.002 s, a page turn 0.003 s; parse and store of 1,000 entries 0.08 s; database with 50,000 cached entries 18.3 MB; 1 GiB download 12.9 s with a peak of 18 MB and 21 progress reports. Nothing measured on the device or over Wi-Fi. |
+| DT-NC-8 | Wi-Fi drop and return during a 500 MB download | completes after reconnecting, file identical to the server's, no corrupt file | U | | |
+| DT-NC-9 | A file of 4 GiB or more (sparse file on the server) | refused before any byte is written, with the reason | U | | |
+| DT-NC-10 | Number of e-ink refreshes during a download | few (progress text updates at most every 2 s or 5 %) | U | | |
+| DT-NC-11 | The launcher filter (`pbcloud.app`) on the reader's shell: open a downloaded book, then read `system/pbcloud/pbcloud.log` | no line holds the name or path of the book (a notice stands in its place); the exit code of the app is still logged; the first run of 0.1.0 showed `iv_OpenBook filename = <path>` lines without the filter | U | | |
+
 ## Recording
 
 For each measured value write the build version (About) and the date. Findings that change a design decision

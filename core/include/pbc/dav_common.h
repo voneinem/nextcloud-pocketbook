@@ -20,6 +20,8 @@ inline constexpr const char* kNsDav = "DAV:";
 inline constexpr const char* kNsCal = "urn:ietf:params:xml:ns:caldav";
 inline constexpr const char* kNsCard = "urn:ietf:params:xml:ns:carddav";
 inline constexpr const char* kNsCs = "http://calendarserver.org/ns/";
+inline constexpr const char* kNsOc = "http://owncloud.org/ns";      // oc:fileid, oc:size, oc:permissions, oc:favorite, oc:checksums
+inline constexpr const char* kNsNc = "http://nextcloud.org/ns";     // nc:is-encrypted
 inline constexpr const char* kXmlHeader = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 
 std::string escape(const std::string& s);       // & < > " for XML text and attribute values
@@ -38,6 +40,10 @@ Result<XmlNode> parse_multistatus(const Response& r);
 
 }  // namespace dav
 
+// The Retry-After header of a 429 or 503 answer as seconds from `now`, capped at 900 (15 minutes): delta-seconds or an HTTP date (a
+// date in the past is 0). nullopt when absent or unusable.
+std::optional<int64_t> parse_retry_after(const Headers& headers, int64_t now);
+
 // One server account: the base address as entered, the user and the password. Not copyable state: it only holds the strings and the server time.
 class DavSession {
 public:
@@ -53,8 +59,8 @@ public:
     // The HTTP Date header of an answer is remembered (last_server_time).
     Response send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap = 8ll << 20);
 
-    // Maps a transport failure or an HTTP status to the stable keys auth_failed, forbidden, not_found, server_error, protocol_error, too_large and
-    // the transport's own keys. A 2xx status gives an empty Error and *handled = false (the caller reads the answer).
+    // Maps a transport failure or an HTTP status to the stable keys auth_failed, forbidden, not_found, locked (423), rate_limited (429),
+    // maintenance (503; the caller may refine it with status.php), server_error, protocol_error, too_large and the transport's own keys. A 2xx status gives an empty Error and *handled = false (the caller reads the answer).
     Error status_error(const Response& r, bool* handled = nullptr) const;
 
     std::optional<int64_t> last_server_time() const { return server_time_; }

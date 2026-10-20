@@ -1,18 +1,67 @@
 #!/usr/bin/env bash
-# Try the app on the host with a throw-away data folder, without any real account.
+# Try the app on the host against a fake Nextcloud, with a throw-away data folder and download folder. No real account is involved.
 #
 #   scripts/run-host-demo.sh [build-dir]        build-dir defaults to build-host
 #
-# Starts the desktop app with PBC_DATA_DIR pointing to a temporary folder. Everything is removed when the app closes.
-# The app has no server connection in this baseline; a fake server for trying the sync arrives with the first feature.
+# Starts tests/tools/pbc_fake_nextcloud (HTTPS on localhost, its own certificate authority), puts that authority into the demo's
+# custom-ca.pem (the way a user trusts a private CA), starts the desktop app with PBC_DATA_DIR and PBC_DOWNLOAD_DIR in a temporary folder
+# and prints the address, the user name and the app password to type into Settings. Type commands for the server in this terminal:
+#   approve        the browser login that is waiting was approved
+#   touch <path>   change a file on the server (then tap Update in the app)
+#   drop           the next download loses its connection half way
+#   offline|online switch the server off and on
+#   quit           close the demo
+# Everything is removed when the demo ends. The server is a fake of the tests: nothing here proves anything about a real Nextcloud.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${1:-$ROOT/build-host}"
 APP="$BUILD/app/pbcloud"
+SERVER="$BUILD/tests/pbc_fake_nextcloud"
 [ -x "$APP" ] || { echo "missing $APP - build the host target first: cmake -S . -B build-host -G Ninja && cmake --build build-host" >&2; exit 1; }
+[ -x "$SERVER" ] || { echo "missing $SERVER - build it: cmake --build $BUILD --target pbc_fake_nextcloud" >&2; exit 1; }
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/data"
-PBC_DATA_DIR="$tmp/data" "$APP"
+server_pid=""
+app_pid=""
+cleanup() {
+    exec 3>&- 2>/dev/null || true
+    [ -n "$app_pid" ] && kill "$app_pid" 2>/dev/null || true
+    [ -n "$server_pid" ] && kill "$server_pid" 2>/dev/null || true
+    rm -rf "$tmp"
+}
+trap cleanup EXIT
+
+mkdir -p "$tmp/data" "$tmp/downloads" "$tmp/server"
+mkfifo "$tmp/console"
+"$SERVER" "$tmp/server" <"$tmp/console" >"$tmp/server.log" 2>&1 &
+server_pid=$!
+exec 3>"$tmp/console"   # keeps the server's stdin open
+
+for _ in $(seq 1 100); do
+    grep -q '^READY ' "$tmp/server.log" 2>/dev/null && break
+    kill -0 "$server_pid" 2>/dev/null || { cat "$tmp/server.log" >&2; echo "the fake server did not start" >&2; exit 1; }
+    sleep 0.1
+done
+read -r _ url user password ca < <(grep '^READY ' "$tmp/server.log")
+cp "$ca" "$tmp/data/custom-ca.pem"
+
+echo "Fake Nextcloud:  ${url#https://}"
+echo "User name:       $user"
+echo "App password:    $password"
+echo "Downloads go to: $tmp/downloads"
+echo "Commands: approve | touch <path> | drop | offline | online | quit"
+
+PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" "$APP" &
+app_pid=$!
+
+# commands for the server until the app closes or "quit" is typed
+shown=0
+while kill -0 "$app_pid" 2>/dev/null; do
+    if read -r -t 1 line; then
+        [ "$line" = "quit" ] && break
+        echo "$line" >&3
+    fi
+    total=$(wc -l <"$tmp/server.log")
+    if [ "$total" -gt "$shown" ]; then tail -n +"$((shown + 1))" "$tmp/server.log" | grep -v '^READY ' || true; shown=$total; fi
+done

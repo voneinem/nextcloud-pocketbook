@@ -2,6 +2,7 @@
 // Abstract HTTP seam (T015). The production implementation (CurlTransport) verifies TLS and
 // refuses non-https URLs; tests use a scripted FakeTransport. No Qt.
 
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,6 +46,18 @@ struct Request {
     std::string upload_file;
     std::string upload_field = "file";
     std::string upload_file_name;
+    // Downloads that continue a partial file (specs/001-nextcloud-files-client, research R-8):
+    // save_append: with save_body_to, a 206 answer is appended to the existing file; any other 2xx answer (the server ignored the
+    //   Range) rewrites the file from the start. Nothing is ever removed by the transport in this mode (an error status, a dropped
+    //   connection, a cancel): the caller owns the partial file and sees what the server said in Response::status/headers.
+    // resume_from: the bytes already in the file; they count towards max_body_bytes and in the progress numbers.
+    bool save_append = false;
+    long long resume_from = 0;
+    // Called from the transfer thread (at least once per second while connected); false cancels the transfer. `done` includes
+    // resume_from for a 206 answer; `total` is 0 while unknown.
+    std::function<bool(long long done, long long total)> progress;
+    long buffer_size = 0;            // 0 = libcurl's default; file transfers use 65536
+    bool identity_encoding = false;  // send Accept-Encoding: identity, so Content-Length and Range mean the stored bytes
 };
 
 struct Response {
@@ -56,6 +69,7 @@ struct Response {
     std::string error_detail;             // short, never contains credentials, addresses or message text
     bool body_too_large = false;          // the transfer was stopped at Request::max_body_bytes
     bool storage_full = false;            // writing Request::save_body_to failed because the device is full
+    bool cancelled = false;               // the progress callback returned false
 };
 
 class HttpTransport {

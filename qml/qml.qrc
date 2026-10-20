@@ -26,13 +26,20 @@
         <file>SelectionHandles.qml</file>
         <file>SelectionMenu.qml</file>
         <file>TextMenu.qml</file>
-        <file>DateTimePicker.qml</file>
-        <file>EmojiPicker.qml</file>
         <file>ModelPager.qml</file>
-        <file>EventRow.qml</file>
-        <file>ContactRow.qml</file>
         <file>pages/SettingsPage.qml</file>
         <file>pages/HomePage.qml</file>
+        <file>pages/LoginPage.qml</file>
+        <file>pages/FolderPage.qml</file>
+        <file>pages/DetailsPage.qml</file>
+        <file>pages/ConflictPage.qml</file>
+        <file>pages/UpdatePage.qml</file>
+        <file>pages/FavoritesPage.qml</file>
+        <file>pages/SearchPage.qml</file>
+        <file>pages/SpacePage.qml</file>
+        <file>Problems.qml</file>
+        <file>EntryWords.qml</file>
+        <file>FlatList.qml</file>
         <file>strings_de.tsv</file>
         <file>pages/StorageErrorPage.qml</file>
         <file>pages/AboutPage.qml</file>

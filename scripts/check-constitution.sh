@@ -21,14 +21,26 @@
 #        CURLUSESSL_ALL, and the literal schemes imap:// and smtp:// (no TLS) appear in core/, bridge/ and
 #        app/ only in core/src/curl_session.cpp (tests/ may use them for the fake servers).
 #   R8 No log::text / log::count key that is, starts with or ends with the word host, folder, subject, from,
-#        to, recipient, title, summary, attendee, location, contact, phone, email, book, org or note in core/, bridge/ and app/ (no mail or
-#        calendar content or server names in logs).
+#        to, recipient, title, summary, attendee, location, contact, phone, email, book, org, note, path, name, file, filename, url, address,
+#        server, remote, local, etag, password, secret or account in core/, bridge/ and app/ (no mail or calendar content, no server names
+#        and no names or paths of the user's files in logs; counts such as files, folders or entries are fine).
 #   R9 The identifier pbnotes (the application this one was started from) appears in no tracked file except
 #        under docs/reference/, in NOTICE and under licenses/ (the planning documents in specs/ and .specify/
 #        describe the rename, tests/templates/ holds the old perf tests until they are rewritten).
 #   R11 The identifier pboffice (PB Office, the application this one was bootstrapped from) appears in no tracked file
 #        except under docs/reference/, in NOTICE and under licenses/ (specs/ and .specify/ describe the origin). The two
 #        apps must never share a binary name, a launcher entry or a data directory.
+#   N1 No plaintext http:// URL literal in core/, bridge/, app/ or qml/*.qml (comments excepted). XML namespace URIs of the DAV
+#        vocabularies (owncloud.org, nextcloud.org, calendarserver.org, sabredav.org, www.w3.org) are protocol identifiers, not endpoints,
+#        and are on an explicit exempt list.
+#   N2 No HTTP write method (PUT, MKCOL, MOVE, COPY, DELETE, PROPPATCH, LOCK, UNLOCK) as a string literal in the code that builds
+#        requests: core/src/nc_*.cpp, downloader.cpp, update.cpp, local_files.cpp, bridge/ and app/ (the client is read-only toward the
+#        server). The generic transport files carry any method and are not scanned.
+#   N3 No QTimer, QBasicTimer or sleep in core/ and bridge/ except core/src/downloader.cpp and its header (no background activity; the download wait).
+#   N4 No log field named href, term, user, login, token, query, search or link in core/, bridge/ and app/ (server data and user
+#        input stay out of the log).
+#   N5 No unlink/remove/rename in core/src outside local_files.cpp, downloader.cpp, credentials_file.cpp, ca_selector.cpp,
+#        curl_transport.cpp and store*.cpp (all file mutation goes through the audited modules).
 #   R10 libcurl tracing is never switched on (it would write LOGIN / AUTH PLAIN passwords to the log):
 #        CURLOPT_VERBOSE, CURLOPT_DEBUGFUNCTION, CURLOPT_DEBUGDATA, CURLOPT_STDERR, curl -v / --verbose /
 #        --trace* in core/, bridge/, app/ and scripts/.
@@ -59,7 +71,8 @@ scan() {
     while IFS= read -r -d '' f; do
         [ -f "$root/$f" ] || continue
         case "$f" in
-            third_party/*|"scripts/$SELF"|.claude/*|*.bmp|*.zip|*.pem) continue ;;
+            # .specify/extensions/ holds vendored Spec Kit extensions (their own docs, not this project's text)
+            third_party/*|"scripts/$SELF"|.claude/*|.specify/extensions/*|*.bmp|*.zip|*.pem) continue ;;
         esac
         grep -Iq . "$root/$f" 2>/dev/null || continue   # skip binary/empty files
         local p="$root/$f"
@@ -133,13 +146,50 @@ scan() {
                     report R7 "$f" "$p" '(imap|smtp)://' && bad=1
                 fi
                 # R8: log keys that would carry mail or calendar content or server names
-                report R8 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(host|folder|subject|from|to|recipient|title|summary|attendee|location|contact|phone|email|book|org|note)(_[A-Za-z0-9_.]+)?"' && bad=1
+                report R8 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(host|folder|subject|from|to|recipient|title|summary|attendee|location|contact|phone|email|book|org|note|path|name|file|filename|url|address|server|remote|local|etag|password|secret|account)(_[A-Za-z0-9_.]+)?"' && bad=1
                 ;;
         esac
         case "$f" in
             core/*|bridge/*|app/*|scripts/*)
                 # R10: no libcurl tracing
                 report R10 "$f" "$p" 'CURLOPT_(VERBOSE|DEBUGFUNCTION|DEBUGDATA|STDERR)|(^|[^A-Za-z0-9_-])curl[^#|;&]*[[:space:]](-[A-Za-z]*v[A-Za-z]*|--verbose|--trace[a-z-]*)([[:space:]]|$)' && bad=1
+                ;;
+        esac
+        # N1: no plaintext endpoint (XML namespace URIs are exempt)
+        case "$f" in
+            core/*|bridge/*|app/*|qml/*.qml)
+                out="$(grep -nE 'http://' "$p" 2>/dev/null |
+                       grep -vE '^[0-9]+:[[:space:]]*(//|\*|#|/\*)' |
+                       grep -vE '^[0-9]+:[^"'"'"']*[[:space:]]//[[:space:]].*http://' |
+                       grep -vE 'http://(www\.w3\.org|owncloud\.org|nextcloud\.org|calendarserver\.org|sabredav\.org)(/|"|\\|$)')" && {
+                    printf '%s\n' "$out" | sed "s#^#N1 $f:#"; bad=1; }
+                ;;
+        esac
+        # N2: the client is read-only toward the server
+        case "$f" in
+            core/src/nc_*.cpp|core/src/downloader.cpp|core/src/update.cpp|core/src/local_files.cpp|bridge/*|app/*)
+                report N2 "$f" "$p" '"(PUT|MKCOL|MOVE|COPY|DELETE|PROPPATCH|LOCK|UNLOCK)"' && bad=1
+                ;;
+        esac
+        # N3: no background activity: no timers and no sleeping outside the download wait
+        case "$f" in
+            core/*|bridge/*)
+                if [ "$f" != core/src/downloader.cpp ] && [ "$f" != core/include/pbc/downloader.h ]; then
+                    report N3 "$f" "$p" '\bQ(Basic)?Timer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
+                fi
+                ;;
+        esac
+        # N4: server data and user input stay out of the log
+        case "$f" in
+            core/*|bridge/*|app/*)
+                report N4 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(href|term|user|login|token|query|search|link)(_[A-Za-z0-9_.]+)?"' && bad=1
+                ;;
+        esac
+        # N5: file mutation only in the audited modules
+        case "$f" in
+            core/src/local_files.cpp|core/src/downloader.cpp|core/src/credentials_file.cpp|core/src/ca_selector.cpp|core/src/curl_transport.cpp|core/src/store*.cpp) ;;
+            core/src/*.cpp)
+                report N5 "$f" "$p" '(^|[^A-Za-z0-9_.>])(::|std::)?(unlink|remove|rename)[[:space:]]*\(|filesystem::(remove|remove_all|rename)' && bad=1
                 ;;
         esac
     done < <(list_files "$root")
@@ -215,11 +265,16 @@ if [ "${1:-}" = "--self-test" ]; then
     for w in contact phone email book org note; do   # spec 002 FR-027: no contact data in logs
         violate core/src/a.cpp "log::text(\"$w\", v);" "R8: log key $w"
     done
+    for w in path name file filename url address server remote local etag password secret account; do   # spec 001: no file names, paths or server data in logs
+        violate core/src/a.cpp "log::text(\"$w\", v);" "R8: log key $w"
+    done
+    violate core/src/a.cpp 'log::text("remote_path", v);' "R8: log key remote_path"
+    violate bridge/a.cpp 'log::text("file_name", v);' "R8: log key file_name"
     violate core/src/a.cpp 'log::count("contact_name_len", 1);' "R8: log key contact_name_len"
     violate bridge/a.cpp 'log::text("primary_email", v);' "R8: log key primary_email"
     violate bridge/a.cpp 'log::text("sender_from", v);' "R8: log key sender_from"
     violate app/a.cpp 'log::count("folder_name_len", 1);' "R8: log key folder_name_len"
-    printf 'log::text("result", r); log::count("pulled", 3); log::text("tofu", x); log::count("books", 2); log::count("contacts", 5); log::count("notes_total", 1);\n' > "$tmp/core/src/log_ok.cpp"
+    printf 'log::text("result", r); log::count("pulled", 3); log::text("tofu", x); log::count("books", 2); log::count("contacts", 5); log::count("notes_total", 1); log::count("files", 4); log::count("folders", 2); log::count("entries", 9); log::text("source", s);\n' > "$tmp/core/src/log_ok.cpp"
     expect pass "R8: other keys (also tofu, books, contacts as counts) are allowed"; rm "$tmp/core/src/log_ok.cpp"
     # R9: the old application's identifier stays out of this one
     violate docs/a.md 'see pbnotes for the idea' "R9: pbnotes in docs"
@@ -255,6 +310,57 @@ if [ "${1:-}" = "--self-test" ]; then
     violate scripts/a.sh 'curl --trace-ascii - https://example.org' "R10: curl --trace-ascii"
     printf 'curl -sS --max-time 5 https://example.org\n' > "$tmp/scripts/curl_ok.sh"
     expect pass "R10: curl without tracing is allowed"; rm "$tmp/scripts/curl_ok.sh"
+    # N1: no plaintext http:// endpoint; XML namespace URIs and comments are fine
+    mkdir -p "$tmp/qml" "$tmp/tests" "$tmp/bridge/src" "$tmp/core/include"
+    violate core/src/a.cpp 'const char* u = "http://cloud.example.org/x";' "N1: http:// literal in core"
+    violate bridge/a.cpp 'auto u = QStringLiteral("http://cloud.example.org");' "N1: http:// literal in bridge"
+    violate app/a.cpp 'const char* u = "http://localhost/x";' "N1: http:// literal in app"
+    violate qml/A.qml 'Item { property string u: "http://cloud.example.org" }' "N1: http:// literal in QML"
+    printf 'inline constexpr const char* kNsOc = "http://owncloud.org/ns";\nconst char* b = "xmlns:nc=\\"http://nextcloud.org/ns\\"";\n// see http://example.org/doc\nint x; // docs: http://example.org/y\n' > "$tmp/core/src/ns_ok.cpp"
+    expect pass "N1: namespace URIs and comments are allowed"; rm "$tmp/core/src/ns_ok.cpp"
+    printf 'const char* u = "http://localhost:1/";\n' > "$tmp/tests/t.cpp"
+    expect pass "N1: http:// literals are allowed in tests/"; rm "$tmp/tests/t.cpp"
+    # N2: no write method toward the server
+    for m in PUT MKCOL MOVE COPY DELETE PROPPATCH LOCK UNLOCK; do
+        violate core/src/nc_files.cpp "req.method = \"$m\";" "N2: method $m in a request builder"
+    done
+    violate core/src/downloader.cpp 'r.method = "DELETE";' "N2: DELETE in the downloader"
+    violate bridge/a.cpp 'r.method = "MKCOL";' "N2: MKCOL in the bridge"
+    violate app/a.cpp 'r.method = "PUT";' "N2: PUT in the app"
+    printf 'if (request.method == "PUT") { }\n' > "$tmp/core/src/curl_transport.cpp"
+    printf 'r.method = "PROPFIND"; r.method = "GET"; r.method = "REPORT"; r.method = "SEARCH"; r.method = "POST";\n' > "$tmp/core/src/nc_listing.cpp"
+    expect pass "N2: the generic transport may name any method, read methods are allowed"
+    rm -f "$tmp/core/src/curl_transport.cpp" "$tmp/core/src/nc_listing.cpp"
+    # N3: no timers, no sleeping, except the download wait
+    violate bridge/src/a.cpp 'QTimer t;' "N3: QTimer in the bridge"
+    violate bridge/src/a.cpp 'QBasicTimer t;' "N3: QBasicTimer in the bridge"
+    violate core/src/a.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the core"
+    violate core/src/a.cpp 'usleep(1000);' "N3: usleep in the core"
+    violate core/src/a.cpp 'sleep(1);' "N3: sleep in the core"
+    printf 'std::this_thread::sleep_for(std::chrono::seconds(5));\n' > "$tmp/core/src/downloader.cpp"
+    printf 'int timers = 0; int sleeping = 1; bool asleep() { return false; }\n' > "$tmp/bridge/src/ok.cpp"
+    expect pass "N3: the downloader may wait; words that merely contain sleep or timer are fine"
+    rm -f "$tmp/core/src/downloader.cpp" "$tmp/bridge/src/ok.cpp"
+    # N4: server data and user input stay out of the log
+    for w in href term user login token query search link; do
+        violate core/src/a.cpp "log::text(\"$w\", v);" "N4: log key $w"
+    done
+    violate bridge/a.cpp 'log::text("search_term", v);' "N4: log key search_term"
+    violate app/a.cpp 'log::count("login_name_len", 1);' "N4: log key login_name_len"
+    printf 'log::text("result", r); log::count("entries", 3); log::count("skipped_hostile", 1); log::text("key", k);\n' > "$tmp/core/src/log_ok.cpp"
+    expect pass "N4: counts and result keys are allowed"; rm "$tmp/core/src/log_ok.cpp"
+    # N5: file mutation only in the audited modules
+    violate core/src/a.cpp '::unlink(p.c_str());' "N5: unlink"
+    violate core/src/a.cpp 'std::remove(p.c_str());' "N5: std::remove"
+    violate core/src/a.cpp 'std::rename(a.c_str(), b.c_str());' "N5: std::rename"
+    violate core/src/a.cpp 'std::filesystem::remove(p);' "N5: filesystem::remove"
+    for m in local_files downloader credentials_file ca_selector curl_transport store_files; do
+        printf 'std::remove(p.c_str()); ::rename(a, b); ::unlink(c);\n' > "$tmp/core/src/$m.cpp"
+    done
+    expect pass "N5: the audited modules may remove and rename"
+    for m in local_files downloader credentials_file ca_selector curl_transport store_files; do rm -f "$tmp/core/src/$m.cpp"; done
+    printf 'list.remove(x); items.erase(it); remove_if(a, b, c); int removed = 0;\n' > "$tmp/core/src/ok2.cpp"
+    expect pass "N5: member calls and other names are not matched"; rm "$tmp/core/src/ok2.cpp"
     violate docs/a.md 'see /home/someone/project/file' "R5: Linux home path"
     violate docs/a.md 'see /Users/someone/project/file' "R5: macOS home path"
     violate docs/a.md 'see C:\Users\x\file' "R5: drive-letter path"

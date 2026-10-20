@@ -89,12 +89,13 @@ cmake: CURL
 id: openssl
 kind: component
 name: OpenSSL
-purpose: Encrypts and verifies every connection
+purpose: Encrypts and verifies every connection, and checks the checksum of downloaded files
 license: Apache License 2.0
 holder: The OpenSSL Project Authors
 url: https://www.openssl.org/source/license.html
 origin: system
 text: licenses/Apache-2.0.txt
+cmake: OpenSSL
 
 id: inkview
 kind: component

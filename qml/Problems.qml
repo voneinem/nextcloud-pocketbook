@@ -1,0 +1,95 @@
+pragma Singleton
+import QtQuick
+
+// What the app tells the user about a problem with the connection, and what to do about it: one message and one "what to do" line per
+// cause key (specs/001-nextcloud-files-client FR-006). The keys are those of the core (contracts/server-requests.md). Neither text ever
+// holds an address, a user name or a name from the server.
+QtObject {
+    function title(key) {
+        switch (key) {
+        case "": return ""
+        case "scheme_not_allowed": return qsTr("Only https addresses are accepted.")
+        case "address_invalid": return qsTr("The address is not valid.")
+        case "clock_implausible": return qsTr("The reader's date and time are wrong.")
+        case "no_network": return qsTr("There is no network connection.")
+        case "server_unreachable": return qsTr("The server cannot be reached.")
+        case "timeout": return qsTr("The server did not answer in time.")
+        case "cert_untrusted": return qsTr("The server's certificate is not trusted by this reader.")
+        case "cert_expired": return qsTr("The server's certificate is expired or not valid yet.")
+        case "cert_host_mismatch": return qsTr("The certificate does not belong to this address.")
+        case "not_nextcloud": return qsTr("This address does not answer like a Nextcloud.")
+        case "maintenance": return qsTr("The server is in maintenance mode.")
+        case "server_too_old": return qsTr("This Nextcloud version is too old.")
+        case "auth_failed": return qsTr("The user name or the app password is wrong.")
+        case "auth_app_password_required": return qsTr("An app password is needed.")
+        case "no_webdav": return qsTr("The server has no file access at this address.")
+        case "forbidden": return qsTr("The server refused access to your files.")
+        case "rate_limited": return qsTr("The server asks for a pause.")
+        case "redirect_other_host": return qsTr("The server wants to send you to another address.")
+        case "login_failed": return qsTr("The login did not finish.")
+        case "login_expired": return qsTr("The login ran out of time.")
+        case "protocol_error":
+        case "malformed_xml": return qsTr("The answer of the server could not be understood.")
+        case "storage_full":
+        case "write_failed": return qsTr("This could not be saved on the reader.")
+        case "server_error": return qsTr("The server reported a problem.")
+        case "not_found": return qsTr("The file is no longer on the server.")
+        case "locked": return qsTr("The file is locked on the server.")
+        case "connection_lost": return qsTr("The connection was lost.")
+        case "not_enough_space": return qsTr("There is not enough free space on the reader.")
+        case "too_large_for_storage": return qsTr("This file is too large for the reader's storage.")
+        case "storage_readonly": return qsTr("The reader's storage cannot be written to.")
+        case "checksum_mismatch": return qsTr("The downloaded file did not match the checksum of the server.")
+        case "size_mismatch": return qsTr("The downloaded file has the wrong size.")
+        case "local_changed": return qsTr("The copy on the reader has been changed.")
+        case "path_too_long": return qsTr("The folder path is too long for the reader's storage.")
+        case "path_unsafe": return qsTr("A link or a file is in the way in the download folder.")
+        case "cancelled": return qsTr("The download was cancelled.")
+        default: return qsTr("Something went wrong.")
+        }
+    }
+
+    function action(key) {
+        switch (key) {
+        case "": return ""
+        case "scheme_not_allowed": return qsTr("Type the address with https:// or just the name of the server.")
+        case "address_invalid": return qsTr("Type the address of your server, for example cloud.example.org.")
+        case "clock_implausible": return qsTr("Set the date and time in the reader's settings, then try again.")
+        case "no_network": return qsTr("Switch on Wi-Fi and try again.")
+        case "server_unreachable": return qsTr("Check the address and the Wi-Fi connection.")
+        case "timeout": return qsTr("Try again later.")
+        case "cert_untrusted": return qsTr("If your server uses your own certificate authority, put its certificate as custom-ca.pem in the app's data folder. The check cannot be switched off.")
+        case "cert_expired": return qsTr("Check the reader's date and time first. If they are right, the certificate of the server needs to be renewed.")
+        case "cert_host_mismatch": return qsTr("Check the address you typed.")
+        case "not_nextcloud": return qsTr("Use the address you open in the browser to reach your files.")
+        case "maintenance": return qsTr("Try again later.")
+        case "server_too_old": return qsTr("Nextcloud 30 or newer is needed. Ask the administrator to update the server.")
+        case "auth_failed": return qsTr("If your account uses two-factor authentication, an app password is needed: create one in Nextcloud under Settings > Security.")
+        case "auth_app_password_required": return qsTr("Create one in Nextcloud under Settings > Security and use it here instead of your account password.")
+        case "no_webdav": return qsTr("Check the address. The administrator may have switched off WebDAV.")
+        case "forbidden": return qsTr("Ask the administrator of the server.")
+        case "rate_limited": return qsTr("Wait a few minutes and try again.")
+        case "redirect_other_host": return qsTr("For your safety the app does not follow it. Use the address of the server itself.")
+        case "login_failed":
+        case "login_expired": return qsTr("Start the login again.")
+        case "protocol_error":
+        case "malformed_xml": return qsTr("Try again. If it keeps failing, this server may not be supported.")
+        case "storage_full":
+        case "write_failed": return qsTr("Free some space on the reader and try again.")
+        case "server_error": return qsTr("Try again later.")
+        case "not_found": return qsTr("Refresh the folder to see what is there now.")
+        case "locked": return qsTr("Try again later.")
+        case "connection_lost": return qsTr("Check the Wi-Fi connection and try again.")
+        case "not_enough_space": return qsTr("Remove downloaded files on the Storage page and try again.")
+        case "too_large_for_storage": return qsTr("Files of 4 GB or more cannot be stored on this reader.")
+        case "storage_readonly": return qsTr("Check the memory card and try again.")
+        case "checksum_mismatch":
+        case "size_mismatch": return qsTr("The file was discarded. Try again.")
+        case "local_changed": return qsTr("Choose what to do with your copy.")
+        case "path_too_long": return qsTr("Rename the folder on the server.")
+        case "path_unsafe": return qsTr("Check the download folder on the reader.")
+        case "cancelled": return ""
+        default: return qsTr("Try again.")
+        }
+    }
+}
