@@ -79,6 +79,10 @@ QString ConnectionBridge::quotaTotalText() const {
     return account_ && account_->quota_total && *account_->quota_total >= 0 ? human_size(*account_->quota_total) : QString();
 }
 bool ConnectionBridge::quotaUnlimited() const { return account_ && account_->quota_total && *account_->quota_total == -1; }
+QString ConnectionBridge::checkedAtText() const {
+    const qint64 t = checkedAt();
+    return t > 0 && c_.format_date_time ? c_.format_date_time(t) : QString();
+}
 qint64 ConnectionBridge::checkedAt() const { return account_ && account_->checked_at ? *account_->checked_at : 0; }
 QString ConnectionBridge::loginUrl() const { return flow_ ? q(flow_->login_url) : QString(); }
 QString ConnectionBridge::qrImageUrl() const { return flow_ ? QStringLiteral("image://qr/%1").arg(qr_counter_) : QString(); }

@@ -41,6 +41,8 @@ class TransferBridge : public QObject {
     Q_PROPERTY(int updateDone READ updateDone NOTIFY changed)         // files fetched so far in this run
     Q_PROPERTY(int updateTotal READ updateTotal NOTIFY changed)       // files the run plans to fetch
     Q_PROPERTY(QVariantMap updateReport READ updateReport NOTIFY changed)
+    Q_PROPERTY(QString lastUpdateText READ lastUpdateText NOTIFY changed)         // when the last Update ended, "" = never
+    Q_PROPERTY(QString lastUpdateOutcome READ lastUpdateOutcome NOTIFY changed)   // never | success | partial | failed
 
 public:
     struct Config {
@@ -75,6 +77,8 @@ public:
     int updateTotal() const { return update_total_; }
     // {folders, files, added, updated, skipped, needDecision, removed, failed, uncheckedFolders, stoppedBy, decisionPaths, removedPaths}
     QVariantMap updateReport() const { return update_report_; }
+    QString lastUpdateText() const;
+    QString lastUpdateOutcome() const;
 
     // {name, kind, sizeText, mime, dateText, onReader, serverNewer, available, reason, canOpen, localPath, remotePath}
     Q_INVOKABLE QVariantMap details(const QString& remotePath) const;

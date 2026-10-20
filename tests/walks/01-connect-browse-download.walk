@@ -18,6 +18,7 @@ shot @OUT@/04-settings-tested.png
 tap settingsBack
 wait 500
 expect homeState Connected to Example Cloud
+expect homeChecked Last checked:
 shot @OUT@/05-home-connected.png
 # browse: the root, then Books
 tap homeFiles

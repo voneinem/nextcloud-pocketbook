@@ -18,6 +18,7 @@ void AuthGuard::record(const Error& outcome) {
     if (!store_->account()) return;
     if (outcome.ok()) {
         store_->set_setting(kCountKey, "0");
+        store_->touch_account_checked();   // the login worked now
         return;
     }
     if (outcome.key != "auth_failed" && outcome.key != "auth_app_password_required") return;

@@ -2,7 +2,7 @@
 // database file, followed by an integrity check. Steps only go forward; an older build refuses a database of a newer
 // version (schema_too_new). `PRAGMA user_version` is the only version source.
 //
-// Step 1 -> 2 adds the tables of the files client (specs/001-nextcloud-files-client/data-model.md). A fresh database is
+// Step 1 -> 2 adds the tables of the files client (specs/001-nextcloud-files-client/data-model.md; step 2 -> 3 below adds two columns to favorites). A fresh database is
 // created as schema 1 and then migrated, so there is one path to test. Tests add further steps through
 // StoreOptions::extra_migrations.
 
@@ -101,10 +101,16 @@ CREATE TABLE downloads(
 );
 )SQL";
 
+// Step 2 -> 3: a favorite the user may not read must stay marked as such (FR-013); rows written by 0.1.0 read as available.
+const char* kStep2To3 = R"SQL(
+ALTER TABLE favorites ADD COLUMN availability TEXT NOT NULL DEFAULT 'ok' CHECK(availability IN ('ok','no_permission','encrypted','unsupported','unreadable'));
+ALTER TABLE favorites ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+)SQL";
+
 }  // namespace
 
 const std::vector<Migration>& builtin_migrations() {
-    static const std::vector<Migration> list = {{1, 2, kStep1To2}};
+    static const std::vector<Migration> list = {{1, 2, kStep1To2}, {2, 3, kStep2To3}};
     return list;
 }
 

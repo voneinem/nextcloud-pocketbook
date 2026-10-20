@@ -316,6 +316,23 @@ PB_TEST(open_hands_only_a_regular_file_inside_the_download_folder_to_the_reader)
     PB_CHECK(e.opened.isEmpty());
 }
 
+PB_TEST(a_favorite_the_user_may_not_read_is_never_downloaded) {
+    Env e;
+    pbc::RemoteEntry locked;
+    locked.name = "locked.txt";
+    locked.path = "/Priv/locked.txt";
+    locked.size = 10;
+    locked.etag = "\"e\"";
+    locked.availability = pbc::Availability::NoPermission;
+    locked.reason = "no_read_permission";
+    PB_CHECK(e.store->replace_favorites({locked}, 1).ok());
+    PB_CHECK_EQ(e.bridge->details("/Priv/locked.txt").value("available").toBool(), false);
+    e.bridge->download("/Priv/locked.txt", true);
+    e.settle();
+    PB_CHECK_EQ(e.state(), std::string("idle"));
+    PB_CHECK_EQ(e.server.count("GET"), size_t(0));
+}
+
 PB_TEST(marks_are_set_and_removed_and_nothing_is_fetched_by_marking) {
     Env e;
     e.bridge->setKept("/Books", "folder", true);
@@ -337,10 +354,14 @@ PB_TEST(an_update_runs_only_when_asked_and_reports_what_it_did) {
     PB_CHECK_EQ(e.server.request_count(), size_t(0));   // marking and waiting do nothing
     PB_CHECK(!e.bridge->updateRunning());
     QSignalSpy finished(e.bridge.get(), &TransferBridge::updateFinished);
+    PB_CHECK(e.bridge->lastUpdateText().isEmpty());          // never updated: nothing to show
+    PB_CHECK_EQ(e.bridge->lastUpdateOutcome().toStdString(), std::string("never"));
     e.bridge->update();
     PB_CHECK(e.bridge->updateRunning());
     PB_CHECK(finished.wait(20000));
     PB_CHECK(!e.bridge->updateRunning());
+    PB_CHECK_EQ(e.bridge->lastUpdateText().toStdString(), ("T" + std::to_string(e.clock.t)));   // the home page shows when
+    PB_CHECK_EQ(e.bridge->lastUpdateOutcome().toStdString(), std::string("success"));
     const QVariantMap r = e.bridge->updateReport();
     PB_CHECK_EQ(r.value("added").toInt(), 2);          // story.epub and small.txt
     PB_CHECK_EQ(r.value("failed").toInt(), 0);

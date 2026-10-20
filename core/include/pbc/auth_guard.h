@@ -14,7 +14,7 @@ public:
 
     // True while the account is in the needs_signin state: no request may be sent.
     bool blocked() const;
-    // Feeds the outcome of a request that carried the account's credentials. A refused login counts, a success clears the count, any other
+    // Feeds the outcome of a request that carried the account's credentials. A refused login counts, a success clears the count and records the time of the last confirmed login, any other
     // error neither counts nor clears. Without an account nothing happens (the first Test of a new account is always allowed).
     void record(const Error& outcome);
     // The user tapped Test: lifts the block and starts the count again.

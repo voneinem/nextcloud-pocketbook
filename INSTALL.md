@@ -63,7 +63,7 @@ Instead of typing a password you can use **Browser login** in Settings: the read
 laptop, approve the login there, then tap **Check** on the reader.
 
 The language of the interface (English or German) follows the reader and can be changed in Settings. The launcher writes a log to
-`system/pbcloud/pbcloud.log` (the launch before is `pbcloud.log.prev`). The log holds no addresses, names, paths or passwords.
+`system/pbcloud/pbcloud.log` (the launch before is `pbcloud.log.prev`). The app writes no addresses, names, paths or passwords to it. The reader's own libraries print the path of a book when it is opened; the launcher removes such lines before they reach the log (it replaces each by a notice), and a log written by an older package may still hold them.
 
 ## Where files go
 

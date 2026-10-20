@@ -6,6 +6,8 @@ import ".."
 Item {
     id: page
 
+    StackView.onActivated: connection.refresh()   // a listing, a download or an Update may have confirmed the login meanwhile
+
     function push(name, props) { if (page.StackView.view) page.StackView.view.push(Qt.resolvedUrl(name), props || {}) }
 
     TopBar {
@@ -85,6 +87,27 @@ Item {
                 default: return qsTr("Not connected")
                 }
             }
+        }
+        Text {
+            objectName: "homeChecked"
+            x: 30
+            width: parent.width - 60
+            wrapMode: Text.Wrap
+            visible: connection.checkedAtText.length > 0
+            font.pixelSize: Style.labelSize
+            color: Style.ink
+            text: qsTr("Last checked: %1").arg(connection.checkedAtText)
+        }
+        Text {
+            objectName: "homeUpdated"
+            x: 30
+            width: parent.width - 60
+            wrapMode: Text.Wrap
+            visible: transfer.lastUpdateText.length > 0
+            font.pixelSize: Style.labelSize
+            color: Style.ink
+            text: transfer.lastUpdateOutcome === "success" ? qsTr("Last update: %1").arg(transfer.lastUpdateText)
+                : qsTr("Last update: %1 (not complete)").arg(transfer.lastUpdateText)
         }
         Text {
             objectName: "homeAction"

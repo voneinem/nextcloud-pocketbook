@@ -47,6 +47,24 @@ PB_TEST(the_zone_comes_from_the_configuration_then_the_environment_and_otherwise
     PB_CHECK(z.utc_fallback);
 }
 
+PB_TEST(the_reader_names_its_zone_by_city_only_and_a_unique_city_is_found) {
+    // seen on the InkPad One: global.cfg holds "timezone=Berlin", not "Europe/Berlin"
+    auto d = db();
+    auto z = pbc::reader_zone(d.get(), "timezone=Berlin\n", {"", ""});
+    PB_CHECK_EQ(z.name, std::string("Europe/Berlin"));
+    PB_CHECK(!z.utc_fallback);
+    z = pbc::reader_zone(d.get(), "timezone=berlin\n", {"", ""});   // the case does not matter
+    PB_CHECK_EQ(z.name, std::string("Europe/Berlin"));
+    z = pbc::reader_zone(d.get(), "timezone=New_York\n", {"", ""});
+    PB_CHECK_EQ(z.name, std::string("America/New_York"));
+    // a city that exists in more than one region is not guessed: the next source decides
+    z = pbc::reader_zone(d.get(), "timezone=Mars\n", {"", ""});
+    PB_CHECK(z.utc_fallback);
+    z = pbc::reader_zone(d.get(), "timezone=Berlin\n", {"Asia/Tokyo", ""});
+    PB_CHECK_EQ(z.name, std::string("Europe/Berlin"));   // the configuration wins over the environment
+    PB_CHECK_EQ(pbc::format_date_time(1792523723, z, d.get()), std::string("2026-10-20 21:15"));   // 19:15 UTC is 21:15 in Berlin
+}
+
 PB_TEST(dates_follow_summer_and_winter_time) {
     auto d = db();
     const auto berlin = pbc::reader_zone(d.get(), "timezone=Europe/Berlin\n", {"", ""});

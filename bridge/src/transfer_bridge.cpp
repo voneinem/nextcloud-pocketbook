@@ -225,6 +225,13 @@ void TransferBridge::open(const QString& remotePath) {
     c_.open_file(q(abs.value));
 }
 
+QString TransferBridge::lastUpdateText() const {
+    const auto t = c_.store->sync_state().last_finished;
+    return t && c_.format_date_time ? c_.format_date_time(*t) : QString();
+}
+
+QString TransferBridge::lastUpdateOutcome() const { return q(c_.store->sync_state().outcome); }
+
 void TransferBridge::setKept(const QString& remotePath, const QString& kind, bool on) {
     if (kind != QLatin1String("folder") && kind != QLatin1String("file")) return;
     const pbc::Kind k = kind == QLatin1String("folder") ? pbc::Kind::Folder : pbc::Kind::File;

@@ -33,8 +33,17 @@ below is tested on the host against a fake Nextcloud server; nothing is verified
 - A Storage page with the downloaded copies, free space and the cache; removing a copy never touches the server.
 
 ### Data
-- **One-way database upgrade (schema 2).** The first start migrates the database and keeps `pbcloud.db.bak` until the next successful start;
-  an older build refuses the new file. See `INSTALL.md`.
+- **One-way database upgrade (schema 3).** The first start migrates the database and keeps `pbcloud.db.bak` until the next successful start;
+  an older build refuses the new file. A database written by an earlier development build of 0.1.0 (schema 2) is upgraded by one more step that adds the availability
+  of favorites (a favorite you may not read is shown as unavailable and is not downloaded). See `INSTALL.md`.
+
+### Home page
+- The home page shows when the account was last checked (the last time the server accepted the login: the start check, a Test, a listing, a download or an Update) and when the last Update ended.
+- Dates follow the reader's time zone also when `global.cfg` names it by the city only (`timezone=Berlin`, seen on the InkPad One); a city that exists in several regions is not guessed and the dates stay in UTC.
+
+### Log
+- The launcher writes the log line by line while the app runs, so an app that is stopped (the reader's USB mode does that) still leaves its lines.
+- The launcher removes the lines in which the reader's libraries print the path of an opened book (`iv_OpenBook`, `task_findbybook`) before they reach `pbcloud.log`; the app's own lines, its exit code and its start-up evidence stay (DT-NC-11).
 
 ### Removed
 - Leftovers of the baseline: the sync scheduler, the page arithmetic of the message reader, FTS5 and the calendar and contact QML components

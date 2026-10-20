@@ -81,7 +81,7 @@ certificate authority, and tap Test in Settings.
   this reader's storage really does with the file.
 - Certificates are always verified; there is no switch to turn that off. Credentials are never sent to another host than the one
   you entered, and a redirect to another host is refused.
-- Server addresses, user names, file names, paths, search terms and tokens are not written to the log and not shown in error texts.
+- Server addresses, user names, file names, paths, search terms and tokens are not written to the log and not shown in error texts. The reader's libraries print the path of a book when it is opened; the launcher filters those lines out of the log.
 - Names that come from the server are never trusted as local paths: they are cleaned and checked before any file is created, and a
   link or an unexpected file in the download folder stops the download.
 - Nothing is sent in the background. The app asks the server only at start (one check that the login still works, and only when

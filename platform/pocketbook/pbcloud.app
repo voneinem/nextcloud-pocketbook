@@ -12,6 +12,7 @@
 #   - Qt Quick needs a GL context: use the EGL QPA (pocketbook2egl).
 #   - Content rotation (g-sensor) and devicePixelRatio scaling are handled in the app.
 
+STORAGE=/mnt/ext1
 APPDIR=/mnt/ext1/applications
 DATADIR=/mnt/ext1/system/pbcloud
 mkdir -p "$DATADIR"
@@ -25,7 +26,7 @@ echo "--- diagnostics: uid/groups: $(id 2>/dev/null || echo unknown)"
 echo "--- diagnostics: gpu node: $(ls -l /dev/mali0 2>/dev/null || echo 'not found')"
 echo "--- diagnostics: uptime: $(uptime 2>/dev/null || echo unknown)"
 echo "--- diagnostics: memory: $(grep -E '^(MemFree|MemAvailable)' /proc/meminfo 2>/dev/null | tr -s ' ' | tr '\n' ' ')"
-echo "--- diagnostics: other app processes: $(ps 2>/dev/null | grep -E 'pbcloud\.bin|inkfeed\.bin' | grep -v grep || echo none)"
+echo "--- diagnostics: other app processes: $(ps 2>/dev/null | grep -E 'pbcloud\.bin' | grep -v grep || echo none)"
 
 export LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/plugins/platforms"
@@ -46,10 +47,40 @@ if [ -e "$DATADIR/run-probe" ]; then
     exit 0
 fi
 
+# The log must not hold the name or the path of any file of the user (Constitution IV), and the system's libraries print them: when a book
+# is opened, InkView writes "iv_OpenBook filename = <path>" and "task_findbybook('<path>')". Everything the app prints goes through
+# this filter before it reaches the log: a line that names anything on the storage, or one of those two calls, is replaced by a notice.
+# The path of the app itself (the program_name line) is the one thing that may stay. Nothing else is written anywhere before the filter.
+filter_log() {
+    # a read loop, not sed: sed holds its output back until it ends, and an app that is killed (the reader's USB mode does that) would
+    # leave no log at all. The shell writes each line as it comes.
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            *iv_OpenBook*|*task_findbybook*)
+                line="[a line with a file path was removed from the log]" ;;
+            *"$STORAGE/"*)
+                # the path of the app itself may stay; anything else on the storage may be a file of the user
+                other=$(printf '%s\n' "$line" | sed "s#$APPDIR/pbcloud\\.bin##g")
+                case "$other" in
+                    *"$STORAGE/"*) line="[a line with a file path was removed from the log]" ;;
+                esac ;;
+        esac
+        printf '%s\n' "$line"
+    done
+}
+
 # The log is a file, so the app's own stdout is block-buffered and lost when the process aborts; line buffering
-# keeps the start-up lines of a failed start (stdbuf is not on every reader).
+# keeps the start-up lines of a failed start (stdbuf is not on every reader). The exit code of the app is kept in a small file because
+# a pipe through the filter would hide it (no pipefail in this shell).
 run_app() {
-    if command -v stdbuf >/dev/null 2>&1; then stdbuf -oL -eL "$APPDIR/pbcloud.bin"; else "$APPDIR/pbcloud.bin"; fi
+    rm -f "$DATADIR/exit-code"
+    {
+        if command -v stdbuf >/dev/null 2>&1; then stdbuf -oL -eL "$APPDIR/pbcloud.bin"; else "$APPDIR/pbcloud.bin"; fi
+        echo $? > "$DATADIR/exit-code"
+    } 2>&1 | filter_log
+    code=$(cat "$DATADIR/exit-code" 2>/dev/null || echo 1)
+    rm -f "$DATADIR/exit-code"
+    return "$code"
 }
 
 # Everything this attempt wrote to the log (stdout and stderr share the file).

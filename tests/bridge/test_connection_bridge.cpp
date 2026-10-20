@@ -49,6 +49,7 @@ struct Env {
         c.worker = &worker;
         c.http = &server;
         c.clock = &clock;
+        c.format_date_time = [](qint64 t) { return QStringLiteral("T%1").arg(t); };
         c.wifi_up = [this] { return wifi; };
         c.ensure_network = [this](std::function<void(bool)> done) {
             ++network_requests;
@@ -73,6 +74,11 @@ struct Env {
 
 }  // namespace
 
+PB_TEST(without_a_check_there_is_no_time_to_show) {
+    Env e;
+    PB_CHECK(e.bridge->checkedAtText().isEmpty());
+}
+
 PB_TEST(a_good_test_saves_the_account_and_the_password_and_shows_the_result) {
     Env e;
     e.server.set_quota(1000, 9000);
@@ -86,6 +92,7 @@ PB_TEST(a_good_test_saves_the_account_and_the_password_and_shows_the_result) {
     PB_CHECK(!e.bridge->quotaTotalText().isEmpty());
     PB_CHECK(!e.bridge->quotaUnlimited());
     PB_CHECK_EQ(e.bridge->checkedAt(), qint64(e.clock.t));
+    PB_CHECK_EQ(e.bridge->checkedAtText().toStdString(), ("T" + std::to_string(e.clock.t)));   // the home page shows when the account was last checked
     PB_CHECK(e.bridge->problemKey().isEmpty());
     PB_CHECK(!e.bridge->busy());
     const auto creds = pbc::load_credentials(e.store->directory());

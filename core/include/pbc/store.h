@@ -46,7 +46,7 @@ struct SyncState {
 
 class Store {
 public:
-    static constexpr int kSchemaVersion = 2;   // 1: settings and sync state; 2: the tables of the files client
+    static constexpr int kSchemaVersion = 3;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites
 
     // Creates `dir` (mode 0700) if needed and opens `dir/pbcloud.db` (0600).
     // Errors: "schema_too_new" (the file is left untouched), "migration_failed" (rolled back, backup kept),
@@ -78,6 +78,8 @@ public:
     Error save_account(const AccountRow& row);
     // Signing out: removes the account row only. The cache, the downloaded copies and the marks stay.
     Error clear_account();
+    // The server accepted the account's credentials just now: the time shown as "Last checked". Nothing else of the row changes.
+    Error touch_account_checked();
     Error set_account_state(const std::string& state, const std::string& problem_key);
 
     // ---- cached listings (store_files.cpp) ----

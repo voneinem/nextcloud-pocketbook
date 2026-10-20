@@ -382,3 +382,10 @@ Task: "tests/integration/test_download_kill.cpp"   (T069)
 - The demo and the walk (`scripts/run-host-demo.sh`, `scripts/ui-walk.sh`, `app/ui_script.*`) are host-only additions to T118; the acceptance walk is CTest `ui_walk`.
 - Nothing was committed after the bootstrap commit; the work of this feature is in the working tree of branch `feature/001-nextcloud-files-client`.
 
+
+## Phase 10: Convergence
+
+- [X] T130 CRITICAL Keep file names and paths out of `pbcloud.log`: the launcher `platform/pocketbook/pbcloud.app` sends all stdout/stderr, including the InkView SDK lines `iv_OpenBook filename = <path>` and `task_findbybook('<path>')` seen on the reader, into the log; filter or redirect them (the shell on the reader may lack process substitution and `stdbuf`), keep the start-up evidence of a failed start, correct the statements "holds no addresses, names, paths or passwords" in `INSTALL.md` and `README.md`, add a launcher test with a fake binary that prints such lines, and record the re-check on the reader in `docs/device-test-checklist.md` per Constitution IV and FR-008 (contradicts)
+- [X] T131 Show the time of the last account check and of the last Update on `qml/pages/HomePage.qml` (from `connection.checkedAt` and the stored sync state, through a bridge property), with German texts in `qml/strings_de.tsv` and a bridge test, per FR-035 and SC-015 (partial)
+- [X] T132 Store availability and reason for favorites (`favorites` table, `Store::replace_favorites`, `Store::entry` fallback, a schema 2 migration step if the table changes) so that a favorite the user may not read is shown as unavailable and `TransferBridge::download` refuses it, with tests in `tests/unit/test_store_favorites.cpp` and `tests/bridge/test_browse_bridge.cpp`, per FR-013 (partial)
+- [X] T133 Record the host-only scripted walk (`app/ui_script.{h,cpp}`, `scripts/ui-walk.sh`, `tests/walks/`, the `Qt6::Test` link of the host app, `scripts/run-host-demo.sh`) in `plan.md` as justified by T118 and T129, and remove the `inkfeed.bin` leftover from the `ps` diagnostic line of `platform/pocketbook/pbcloud.app`, per plan: project structure (unrequested)

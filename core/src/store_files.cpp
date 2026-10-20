@@ -114,6 +114,16 @@ Error Store::clear_account() {
     return {};
 }
 
+Error Store::touch_account_checked() {
+    const int64_t now = clock_->now();
+    std::lock_guard<std::mutex> lock(mu_);
+    Stmt st(db_, "UPDATE account SET checked_at = ? WHERE id = 1");
+    if (!st.ok()) return storage_error(db_, "write_failed");
+    st.bind_int64(1, now);
+    if (st.step() != SQLITE_DONE) return storage_error(db_, "write_failed");
+    return {};
+}
+
 Error Store::set_account_state(const std::string& state, const std::string& problem_key) {
     if (state != "untested" && state != "ok" && state != "needs_signin" && state != "problem") return bad("protocol_error", "unknown account state");
     std::lock_guard<std::mutex> lock(mu_);
@@ -334,7 +344,7 @@ std::optional<RemoteEntry> Store::entry(const std::string& path) const {
     }
     // not in any cached listing: a favorite, or a result of the server search of this run
     {
-        Stmt st(db_, "SELECT kind, size, mtime, etag, mime FROM favorites WHERE remote_path = ?");
+        Stmt st(db_, "SELECT kind, size, mtime, etag, mime, availability, reason FROM favorites WHERE remote_path = ?");
         if (st.ok()) {
             st.bind_text(1, p);
             if (st.step() == SQLITE_ROW) {
@@ -346,6 +356,8 @@ std::optional<RemoteEntry> Store::entry(const std::string& path) const {
                 e.mtime = opt_col(st, 2);
                 e.etag = st.text(3);
                 e.mime = st.text(4);
+                e.availability = availability_from(st.text(5));
+                e.reason = st.text(6);
                 e.favorite = true;
                 return e;
             }
@@ -636,7 +648,7 @@ Error Store::replace_favorites(const std::vector<RemoteEntry>& entries, int64_t 
         if (!st.ok() || st.step() != SQLITE_DONE) return storage_error(db_, "write_failed");
     }
     {
-        Stmt st(db_, "INSERT INTO favorites(remote_path, kind, size, mtime, etag, mime, position) VALUES(?,?,?,?,?,?,?)");
+        Stmt st(db_, "INSERT INTO favorites(remote_path, kind, size, mtime, etag, mime, availability, reason, position) VALUES(?,?,?,?,?,?,?,?,?)");
         if (!st.ok()) return storage_error(db_, "write_failed");
         int position = 0;
         for (const RemoteEntry& e : entries) {
@@ -648,7 +660,9 @@ Error Store::replace_favorites(const std::vector<RemoteEntry>& entries, int64_t 
             bind_opt(st, 4, e.mtime);
             st.bind_text(5, cap(e.etag, 256));
             st.bind_text(6, cap(e.mime, 100));
-            st.bind_int64(7, position++);
+            st.bind_text(7, availability_text(e.availability));
+            st.bind_text(8, cap(e.reason, 64));
+            st.bind_int64(9, position++);
             if (st.step() != SQLITE_DONE) return storage_error(db_, "write_failed");   // for example the same path twice
         }
     }
@@ -664,7 +678,7 @@ Error Store::replace_favorites(const std::vector<RemoteEntry>& entries, int64_t 
 std::vector<RemoteEntry> Store::favorites() const {
     std::vector<RemoteEntry> out;
     std::lock_guard<std::mutex> lock(mu_);
-    Stmt st(db_, "SELECT remote_path, kind, size, mtime, etag, mime FROM favorites ORDER BY position");
+    Stmt st(db_, "SELECT remote_path, kind, size, mtime, etag, mime, availability, reason FROM favorites ORDER BY position");
     if (!st.ok()) return out;
     while (st.step() == SQLITE_ROW) {
         RemoteEntry e;
@@ -675,6 +689,8 @@ std::vector<RemoteEntry> Store::favorites() const {
         e.mtime = opt_col(st, 3);
         e.etag = st.text(4);
         e.mime = st.text(5);
+        e.availability = availability_from(st.text(6));
+        e.reason = st.text(7);
         e.favorite = true;
         out.push_back(std::move(e));
     }
@@ -739,7 +755,7 @@ std::vector<SearchHit> Store::search_cached(const std::string& raw_term, int lim
     }
     auto matches = [&](const std::string& path) { return sort_key(path.substr(path.rfind('/') + 1)).find(folded) != std::string::npos; };
     {
-        Stmt st(db_, "SELECT remote_path, kind, size, mtime, etag, mime FROM favorites ORDER BY position");
+        Stmt st(db_, "SELECT remote_path, kind, size, mtime, etag, mime, availability, reason FROM favorites ORDER BY position");
         while (st.ok() && st.step() == SQLITE_ROW) {
             const std::string path = st.text(0);
             if (!matches(path) || seen.count(path)) continue;
@@ -751,6 +767,8 @@ std::vector<SearchHit> Store::search_cached(const std::string& raw_term, int lim
             e.mtime = opt_col(st, 3);
             e.etag = st.text(4);
             e.mime = st.text(5);
+            e.availability = availability_from(st.text(6));
+            e.reason = st.text(7);
             e.favorite = true;
             seen.insert(path);
             out.push_back({std::move(e), "favorites"});

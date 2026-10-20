@@ -11,6 +11,8 @@ expect updateUpdated 1
 shot @OUT@/21-update-second.png
 tap updateBack
 wait 500
+expect homeUpdated Last update:
+shot @OUT@/21b-home-last-update.png
 # favorites
 tap homeFavorites
 waitfor favoritesAge Updated just now

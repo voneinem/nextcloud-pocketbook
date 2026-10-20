@@ -234,3 +234,10 @@ scope is never touched by Update.
 | Favorites kept | 2,000 |
 | `local_files` rows | not bounded by the app (bounded by the card); the Space screen pages them |
 | Database file | ≤ 50 MB expected at the cache limits (about 300 bytes per entry plus indexes); checked by a budget test |
+
+## As built: schema 3
+
+`favorites` has two more columns, added by the step 2 -> 3 of `store_migrations.cpp`: `availability TEXT NOT NULL DEFAULT 'ok'` (same values as in `entries`) and
+`reason TEXT NOT NULL DEFAULT ''`. A favorite the user may not read, or an encrypted folder, keeps its marker so that it is shown as unavailable and is never
+downloaded (FR-013). Rows written by a schema 2 build read as available. `Store::kSchemaVersion` is 3; a build that knows only schema 2 refuses the file.
+

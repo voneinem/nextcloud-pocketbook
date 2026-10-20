@@ -32,6 +32,27 @@ const pbc::Error kDown = pbc::make_error(pbc::ErrorClass::Network, "server_unrea
 
 }  // namespace
 
+PB_TEST(a_request_the_server_accepted_records_when_the_login_was_last_confirmed) {
+    struct TestClock : pbc::Clock {
+        int64_t t = 1792500000;
+        int64_t now() const override { return t; }
+    } clock;
+    pbtest::TmpDir d;
+    auto r = pbc::Store::open(d.file("data"), clock);
+    PB_CHECK(r.ok());
+    auto& s = *r.value;
+    with_account(s);
+    pbc::AuthGuard guard(s);
+    PB_CHECK(!s.account()->checked_at.has_value());
+    clock.t = 1792500100;
+    guard.record(pbc::Error());   // a listing, a download, an Update: the server took the credentials
+    PB_CHECK_EQ(*s.account()->checked_at, int64_t(1792500100));
+    clock.t = 1792500200;
+    guard.record(kDown);          // an error that is not about the login changes nothing
+    guard.record(kAuth);
+    PB_CHECK_EQ(*s.account()->checked_at, int64_t(1792500100));
+}
+
 PB_TEST(one_failed_login_does_not_block_but_two_in_a_row_do) {
     pbtest::TmpDir d;
     auto s = open_store(d);

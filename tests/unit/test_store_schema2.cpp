@@ -56,11 +56,11 @@ const char* kFolder = "INSERT INTO folders(path, last_access_at) VALUES('/', 1)"
 
 }  // namespace
 
-PB_TEST(a_fresh_database_is_schema_2_with_every_table) {
+PB_TEST(a_fresh_database_is_the_current_schema_with_every_table) {
     pbtest::TmpDir d;
     auto s = open_current(d);
-    PB_CHECK_EQ(pbc::Store::kSchemaVersion, 2);
-    PB_CHECK_EQ(s->schema_version(), 2);
+    PB_CHECK_EQ(pbc::Store::kSchemaVersion, 3);
+    PB_CHECK_EQ(s->schema_version(), 3);
     for (const char* t : {"settings", "sync_state", "account", "folders", "entries", "local_files", "offline_marks", "favorites", "downloads"})
         PB_CHECK(table_exists(*s, t));
     PB_CHECK(s->check_integrity().ok());
@@ -79,12 +79,41 @@ PB_TEST(a_schema_1_database_upgrades_in_one_step_after_a_backup_and_keeps_its_da
         PB_CHECK(s->write_sync_state(st).ok());
     }
     auto s = open_current(d);
-    PB_CHECK_EQ(s->schema_version(), 2);
+    PB_CHECK_EQ(s->schema_version(), 3);
     PB_CHECK_EQ(s->setting("ui_language"), std::string("de"));
     PB_CHECK_EQ(s->sync_state().outcome, std::string("success"));
     PB_CHECK_EQ(s->sync_state().counts_json, std::string("{\"a\":1}"));
     PB_CHECK(table_exists(*s, "entries"));
     PB_CHECK(exists(d.file("data/pbcloud.db.bak")));   // kept until the next successful start (research R-07)
+    PB_CHECK(s->check_integrity().ok());
+}
+
+// A database as the 0.1.0 build wrote it: schema 2, favorites without availability.
+std::unique_ptr<pbc::Store> open_schema2(const pbtest::TmpDir& d) {
+    pbc::StoreOptions o;
+    o.target_version = 2;
+    auto r = pbc::Store::open(d.file("data"), g_clock, o);
+    if (!r.ok()) PB_FAIL_AT("cannot create the schema-2 database: " + r.error.key);
+    return std::move(r.value);
+}
+
+PB_TEST(a_schema_2_database_upgrades_to_3_and_its_favorites_read_as_available)
+{
+    pbtest::TmpDir d;
+    {
+        auto s = open_schema2(d);
+        PB_CHECK_EQ(s->schema_version(), 2);
+        PB_CHECK(s->debug_exec("INSERT INTO favorites(remote_path, kind, size, etag, position) VALUES('/Books/a.epub', 'file', 5, '\"e\"', 0)").empty());
+        PB_CHECK(s->set_setting("keep", "me").ok());
+    }
+    auto s = open_current(d);
+    PB_CHECK_EQ(s->schema_version(), 3);
+    PB_CHECK_EQ(s->setting("keep"), std::string("me"));
+    const auto f = s->favorites();
+    PB_CHECK_EQ(f.size(), size_t(1));
+    PB_CHECK(f[0].availability == pbc::Availability::Ok);
+    PB_CHECK_EQ(s->debug_query("SELECT availability || '|' || reason FROM favorites"), std::string("ok|"));
+    PB_CHECK(exists(d.file("data/pbcloud.db.bak")));   // kept until the next successful start
     PB_CHECK(s->check_integrity().ok());
 }
 
@@ -117,7 +146,7 @@ PB_TEST(a_newer_database_is_refused_and_left_byte_identical) {
     pbtest::TmpDir d;
     {
         auto s = open_current(d);
-        PB_CHECK(s->debug_exec("PRAGMA user_version = 3").empty());
+        PB_CHECK(s->debug_exec("PRAGMA user_version = 4").empty());
     }
     const std::string path = d.file("data/pbcloud.db");
     const std::string before = read_file(path);

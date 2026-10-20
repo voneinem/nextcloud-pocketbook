@@ -231,4 +231,30 @@ PB_TEST(saving_another_account_drops_the_cached_lists_and_the_favorites_with_the
     PB_CHECK(s->local_file("/Books/a.epub").has_value());
 }
 
+PB_TEST(a_favorite_that_cannot_be_read_keeps_its_availability_and_reason) {
+    pbtest::TmpDir d;
+    TickClock clock;
+    auto s = open(d, clock);
+    pbc::RemoteEntry locked = entry("/Priv", "locked.docx");
+    locked.availability = pbc::Availability::NoPermission;
+    locked.reason = "no_read_permission";
+    pbc::RemoteEntry vault = entry("/", "Vault", true);
+    vault.availability = pbc::Availability::Encrypted;
+    vault.reason = "end_to_end_encrypted";
+    PB_CHECK(s->replace_favorites({entry("/A", "ok.txt"), locked, vault}, 100).ok());
+    const auto v = s->favorites();
+    PB_CHECK_EQ(v.size(), size_t(3));
+    PB_CHECK(v[0].availability == pbc::Availability::Ok);
+    PB_CHECK(v[1].availability == pbc::Availability::NoPermission);
+    PB_CHECK_EQ(v[1].reason, std::string("no_read_permission"));
+    PB_CHECK(v[2].availability == pbc::Availability::Encrypted);
+    const auto e = s->entry("/Priv/locked.docx");   // what a tap on it sees
+    PB_CHECK(e.has_value());
+    PB_CHECK(e->availability == pbc::Availability::NoPermission);
+    PB_CHECK_EQ(e->reason, std::string("no_read_permission"));
+    const auto hits = s->search_cached("locked", 5);
+    PB_CHECK_EQ(hits.size(), size_t(1));
+    PB_CHECK(hits[0].entry.availability == pbc::Availability::NoPermission);
+}
+
 PB_TEST_MAIN()

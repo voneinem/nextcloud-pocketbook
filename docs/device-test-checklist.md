@@ -68,6 +68,7 @@ Added by `specs/001-nextcloud-files-client/`. Same legend as above.
 | DT-NC-8 | Wi-Fi drop and return during a 500 MB download | completes after reconnecting, file identical to the server's, no corrupt file | U | | |
 | DT-NC-9 | A file of 4 GiB or more (sparse file on the server) | refused before any byte is written, with the reason | U | | |
 | DT-NC-10 | Number of e-ink refreshes during a download | few (progress text updates at most every 2 s or 5 %) | U | | |
+| DT-NC-11 | The launcher filter (`pbcloud.app`) on the reader's shell: open a downloaded book, then read `system/pbcloud/pbcloud.log` | no line holds the name or path of the book (a notice stands in its place); the exit code of the app is still logged; the first run of 0.1.0 showed `iv_OpenBook filename = <path>` lines without the filter | U | | |
 
 ## Recording
 

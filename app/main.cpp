@@ -174,11 +174,23 @@ int main(int argc, char** argv) {
 #endif
     if (store && !ca_file.empty()) {
         http = std::make_unique<pbc::CurlTransport>(ca_file);
+        std::string reader_config;
+        {
+#ifdef PLATFORM_POCKETBOOK
+            const QString cfg_path = QStringLiteral("/mnt/ext1/system/config/global.cfg");
+#else
+            const QString cfg_path = qEnvironmentVariable("PBC_READER_CONFIG");
+#endif
+            QFile f(cfg_path);
+            if (!cfg_path.isEmpty() && f.open(QIODevice::ReadOnly)) reader_config = f.read(64 * 1024).toStdString();
+        }
+        const auto zone = std::make_shared<pbc::ReaderZone>(pbc::reader_zone(tzdb.get(), reader_config, pbc::read_zone_environment()));
         ConnectionBridge::Config cc;
         cc.store = store.get();
         cc.worker = &worker;
         cc.http = http.get();
         cc.clock = &clock;
+        cc.format_date_time = [zone, &tzdb](qint64 t) { return QString::fromStdString(pbc::format_date_time(t, *zone, tzdb.get())); };
         cc.wifi_up = [&device] { return device.wifiConnected(); };
         // a tap that needs the network: ask the system to bring Wi-Fi up if it is not, then continue (never at start)
         cc.ensure_network = [&device](std::function<void(bool)> done) {
@@ -196,17 +208,6 @@ int main(int argc, char** argv) {
         connectionBridge = std::make_unique<ConnectionBridge>(cc);
 
         // the file list: dates in the reader's own zone, read from its configuration (research R-14; the key is unverified, DT-NC-6)
-        std::string reader_config;
-        {
-#ifdef PLATFORM_POCKETBOOK
-            const QString cfg_path = QStringLiteral("/mnt/ext1/system/config/global.cfg");
-#else
-            const QString cfg_path = qEnvironmentVariable("PBC_READER_CONFIG");
-#endif
-            QFile f(cfg_path);
-            if (!cfg_path.isEmpty() && f.open(QIODevice::ReadOnly)) reader_config = f.read(64 * 1024).toStdString();
-        }
-        const auto zone = std::make_shared<pbc::ReaderZone>(pbc::reader_zone(tzdb.get(), reader_config, pbc::read_zone_environment()));
         BrowseBridge::Config bc;
         bc.store = store.get();
         bc.worker = &worker;

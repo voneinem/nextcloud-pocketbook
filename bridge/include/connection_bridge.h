@@ -33,6 +33,7 @@ class ConnectionBridge : public QObject {
     Q_PROPERTY(QString quotaTotalText READ quotaTotalText NOTIFY changed)
     Q_PROPERTY(bool quotaUnlimited READ quotaUnlimited NOTIFY changed)
     Q_PROPERTY(qint64 checkedAt READ checkedAt NOTIFY changed)
+    Q_PROPERTY(QString checkedAtText READ checkedAtText NOTIFY changed)   // the time of the last account check in the reader's zone, "" = never
     Q_PROPERTY(QString problemKey READ problemKey NOTIFY changed)
     Q_PROPERTY(int clockWarningMinutes READ clockWarningMinutes NOTIFY changed)
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
@@ -45,6 +46,7 @@ class ConnectionBridge : public QObject {
 
 public:
     struct Config {
+        std::function<QString(qint64)> format_date_time;   // a time in the reader's zone
         pbc::Store* store = nullptr;
         Worker* worker = nullptr;
         pbc::HttpTransport* http = nullptr;
@@ -68,6 +70,7 @@ public:
     QString quotaTotalText() const;
     bool quotaUnlimited() const;
     qint64 checkedAt() const;
+    QString checkedAtText() const;
     QString problemKey() const { return problem_; }
     int clockWarningMinutes() const { return clock_warning_; }
     bool busy() const { return busy_; }

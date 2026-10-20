@@ -132,12 +132,13 @@ core/
 │   ├── http_transport.h  dav_common.h  store.h                                  # changed (additive)
 │   └── (existing files kept; sync_scheduler.h and paging.h removed)
 └── src/                                                                          # one .cpp per header above, store_files.cpp,
-                                                                                  # store_migrations.cpp (schema 1 -> 2), log_codes.h
+                                                                                  # store_migrations.cpp (schema 1 -> 2 -> 3), log_codes.h
 bridge/
 ├── include/  connection_bridge.h  browse_bridge.h  transfer_bridge.h  space_bridge.h  qr_image_provider.h
 └── src/      the matching .cpp files; worker.cpp reused
 app/
 ├── main.cpp                     # wires the bridges, the image provider, the account check at start
+├── ui_script.{h,cpp}            # host build only: the scripted walk of scripts/ui-walk.sh (taps, typing, pictures, expectations)
 └── device_bridge.{h,cpp}        # downloadRoot, openFile inside the root
 qml/
 ├── pages/  HomePage.qml(changed)  FolderPage.qml  DetailsPage.qml  ConflictPage.qml  UpdatePage.qml
@@ -153,12 +154,19 @@ tests/
 │                 test_update  test_favorites_search  test_no_background_network  test_budget_cache  test_budget_download
 ├── bridge/       test_connection_bridge  test_browse_bridge  test_transfer_bridge  test_space_bridge
 ├── support/      fake_nextcloud_server.h (new)  fake_storage.h (new)  (existing fake_transport.h, tls_test_server.h, kill_harness.h …)
-├── tools/        pbc_fake_nextcloud.cpp  (HTTPS demo server for scripts/run-host-demo.sh)
+├── tools/        pbc_fake_nextcloud.cpp  (HTTPS demo server for scripts/run-host-demo.sh and scripts/ui-walk.sh)
+├── walks/        01-connect-browse-download.walk  02-restart-update-favorites-search-storage.walk  (CTest ui_walk)
 └── fixtures/nextcloud/   anonymized *.xml / *.json answers with the .unverified suffix
-scripts/          check-constitution.sh (rules N1–N5), run-host-demo.sh (starts the fake server), probe-device.sh (new probes)
+scripts/          check-constitution.sh (rules N1–N5), run-host-demo.sh (starts the fake server), probe-device.sh (new probes),
+                  ui-walk.sh (host-only scripted walk through the real pages, pictures; see below)
 docs/             live-server-checklist.md (LV-N1..LV-N9), device-test-checklist.md (DT-NC-1..DT-NC-10), device-findings.md
 README.md  INSTALL.md  CHANGELOG.md  VERSION (0.1.0)
 ```
+
+**Host-only tooling (added during implementation, tasks T118, T129, T133)**: `app/ui_script.{h,cpp}` is compiled only for the host build (`#ifndef PLATFORM_POCKETBOOK`,
+the host app links `Qt6::Test` for it) and runs only when `PBC_UI_SCRIPT` names a script. `scripts/ui-walk.sh` starts `pbc_fake_nextcloud` and runs the app offscreen
+through `tests/walks/*.walk`; it is the acceptance walk of the stories and CTest `ui_walk`. It is justified by the acceptance requirement of T129 (the pages and their
+wiring can be exercised without a reader); it is not part of the package and sends nothing anywhere but to the local fake server.
 
 **Structure Decision**: keep the baseline's four-layer layout unchanged (Principle II). New logic goes into new
 core modules rather than into existing ones, so the sibling-derived code stays recognizable. Platform behavior

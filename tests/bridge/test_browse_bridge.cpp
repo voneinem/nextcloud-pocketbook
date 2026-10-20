@@ -374,6 +374,22 @@ PB_TEST(favorites_are_fetched_once_when_never_fetched_shown_from_the_store_after
     PB_CHECK_EQ(e.names().join(",").toStdString(), std::string("book2.epub"));
 }
 
+PB_TEST(a_favorite_the_user_may_not_read_is_shown_as_unavailable_and_says_why) {
+    Env e;
+    e.server.set_favorite("/readme.txt", true);
+    e.server.set_permissions("/readme.txt", "RDNVCK");   // no read permission
+    e.browse->showFavorites();
+    e.settle();
+    const QVariantMap row = e.browse->rows().at(0).toMap();
+    PB_CHECK_EQ(row.value("availability").toString().toStdString(), std::string("no_permission"));
+    PB_CHECK_EQ(row.value("reason").toString().toStdString(), std::string("no_read_permission"));
+    QSignalSpy reason(e.browse.get(), &BrowseBridge::showReason);
+    QSignalSpy details(e.browse.get(), &BrowseBridge::showDetails);
+    e.browse->open("/readme.txt");   // a tap says why and opens nothing
+    PB_CHECK_EQ(reason.count(), 1);
+    PB_CHECK_EQ(details.count(), 0);
+}
+
 PB_TEST(favorites_stay_readable_offline_and_a_failed_refresh_keeps_them) {
     Env e;
     e.server.set_favorite("/readme.txt", true);

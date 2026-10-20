@@ -1,5 +1,6 @@
 #include "pbc/reader_zone.h"
 
+#include <cctype>
 #include <cstdio>
 
 namespace pbc {
@@ -28,12 +29,38 @@ std::string timezone_from_config_text(std::string_view config) {
     return std::string();
 }
 
+namespace {
+
+std::string lower_of(std::string_view v) {
+    std::string out(v);
+    for (char& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return out;
+}
+
+// The reader names its zone by the city only ("Berlin", seen on the InkPad One): the one bundled zone that ends in that city, or "" when
+// there is none or more than one (a guess between two regions could show a wrong time).
+std::string zone_of_city(const TzDatabase& db, const std::string& city) {
+    const std::string want = lower_of(city);
+    if (want.empty() || want.find('/') != std::string::npos) return std::string();
+    std::string found;
+    for (const std::string& name : db.zone_names()) {
+        const size_t slash = name.rfind('/');
+        if (slash == std::string::npos || lower_of(std::string_view(name).substr(slash + 1)) != want) continue;
+        if (!found.empty()) return std::string();   // ambiguous
+        found = name;
+    }
+    return found;
+}
+
+}  // namespace
+
 ReaderZone reader_zone(const TzDatabase* db, std::string_view config_text, const ZoneEnvironment& env) {
     ReaderZone z;
     if (!db) return z;
     const std::string configured = timezone_from_config_text(config_text);
     if (!configured.empty()) {
-        const std::string canonical = db->canonical_name(configured);
+        std::string canonical = db->canonical_name(configured);
+        if (canonical.empty()) canonical = zone_of_city(*db, configured);
         if (!canonical.empty()) {
             z.name = canonical;
             z.utc_fallback = false;

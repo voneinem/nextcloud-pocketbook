@@ -44,3 +44,13 @@ First run of PB Cloud 0.1.0 on the InkPad One, 2026-10-20, read from `system/pbc
 
 Not yet observed: the browser login, a dropped connection, a file of 4 GiB or more, the budgets (cold start, memory), the library listing the files without a rescan, and every
 other LV and DT item. Nothing in the checklists was changed to verified on this evidence.
+
+Second run, 2026-10-20 evening (database and log read from the mounted reader):
+
+| Observation | Evidence | Status |
+|---|---|---|
+| `system/config/global.cfg` names the zone by city only: `timezone=Berlin` (not `Europe/Berlin`). Version 0.1.0 as first installed did not recognize it and showed dates in UTC (two hours early in summer time) | `global.cfg`, the owner's report of "19:15" for a check at 21:15 | Observed. The app now finds a unique city in the bundled zones (DT-NC-6 stays open until the new build is seen on the reader) |
+| The log of a launch ended after the launcher's header: the app's lines were held back by `sed` in the first filtering launcher and lost when the app was stopped by the USB mode | `pbcloud.log` of 21:42 | Observed. The launcher now filters line by line with the shell (DT-NC-11) |
+| The upgrade of the database to schema 3 ran on the first start (`user_version` 3, `pbcloud.db.bak` kept) and an Update at 21:43 was recorded in `sync_state` | the database file | Observed |
+| "Last checked" stayed at the time of the start check because the account check runs only at start and only with Wi-Fi already on; since then any request the server accepts confirms the login | `account.checked_at` = 21:15 while the Update ran at 21:43 | Observed; behavior changed |
+
