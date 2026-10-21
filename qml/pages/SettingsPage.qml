@@ -23,6 +23,13 @@ Item {
         if (connection.quotaUsedText.length > 0) return qsTr("%1 used").arg(connection.quotaUsedText)
         return qsTr("unknown")
     }
+    // the page is longer than the screen: scrolling is by page, as everywhere (no dragging, no kinetic movement on e-ink)
+    readonly property bool scrollable: flick.contentHeight > flick.height + 1
+    function pageBy(direction) {
+        var maxY = Math.max(0, flick.contentHeight - flick.height)
+        flick.contentY = Math.min(maxY, Math.max(0, flick.contentY + direction * Math.max(100, flick.height - 80)))
+    }
+
     function scrollTo(item) {
         var y = item.mapToItem(column, 0, 0).y
         flick.contentY = Math.max(0, y - 160)
@@ -222,6 +229,22 @@ Item {
         id: panel
         anchors.bottom: parent.bottom
         tools: [
+            ToolButton {
+                objectName: "settingsPageUp"
+                text: qsTr("Page up")
+                icon: "chevron-up"
+                visible: page.scrollable
+                enabled: flick.contentY > 1
+                onClicked: page.pageBy(-1)
+            },
+            ToolButton {
+                objectName: "settingsPageDown"
+                text: qsTr("Page down")
+                icon: "chevron-down"
+                visible: page.scrollable
+                enabled: flick.contentY < flick.contentHeight - flick.height - 1
+                onClicked: page.pageBy(1)
+            },
             ToolButton {
                 objectName: "settingsTest"
                 text: qsTr("Test")

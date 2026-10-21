@@ -2,6 +2,7 @@
 # Generates the two 122x122, 8 bpp, opaque BMP launcher icons (normal and focused) into
 # res/icons/. Needs python3 only (no imaging library). The generated files are committed.
 # The glyph has no outer frame (spec 010), so it sits with the reader's own frameless line-art icons.
+# The mark is the Nextcloud logo as drawn by the selfh.st icon set (CC BY 4.0; attribution in NOTICE and licenses/manifest.txt).
 #
 #   scripts/make-icons.sh
 set -eu
@@ -33,25 +34,22 @@ def inside_round_rect(x, y, x0, y0, x1, y1, r):
     return (x - cx) ** 2 + (y - cy) ** 2 <= R * R
 
 def draw():
-    """The cloud glyph, no frame: a cloud outline (3 px) made of three round puffs on a rounded base.
-    The built-in icons of the reader are line art of about 75-90 px in a 122 px cell; this one is 95 x 83."""
+    """The Nextcloud mark, no frame: three interlocking rings, black on white. The geometry is that of the "nextcloud" icon of selfh.st
+    (CC BY 4.0, https://selfh.st/icons/; see NOTICE): the outline is the union of three discs, with a round hole in each. The built-in
+    icons of the reader are line art of about 75-100 px in a 122 px cell; this one is 100 px wide (the mark is wide, not tall)."""
     px = canvas()
-    t = 3.5
-    circles = ((41.8, 63.4, 21.6), (64.6, 49, 28.8), (87.4, 64.8, 20.4))
-    base = (14.2, 63.4, 107.8, 101.8, 19.2)                           # x0, y0, x1, y1, radius
-
-    def inside(x, y, d):
-        # the cloud with every part shrunk by d canvas pixels (d = 0 is the full shape)
-        for cx, cy, r in circles:
-            if (x - cx * S) ** 2 + (y - cy * S) ** 2 <= ((r - d) * S) ** 2:
-                return True
-        x0, y0, x1, y1, r = base
-        return inside_round_rect(x, y, x0 + d, y0 + d, x1 - d, y1 - d, max(0, r - d))
-
+    # in the units of the 512 x 512 original: centre x, centre y, outer radius, hole radius
+    rings = ((118.9, 256.0, 57.6, 23.3), (256.0, 255.9, 88.7, 54.5), (393.1, 256.0, 57.6, 23.3))
+    left, right = 118.9 - 57.6, 393.1 + 57.6
+    k = 100.0 / (right - left)                       # original unit -> canvas pixels
+    ox = W / 2.0 - (left + right) / 2.0 * k           # centred on the canvas
+    oy = H / 2.0 - 256.0 * k
     for y in range(H * S):
         row = px[y]
         for x in range(W * S):
-            if inside(x, y, 0) and not inside(x, y, t):
+            ux, uy = ((x + 0.5) / S - ox) / k, ((y + 0.5) / S - oy) / k
+            if any((ux - cx) ** 2 + (uy - cy) ** 2 <= r * r for cx, cy, r, _ in rings) and \
+               not any((ux - cx) ** 2 + (uy - cy) ** 2 < h * h for cx, cy, _, h in rings):
                 row[x] = 1
     return px
 

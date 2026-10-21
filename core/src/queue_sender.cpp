@@ -92,6 +92,7 @@ public:
         const std::string link_key = open_link(store_, http_, clock_, link_);
         if (!link_key.empty()) {
             report_.stopped_by_key = link_key;
+            log_end();
             return report_;
         }
         std::string stop;
@@ -124,12 +125,16 @@ public:
         report_.stopped_by_key = stop;
         report_.left = store_.queue_count_sendable(link_.account.base_url, link_.account.user_id);
         if (handled_ > 0 || !stop.empty()) remember();
-        log::event("queue.send", {log::count("done", report_.done), log::count("failed", report_.failed), log::count("conflict", report_.conflict),
-                                  log::count("unknown", report_.unknown), log::count("left", report_.left)});
+        log_end();
         return report_;
     }
 
 private:
+    void log_end() const {
+        log::event("queue.send", {log::count("done", report_.done), log::count("failed", report_.failed), log::count("conflict", report_.conflict),
+                                  log::count("unknown", report_.unknown), log::count("left", report_.left), log::text("stopped", report_.stopped_by_key)});
+    }
+
     Store& store_;
     HttpTransport& http_;
     const Clock& clock_;

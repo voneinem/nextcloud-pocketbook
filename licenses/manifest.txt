@@ -21,6 +21,16 @@ url: https://github.com/jrohde/InkFeed
 origin: bundled
 text: licenses/inkfeed-MIT.txt
 
+id: nextcloud-icon
+kind: component
+name: Nextcloud logo (selfh.st icon)
+purpose: The mark of the app icon on the reader's home screen
+license: Creative Commons Attribution 4.0 (CC BY 4.0)
+holder: selfh.st (Nextcloud GmbH holds the trademark)
+url: https://selfh.st/icons/
+origin: bundled
+text: licenses/CC-BY-4.0.txt
+
 id: mozilla-ca
 kind: component
 name: Mozilla CA certificate bundle

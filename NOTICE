@@ -58,6 +58,15 @@ public domain. The table that maps Windows zone names (for example "W. Europe St
 IANA names is hand-written in core/src/tz.cpp; it is not a copy of a data file.
 
 --------------------------------------------------------------------------------
+Nextcloud logo (selfh.st icon) (CC BY 4.0)
+https://selfh.st/icons/
+The launcher icon of the app (res/icons/pbcloud.bmp and pbcloud_f.bmp, made by scripts/make-icons.sh) redraws the Nextcloud
+logo, three interlocking rings, from the geometry of the "nextcloud" icon of the selfh.st icon set (Icons by selfh.st/icons,
+https://dashboardicons.com/icons/external/selfhst/nextcloud), converted to black and white without the blue square. The icon set
+is licensed under Creative Commons Attribution 4.0 International; the license text is licenses/CC-BY-4.0.txt. The Nextcloud name
+and logo are trademarks of Nextcloud GmbH; this app is an independent project and is not made or endorsed by Nextcloud GmbH.
+
+--------------------------------------------------------------------------------
 Noto Emoji (SIL Open Font License 1.1)
 third_party/noto-emoji/NotoEmoji.ttf, the monochrome Noto Emoji font from the Google Fonts
 repository (https://github.com/google/fonts/tree/main/ofl/notoemoji). Copyright 2013 Google LLC.

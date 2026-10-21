@@ -8,6 +8,10 @@ Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERS
 Upload and manage files on the server (specs/002-manage-server-files). Tested on the host against a fake Nextcloud server with a write side; nothing
 is verified against a real server or on a reader (`docs/live-server-checklist.md` LV-W1 ..., `docs/device-test-checklist.md` DT-W1 ...).
 
+### Icon
+- The launcher icon is the Nextcloud mark (three rings, black on white, no frame), redrawn from the selfh.st "nextcloud" icon (CC BY 4.0);
+  attribution in NOTICE and the About screen.
+
 ### Upload
 - *Add > Upload files*: a file browser of the reader's storage (list or tiles, remembered) with whole folders; the picks go into a persistent
   queue and show as **Not synced**. Sources are only ever read; links, hidden and special files are skipped and the app's own data folder can

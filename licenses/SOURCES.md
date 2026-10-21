@@ -11,6 +11,7 @@ texts, copied unchanged unless noted.
 | `LGPL-3.0.txt` | `common-licenses/LGPL-3` of the same package |
 | `GPL-3.0.txt` | `common-licenses/GPL-3` of the same package |
 | `curl.txt` | `COPYING` of the curl sources that accompany the PocketBook SDK's CMake (copyright line `1996 - 2024, Daniel Stenberg`); the device's libcurl is a newer release under the same license |
+| `CC-BY-4.0.txt` | `https://creativecommons.org/licenses/by/4.0/legalcode.txt` (plain text of the license, unchanged), for the selfh.st Nextcloud icon |
 | `inkfeed-MIT.txt` | the InkFeed section of `NOTICE` (MIT, Copyright (c) 2026 Joost Rohde) |
 | `../LICENSE` (named as `LICENSE`) | this project's own license |
 | `../third_party/noto-emoji/OFL.txt` | Noto Emoji, see `third_party/noto-emoji/VERSION` |

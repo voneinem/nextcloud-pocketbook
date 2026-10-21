@@ -1,5 +1,6 @@
 // Spec 010 US1 (FR-001..FR-004): the launcher icon has no frame, is sized like the built-in icons, is anti-aliased
 // and has two different variants. Contract: specs/010-builtin-look-gui-overhaul/contracts/ui-components.md section 6.
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -43,8 +44,8 @@ bool load(const std::string& name, Bmp& out) {
     return true;
 }
 
-// Checks one variant: size, no frame (the outer 10 px ring is all background), glyph box 60..85 % and centred,
-// anti-aliased strokes.
+// Checks one variant: size, no frame (the outer 10 px ring is all background), the longer side of the glyph 60..85 % and centred
+// (the Nextcloud mark is wide: three rings in a row), anti-aliased strokes.
 void check_variant(const std::string& name, int background) {
     Bmp b;
     PB_CHECK(load(name, b));
@@ -71,8 +72,8 @@ void check_variant(const std::string& name, int background) {
         }
     PB_CHECK(x1 >= x0 && y1 >= y0);
     const int gw = x1 - x0 + 1, gh = y1 - y0 + 1;
-    PB_CHECK(gw >= 73 && gw <= 103);  // 60..85 % of 122
-    PB_CHECK(gh >= 73 && gh <= 103);
+    PB_CHECK(std::max(gw, gh) >= 73 && std::max(gw, gh) <= 103);  // 60..85 % of 122
+    PB_CHECK(std::min(gw, gh) >= 35);
     PB_CHECK(std::abs((x0 + x1) / 2 - 61) <= 4);
     PB_CHECK(std::abs((y0 + y1) / 2 - 61) <= 4);
     PB_CHECK(soft >= 100);  // anti-aliased

@@ -205,9 +205,15 @@ int main(int argc, char** argv) {
                 return;
             }
             auto link = std::make_shared<QMetaObject::Connection>();
-            *link = QObject::connect(&device, &DeviceBridge::networkResult, &device, [link, done](bool ok) {
+            *link = QObject::connect(&device, &DeviceBridge::networkResult, &device, [link, done, &device](bool ok) {
                 QObject::disconnect(*link);
-                done(ok);
+                if (!ok) {
+                    done(false);
+                    return;
+                }
+                // the system reports "connected" before names and routes work: the first request right after it failed on the reader (device log
+                // 2026-10-21), so the tap goes on after a short settling time
+                QTimer::singleShot(3000, &device, [done, &device] { done(device.wifiConnected()); });
             });
             device.connectNetwork();
         };
