@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import ".."
 
-// About: the app's name, version, author, copyright and license (spec 003). Read-only; nothing is sent anywhere.
+// About: the app's name, version, author, copyright and license (spec 003). Nothing is sent from this page.
 // In the look of the device's own screens (spec 010): a top bar with Back, hairline rows, two tappable rows for the texts.
 Item {
     id: page
@@ -60,6 +60,7 @@ Item {
             Line { text: page.orUnavailable(about.copyright); font.pixelSize: Style.labelSize }
             Line { text: qsTr("License: %1").arg(page.orUnavailable(about.licenseName)) }
             Line { text: qsTr("This is an unofficial app. It is not made by or connected with Nextcloud GmbH."); font.pixelSize: Style.labelSize }
+            Line { text: qsTr("The app writes to your server only when you ask it to, and never by itself."); font.pixelSize: Style.labelSize }
 
             Line { text: qsTr("Time zone data: release %1").arg(about.tzRelease.length > 0 ? about.tzRelease : qsTr("unknown")); font.pixelSize: Style.labelSize }
             Line {

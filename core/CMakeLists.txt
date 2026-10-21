@@ -47,6 +47,17 @@ set(PBC_CORE_SOURCES
     src/downloader.cpp
     src/entry_state.cpp
     src/update.cpp
+    src/check_outcome.cpp
+    src/dav_write.cpp
+    src/queue_sender.cpp
+    src/auto_sync.cpp
+    src/upload_session.cpp
+    src/server_caps.cpp
+    src/new_name.cpp
+    src/source_walk.cpp
+    src/upload_source.cpp
+    src/queue_actions.cpp
+    src/store_queue.cpp
 )
 
 # libcurl: the system package on the host (8.18.0 or newer), the bundled static build for the device.

@@ -5,7 +5,11 @@
 //   pbc-probe [data-dir]       data-dir defaults to /mnt/ext1/system/pbcloud
 //   PBC_PROBE_URL=https://...  an https address of any plain file server (a file of at least 1 MiB): the probe then tests Range, If-Range,
 //                              the progress callback and the redirect rule of the bundled libcurl; the address is never printed
+//   PBC_PROBE_PUT_URL=https://... [PBC_PROBE_PUT_LOGIN=user:app-password]  an https address that accepts a PUT (a file of a TEST account:
+//                              the probe OVERWRITES it): the probe then sends a range of a file with the app's own transport and reports
+//                              the bytes the server received, the cancel by the progress callback and `delivery` (feature 002, DT-W1/DT-W2)
 #include <curl/curl.h>
+#include "pbc/curl_transport.h"
 #include <dirent.h>
 #include <iconv.h>
 #include <sys/stat.h>
@@ -316,6 +320,66 @@ void probe_range_url() {
     }
 }
 
+// Needs PBC_PROBE_PUT_URL (and, for a server that wants a login, PBC_PROBE_PUT_LOGIN). Prints one result line per test and never the address, the
+// login or the file name. The body is a range of a temporary file of the probe, so the range logic of the product (Request::body_file) is what runs.
+void probe_put_range(const std::string& dir) {
+    section("uploads: a PUT from a file range (the app's own transport)");
+    const char* url = std::getenv("PBC_PROBE_PUT_URL");
+    if (!url || std::strncmp(url, "https://", 8) != 0) {
+        std::printf("put-range: skipped (PBC_PROBE_PUT_URL is not set to an https address)\nput-cancel: skipped\nput-delivery: skipped\n");
+        return;
+    }
+    const std::string path = dir + "/pbc-probe-put.bin";
+    {
+        std::ofstream f(path, std::ios::binary | std::ios::trunc);
+        std::string block(1 << 20, 'p');
+        for (int i = 0; i < 3; ++i) f.write(block.data(), static_cast<std::streamsize>(block.size()));
+    }
+    pbc::CurlTransport transport(first_ca_file());
+    const char* login = std::getenv("PBC_PROBE_PUT_LOGIN");
+    std::string user, pass;
+    if (login) {
+        const std::string l = login;
+        const size_t colon = l.find(':');
+        user = l.substr(0, colon);
+        pass = colon == std::string::npos ? std::string() : l.substr(colon + 1);
+    }
+    {   // the second MiB, whole: the server must see exactly 1 MiB
+        pbc::Request r;
+        r.method = "PUT";
+        r.url = url;
+        r.username = user;
+        r.password = pass;
+        r.body_file = path;
+        r.body_offset = 1 << 20;
+        r.body_length = 1 << 20;
+        r.buffer_size = 65536;
+        long long last = 0;
+        r.progress = [&](long long done, long long) { last = done; return true; };
+        const pbc::Response a = transport.perform(r);
+        std::printf("put-range: %s (status %ld, sent %lld bytes of %lld, delivery %s)\n", a.status >= 200 && a.status < 300 ? "accepted" : "not accepted", a.status, last,
+                    r.body_length, a.status != 0 ? "answered" : (a.delivery == pbc::Delivery::NotSent ? "not_sent" : (a.delivery == pbc::Delivery::PartlySent ? "partly_sent" : "fully_sent")));
+    }
+    {   // cancelled by the progress callback after 256 KiB: nothing may be stored by a well-behaved server
+        pbc::Request r;
+        r.method = "PUT";
+        r.url = url;
+        r.username = user;
+        r.password = pass;
+        r.body_file = path;
+        r.body_offset = 0;
+        r.body_length = 3 << 20;
+        r.buffer_size = 65536;
+        long long last = 0;
+        r.progress = [&](long long done, long long) { last = done; return done < 256 * 1024; };
+        const pbc::Response a = transport.perform(r);
+        std::printf("put-cancel: %s (sent %lld bytes, delivery %s)\n", a.cancelled ? "the progress callback stops the transfer" : "did not stop", last,
+                    a.delivery == pbc::Delivery::NotSent ? "not_sent" : (a.delivery == pbc::Delivery::PartlySent ? "partly_sent" : "fully_sent"));
+    }
+    std::printf("put-delivery: cut the Wi-Fi during a longer PUT by hand and read the delivery of the app's log line (DT-W2); this probe cannot cut it\n");
+    ::unlink(path.c_str());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -328,6 +392,7 @@ int main(int argc, char** argv) {
     probe_data_dir(data_dir);
     probe_big_file(data_dir);
     probe_range_url();
+    probe_put_range(data_dir);
     probe_system();
     curl_global_cleanup();
     return 0;

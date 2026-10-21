@@ -1,0 +1,29 @@
+# Delete on the server (specs/002-manage-server-files US6): the confirmation says the entry goes to the server's trash, the entry stays in the list as
+# "Delete pending" until the server has done it, and a server without a trash is not asked at all (see 09-no-trash.walk). Run after 07-move-and-copy.walk.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderSelect
+wait 400
+tap folderRow 8
+shot @OUT@/80-delete-selected.png
+tap folderDelete
+waitfor folderDeleteConfirm
+expect dialogText goes to the server's trash
+shot @OUT@/81-delete-confirm.png
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 500
+shot @OUT@/82-delete-pending.png
+tap folderQueue
+waitfor queueRow
+expect queueRowCaption Not synced
+tap queueSend
+waitfor queueRowCaption Sent
+wait 1200
+shot @OUT@/83-delete-sent.png
+tap queueBack
+wait 500
+shot @OUT@/84-documents-after-delete.png

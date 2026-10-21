@@ -6,7 +6,7 @@ namespace pbc {
 
 inline const char* kSchemaSql = R"SQL(
 CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
--- keys: auto_sync, first_run_done, ui_language, last_integrity_check, schema_backup_pending
+-- keys: auto_sync, picker_view, last_send_at, last_send_counts, first_run_done, ui_language, last_integrity_check, schema_backup_pending
 
 CREATE TABLE sync_state(
     id INTEGER PRIMARY KEY CHECK(id = 1),

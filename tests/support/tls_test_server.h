@@ -128,6 +128,15 @@ public:
     }
     int failed_handshakes() const { return failed_handshakes_; }
 
+    // Uploads (specs/002-manage-server-files): by default the body of a request is read completely and recorded with the request.
+    // discard_body: the body is read and thrown away (a 200 MB upload does not fill the test's memory); only its size is counted.
+    void set_discard_body(bool on) { discard_body_ = on; }
+    // body_read_limit > 0: read at most that many body bytes, then hang up without an answer (a server that dies in the middle of a body).
+    void set_body_read_limit(long long n) { body_read_limit_ = n; }
+    long long body_bytes_received() const { return body_bytes_; }
+    // The sizes of the reads of the last request body (to prove that the client sends in small pieces).
+    long long largest_body_read() const { return largest_read_; }
+
     // True if any received request carried an Authorization header (any case).
     bool saw_authorization() const {
         for (const auto& r : requests()) {
@@ -177,10 +186,36 @@ private:
             for (char& c : low) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             const size_t cl = low.find("content-length:");
             const size_t want = cl == std::string::npos ? 0 : static_cast<size_t>(std::atoll(low.c_str() + cl + 15));
-            while (req.size() < head_end + 4 + want && req.size() < (64u << 20)) {
-                int n = SSL_read(ssl, buf, sizeof buf);
-                if (n <= 0) break;
-                req.append(buf, buf + n);
+            const size_t already = req.size() - (head_end + 4);   // body bytes that arrived with the head
+            if (discard_body_ || body_read_limit_ > 0) {
+                std::string head = req.substr(0, head_end + 4);
+                long long got = static_cast<long long>(already);
+                static thread_local char big[65536];
+                largest_read_ = 0;
+                while (got < static_cast<long long>(want)) {
+                    if (body_read_limit_ > 0 && got >= body_read_limit_) break;
+                    const int n = SSL_read(ssl, big, sizeof big);
+                    if (n <= 0) break;
+                    if (n > largest_read_) largest_read_ = n;
+                    got += n;
+                }
+                body_bytes_ = got;
+                if (body_read_limit_ > 0 && got < static_cast<long long>(want)) {   // die without an answer
+                    {
+                        std::lock_guard<std::mutex> l(mu_);
+                        requests_.push_back(head);
+                    }
+                    SSL_free(ssl);   // no close_notify: the socket is closed by the caller
+                    return;
+                }
+                req = head;
+            } else {
+                while (req.size() < head_end + 4 + want && req.size() < (64u << 20)) {
+                    int n = SSL_read(ssl, buf, sizeof buf);
+                    if (n <= 0) break;
+                    req.append(buf, buf + n);
+                }
+                body_bytes_ = static_cast<long long>(req.size() - (head_end + 4));
             }
         }
         if (req.empty()) {  // TLS 1.3: the server can finish before the client's rejection arrives
@@ -223,6 +258,10 @@ private:
     mutable std::mutex mu_;
     std::vector<std::string> requests_;
     std::atomic<int> failed_handshakes_{0};
+    std::atomic<bool> discard_body_{false};
+    std::atomic<long long> body_read_limit_{0};
+    std::atomic<long long> body_bytes_{0};
+    std::atomic<long long> largest_read_{0};
 };
 
 }  // namespace pbtest

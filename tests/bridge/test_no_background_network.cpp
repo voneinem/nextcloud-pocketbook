@@ -12,6 +12,7 @@
 #include "fake_storage.h"
 #include "fake_nextcloud_server.h"
 #include "pbc/store.h"
+#include "queue_bridge.h"
 #include "test_support.h"
 #include "tmp_dir.h"
 #include "transfer_bridge.h"
@@ -61,6 +62,34 @@ struct App {
     pbtest::FakeStorage storage;
     std::unique_ptr<TransferBridge> transfer;
     std::unique_ptr<BrowseBridge> browse;
+    std::unique_ptr<QueueBridge> queue;
+    std::string picker_root;
+
+    // The queue with Auto Sync's quiet period shortened to milliseconds. The reader's storage is a folder of the test.
+    void make_queue(int quiet_ms) {
+        picker_root = dir.file("root");
+        ::mkdir(picker_root.c_str(), 0700);
+        ::mkdir((picker_root + "/Downloads").c_str(), 0700);
+        QueueBridge::Config q;
+        q.store = store.get();
+        q.worker = &worker;
+        q.http = &server;
+        q.clock = &clock;
+        q.rules.root = picker_root;
+        q.wifi_up = [this] { return wifi; };
+        q.ensure_network = [this](std::function<void(bool)> done) { done(wifi); };
+        q.download_root = dir.file("PBCloud");
+        q.auto_sync_quiet_ms = quiet_ms;
+        queue = std::make_unique<QueueBridge>(q);
+    }
+    QString file(const std::string& rel, const std::string& data) {
+        const std::string path = picker_root + "/" + rel;
+        FILE* f = ::fopen(path.c_str(), "wb");
+        if (!f) PB_FAIL_AT("cannot make " + path);
+        ::fwrite(data.data(), 1, data.size(), f);
+        ::fclose(f);
+        return QString::fromStdString(path);
+    }
 
     App() {
         auto r = pbc::Store::open(dir.file("data"), clock);
@@ -206,6 +235,120 @@ PB_TEST(a_search_typed_offline_and_the_favorites_without_wifi_send_nothing) {
     a.server.clear_log();
     idle(600);
     PB_CHECK_EQ(a.server.request_count(), size_t(0));
+}
+
+// Auto Sync (specs/002-manage-server-files, SC-003, research R-14): the only thing that may start a request besides a tap is the one quiet period
+// after the user's own action. Nothing else: not the start, not Wi-Fi coming up, not a failed item, not a finished send, not reading properties.
+PB_TEST(a_queue_left_by_an_earlier_session_is_not_sent_at_start_when_wifi_comes_up_or_when_properties_are_read) {
+    App a;
+    a.sign_in();
+    a.server.add_folder("/Docs");
+    a.make_queue(40);
+    const QString f = a.file("Downloads/a.txt", "aaa");
+    // queued in an earlier session: it is in the database, nobody acted in this one
+    pbc::QueueItem item;
+    item.kind = pbc::ItemKind::Upload;
+    item.server = a.server.base_url();
+    item.user_id = "demo";
+    item.src_local = f.toStdString();
+    item.src_size = 3;
+    item.dst_parent = "/Docs";
+    item.dst_name = "a.txt";
+    PB_CHECK(a.store->queue_add(item).ok());
+    a.make_queue(40);   // the app starts
+    a.wifi = false;
+    a.connection->checkAtStart();
+    idle(300);
+    a.wifi = true;      // Wi-Fi comes up
+    (void)a.queue->openCount();
+    (void)a.queue->items();
+    (void)a.queue->offline();
+    (void)a.queue->waitingNotice();
+    a.queue->refresh();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.queue->openCount(), 1);
+}
+
+PB_TEST(the_users_own_action_is_the_only_trigger_and_after_the_send_it_is_quiet_again) {
+    App a;
+    a.sign_in();
+    a.server.add_folder("/Docs");
+    a.make_queue(40);
+    QSignalSpy finished(a.queue.get(), &QueueBridge::sendFinished);
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    PB_CHECK(finished.wait(10000));
+    PB_CHECK_EQ(a.server.count("PUT"), size_t(1));
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    a.wifi = false;
+    idle(200);
+    a.wifi = true;      // a Wi-Fi that comes back is not a trigger either
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(finished.count(), 1);
+}
+
+PB_TEST(an_item_that_fails_is_not_tried_again_by_itself_and_with_auto_sync_off_nothing_is_sent) {
+    App a;
+    a.sign_in();
+    a.server.add_folder("/Docs");
+    a.make_queue(40);
+    QSignalSpy finished(a.queue.get(), &QueueBridge::sendFinished);
+    a.server.answer_next("PUT", "/Docs/", 403);
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    PB_CHECK(finished.wait(10000));
+    a.server.clear_log();
+    idle(800);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // the failed item waits for the user's tap
+    a.queue->setAutoSync(false);
+    a.queue->addUploads("/Docs", {a.file("Downloads/b.txt", "bbb")});
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.queue->openCount(), 2);
+}
+
+PB_TEST(an_unknown_item_leaving_the_queue_screen_and_wifi_cycles_start_nothing_and_a_new_action_sends_only_the_new_item) {
+    App a;
+    a.sign_in();
+    a.server.add_folder("/Docs");
+    a.make_queue(40);
+    QSignalSpy finished(a.queue.get(), &QueueBridge::sendFinished);
+    a.server.lose_next_answer("PUT");
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    PB_CHECK(finished.wait(10000));                       // the one Auto Sync send after the user's action: its answer is lost
+    PB_CHECK_EQ(finished.at(0).at(0).toMap().value("unknown").toInt(), 1);
+    a.server.clear_log();
+    a.queue->leaveScreen();
+    a.queue->refresh();
+    for (int i = 0; i < 3; ++i) {
+        a.wifi = false;
+        idle(100);
+        a.wifi = true;
+        idle(150);
+    }
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));     // the unknown item is never taken again by itself
+    a.queue->addUploads("/Docs", {a.file("Downloads/b.txt", "bbb")});   // a new user action: one more send, of the new item only
+    PB_CHECK(finished.wait(10000));
+    PB_CHECK_EQ(a.server.count("PUT"), size_t(1));
+    idle(500);
+    PB_CHECK_EQ(a.server.count("PUT"), size_t(1));
+    PB_CHECK_EQ(finished.count(), 2);
+}
+
+PB_TEST(without_wifi_at_the_end_of_the_quiet_period_nothing_is_sent_and_nothing_follows_when_wifi_returns) {
+    App a;
+    a.sign_in();
+    a.server.add_folder("/Docs");
+    a.make_queue(40);
+    a.wifi = false;
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    idle(400);
+    a.wifi = true;
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.queue->openCount(), 1);
 }
 
 PB_TEST_MAIN()

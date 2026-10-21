@@ -5,6 +5,7 @@
 #include "fake_transport.h"
 #include "pbc/clock_check.h"
 #include "pbc/dav_common.h"
+#include "pbc/error_keys.h"
 #include "test_support.h"
 
 using pbc::DavSession;
@@ -196,6 +197,59 @@ PB_TEST(small_helpers_keep_their_behaviour) {
     PB_CHECK_EQ(pbc::header_value(h, "Depth"), std::string("1"));
     PB_CHECK_EQ(pbc::header_value(h, "Content-Type"), std::string("application/xml; charset=utf-8"));
     PB_CHECK(std::string(pbc::dav::kXmlHeader).find("<?xml") == 0);
+}
+
+// The write side (specs/002-manage-server-files, contracts/server-requests.md W10): the status alone, one layer below the request-specific keys.
+PB_TEST(status_error_maps_the_statuses_of_the_write_requests) {
+    FakeTransport http;
+    DavSession s(http, "https://dav.example.org", "a", "b");
+    auto key = [&](long status) { return s.status_error(FakeTransport::status(status)).key; };
+    PB_CHECK_EQ(key(405), std::string("protocol_error"));   // name_exists for an MKCOL is decided by the request kind, not here
+    PB_CHECK_EQ(key(409), std::string("target_gone"));
+    PB_CHECK_EQ(key(412), std::string("changed_on_server"));
+    PB_CHECK_EQ(key(413), std::string("file_too_large_server"));
+    PB_CHECK_EQ(key(415), std::string("type_not_accepted"));
+    PB_CHECK_EQ(key(507), std::string("server_storage_full"));
+    // the existing mappings do not change
+    PB_CHECK_EQ(key(401), std::string("auth_failed"));
+    PB_CHECK_EQ(key(403), std::string("forbidden"));
+    PB_CHECK_EQ(key(404), std::string("not_found"));
+    PB_CHECK_EQ(key(423), std::string("locked"));
+    PB_CHECK_EQ(key(429), std::string("rate_limited"));
+    PB_CHECK_EQ(key(503), std::string("maintenance"));
+    // 201, 204 and 207 are answers the caller reads
+    for (long ok : {200L, 201L, 204L, 207L}) {
+        bool handled = true;
+        PB_CHECK(s.status_error(FakeTransport::status(ok), &handled).ok());
+        PB_CHECK(!handled);
+    }
+    PB_CHECK(pbc::class_of("target_gone") == pbc::ErrorClass::Server);
+    PB_CHECK(s.status_error(FakeTransport::status(507)).cls == pbc::ErrorClass::Server);
+}
+
+PB_TEST(send_file_hands_a_file_range_to_the_transport_with_the_credentials_outside_the_url) {
+    FakeTransport http;
+    http.set_handler([](const pbc::Request&) { return FakeTransport::status(201, "", {{"Date", "Wed, 14 Oct 2026 12:00:00 GMT"}}); });
+    DavSession s(http, "https://dav.example.org", "alice", "secret-pw");
+    const pbc::Response r = s.send_file("PUT", "https://dav.example.org/remote.php/dav/files/alice/a.bin", "/tmp/source", 10, 20,
+                                        {{"If-None-Match", "*"}}, [](long long, long long) { return true; });
+    PB_CHECK_EQ(r.status, 201L);
+    PB_CHECK_EQ(http.requests().size(), static_cast<size_t>(1));
+    const pbc::Request& q = http.requests()[0];
+    PB_CHECK_EQ(q.method, std::string("PUT"));
+    PB_CHECK_EQ(q.body_file, std::string("/tmp/source"));
+    PB_CHECK_EQ(q.body_offset, 10LL);
+    PB_CHECK_EQ(q.body_length, 20LL);
+    PB_CHECK(q.body.empty());
+    PB_CHECK_EQ(q.username, std::string("alice"));
+    PB_CHECK(q.progress != nullptr);
+    PB_CHECK(q.url.find("secret-pw") == std::string::npos);
+    PB_CHECK_EQ(pbc::header_value(q.headers, "If-None-Match"), std::string("*"));
+    PB_CHECK(s.last_server_time().has_value());   // the Date header is remembered as for send()
+    // an address on another host is never used
+    const pbc::Response other = s.send_file("PUT", "https://evil.example.net/x", "/tmp/source", 0, 1, {}, nullptr);
+    PB_CHECK_EQ(other.status, 0L);
+    PB_CHECK_EQ(http.requests().size(), static_cast<size_t>(1));
 }
 
 PB_TEST_MAIN()

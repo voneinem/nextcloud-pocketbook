@@ -48,6 +48,8 @@ shot @OUT@/11-books-after-download.png
 tap folderKeep
 wait 600
 shot @OUT@/12-books-kept.png
-tap folderUpdate
+tap folderBack
+wait 500
+tap homeUpdate
 waitfor updateStatus finished
 shot @OUT@/13-update-report.png

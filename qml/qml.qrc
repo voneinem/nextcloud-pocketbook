@@ -20,6 +20,7 @@
         <file>PageButtons.qml</file>
         <file>SelectableText.qml</file>
         <file>ConfirmDialog.qml</file>
+        <file>CollisionDialog.qml</file>
         <file>ChoiceDialog.qml</file>
         <file>TextEntryDialog.qml</file>
         <file>SelectionHandle.qml</file>
@@ -37,6 +38,9 @@
         <file>pages/FavoritesPage.qml</file>
         <file>pages/SearchPage.qml</file>
         <file>pages/SpacePage.qml</file>
+        <file>pages/FilePickerPage.qml</file>
+        <file>pages/QueuePage.qml</file>
+        <file>pages/FolderChooserPage.qml</file>
         <file>Problems.qml</file>
         <file>EntryWords.qml</file>
         <file>FlatList.qml</file>

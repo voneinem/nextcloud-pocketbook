@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+  <s:exception>Sabre\DAV\Exception\RequestedRangeNotSatisfiable</s:exception>
+  <s:message>The file you are trying to upload is too large</s:message>
+</d:error>

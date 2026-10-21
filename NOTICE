@@ -4,7 +4,9 @@ This project is licensed under the MIT License (see LICENSE). The following comp
 patterns are used under their own terms. The build setup, the Qt-free core layout, the SQLite store base,
 the TLS/CA handling, the DAV and XML plumbing and the generic QML widgets were taken from the author's own
 office-pocketbook (PB Office 0.3.0), which in turn took them from the author's own notes-pocketbook
-(MIT, same copyright holder).
+(MIT, same copyright holder). The file browser of the Upload action (list and tile views, remembered, no kinetic scrolling) is
+adapted from the attach browser of notes-pocketbook, and the quiet-period rule of Auto Sync from its sync scheduler (the same
+MIT license, the same copyright holder).
 
 --------------------------------------------------------------------------------
 InkFeed (MIT License)

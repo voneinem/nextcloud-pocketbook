@@ -1,0 +1,102 @@
+# Create folders and rename (specs/002-manage-server-files US4): New folder is queued and shown at once as Not synced, a name the server forbids is
+# refused before anything is queued, an upload into a folder that is still queued waits for it, Rename (also a change of case only) is queued, and
+# Send makes it all happen in the right order. Run after 05-collisions-and-conflicts.walk with the same server and folders.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# New folder
+tap folderAdd
+wait 500
+tap choiceRow 1
+waitfor folderNewFolder
+type bad/name
+tap footerButton 1
+waitfor inkFieldError
+shot @OUT@/60-new-folder-refused.png
+tap footerButton 0
+wait 400
+tap folderAdd
+wait 500
+tap choiceRow 1
+waitfor folderNewFolder
+type Reports
+tap footerButton 1
+wait 700
+expect folderRowCaption Not synced
+shot @OUT@/61-new-folder-queued.png
+# the new folder is not on the server yet; the reader still opens it, and an upload into it waits for it
+tap folderRow 0
+waitfor folderPath Reports
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 0
+tap pickerUpload
+waitfor dialogText in the queue
+tap footerButton 0
+wait 500
+shot @OUT@/62-upload-into-new-folder.png
+tap folderUp
+wait 700
+# Rename: select mode, one entry, a change of case only
+tap folderSelect
+wait 400
+tap folderRow 7
+wait 300
+shot @OUT@/63-select-mode.png
+tap folderRename
+waitfor folderRenameEntry
+shot @OUT@/64-rename-dialog.png
+tap inkField
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+type Second.txt
+tap footerButton 1
+wait 700
+shot @OUT@/65-rename-queued.png
+# a rename onto a name that is taken asks (keep both, replace, skip); here: skip
+tap folderSelect
+wait 400
+tap folderRow 8
+tap folderRename
+waitfor folderRenameEntry
+tap inkField
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+type diary.txt
+tap footerButton 1
+waitfor collisionText diary.txt
+shot @OUT@/65b-rename-collision.png
+tap footerButton 0
+wait 500
+# Send: the folder first, then the upload into it, then the rename
+tap folderQueue
+waitfor queueRow
+shot @OUT@/66-queue-three-items.png
+tap queueSend
+waitfor queueRowCaption Sent
+wait 1500
+shot @OUT@/67-queue-sent.png
+tap queueBack
+wait 500
+shot @OUT@/68-documents-after.png

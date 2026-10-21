@@ -16,6 +16,11 @@ PB_TEST(every_key_of_the_contract_is_listed_exactly_once) {
         "local_changed", "locked", "path_too_long", "cancelled",
         // parser-level keys documented next to the contract
         "foreign_href", "qr_too_long", "connection_lost", "path_unsafe", "write_failed",
+        // the write side (specs/002-manage-server-files/contracts/server-requests.md "Error keys added to 001's list")
+        "server_storage_full", "file_too_large_server", "type_not_accepted", "name_forbidden", "not_allowed", "changed_on_server",
+        "name_exists", "target_gone", "source_gone", "partial_failure", "server_refused", "queue_full", "refresh_first", "change_pending",
+        "source_unreadable", "source_changed", "source_not_allowed", "trash_unavailable", "outcome_unknown", "other_account",
+        "no_connection",
     };
     const auto& all = pbc::all_error_keys();
     std::set<std::string> seen(all.begin(), all.end());
@@ -38,6 +43,18 @@ PB_TEST(a_key_belongs_to_one_error_class_and_error_from_key_agrees) {
     PB_CHECK(pbc::class_of("no_network") == pbc::ErrorClass::Network);
     PB_CHECK(pbc::class_of("cancelled") == pbc::ErrorClass::Cancelled);
     PB_CHECK(pbc::class_of("malformed_xml") == pbc::ErrorClass::Protocol);
+}
+
+PB_TEST(the_write_side_keys_have_the_classes_of_the_contract) {
+    for (const char* k : {"server_storage_full", "file_too_large_server", "type_not_accepted", "name_forbidden", "not_allowed", "changed_on_server",
+                          "name_exists", "target_gone", "source_gone", "partial_failure", "server_refused"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Server);
+    for (const char* k : {"queue_full", "source_unreadable", "source_changed", "source_not_allowed"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Storage);
+    for (const char* k : {"no_connection", "outcome_unknown"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Network);
+    for (const char* k : {"refresh_first", "trash_unavailable"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Unsupported);
+    PB_CHECK(pbc::class_of("other_account") == pbc::ErrorClass::Auth);
+    // an unknown key still falls back to a protocol error
+    PB_CHECK(pbc::error_from_key("name_exist").key == "protocol_error");
 }
 
 PB_TEST(an_unknown_key_is_a_protocol_error) {

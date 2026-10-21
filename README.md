@@ -1,11 +1,11 @@
 # PB Cloud
 
-A **read-only Nextcloud files client** for the PocketBook InkPad One. Browse your files page by page, download them on
-demand, keep chosen files and folders offline, and open them in the reader's own viewer. Built for an e-ink screen, offline
-first, with no background network activity.
+A **Nextcloud files client** for the PocketBook InkPad One. Browse your files page by page, download them on demand, keep
+chosen files and folders offline, open them in the reader's own viewer, and upload and manage files on your server. Built for an
+e-ink screen, offline first, with no background network activity: the app writes to the server only on your action.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.1.0-informational.svg)
+![Version](https://img.shields.io/badge/version-0.2.0-informational.svg)
 ![Platform: PocketBook InkPad One](https://img.shields.io/badge/platform-PocketBook%20InkPad%20One-lightgrey.svg)
 ![Status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)
 
@@ -52,6 +52,19 @@ author). It is a separate app with its own binary, launcher and data folder.
   not downloaded, downloaded, outdated, changed on the reader, in conflict or removed on the server.
 - **Favorites and search.** The files you starred in Nextcloud. Search by name works offline in what the reader knows; **Also search the
   server** asks the server once, on your tap.
+- **Upload.** *Add > Upload files* opens a file browser of the reader's storage (list or tiles, remembered): pick files and whole folders
+  and they are put in the **queue**, shown in the listing marked **Not synced**. Nothing is sent by picking. Large files go in chunks
+  and continue where they stopped after a lost connection; an upload whose outcome is unknown is kept and flagged, never repeated
+  silently.
+- **Manage.** New folder, rename, move, copy and delete (the select mode of a folder). Each is queued first and sent later, always on
+  the version of the entry you saw: if it changed on the server meanwhile, the change is held and both versions stay until you decide.
+  A name that is already taken asks: keep both under a new name, replace after a confirmation, or skip. Delete asks for confirmation and
+  says it goes to the **server's trash**; on a server without a trash it is not offered at all (a permanent delete is not part of this app).
+- **Queue and Auto Sync.** The Queue screen shows what waits, what failed and why, what needs your decision. **Send** runs the queue.
+  With **Auto Sync** (Settings; on by default, switchable) the queue is also sent a few seconds after your own action, when Wi-Fi is
+  already on; never at start, never when Wi-Fi comes back, never again by itself after a failure.
+- **Clear refusals.** A full account, a name the server does not accept, a file that is too large or of a type the server refuses, a
+  locked file and a revoked password each have their own message and a next step; the item stays in the queue.
 - **Storage.** Lists everything the app downloaded with sizes, removes local copies (the server is never touched), shows free space
   and the size of the saved lists, and clears them.
 
@@ -59,9 +72,10 @@ The interface is English with a German translation (Settings > Language; texts i
 
 ## Not in this version
 
-Uploading, creating, renaming, moving or deleting on the server, sharing, trash, versions, folder synchronization, several
-accounts, end-to-end encrypted folders (they are shown as such and cannot be opened), Talk, photo upload, editing documents,
-notifications. PB Cloud is read-only toward the server: it sends no write request of any kind.
+Sharing, screens for the trash and for file versions, permanent deletion, folder synchronization, automatic upload of any kind, any
+background activity, several accounts, end-to-end encrypted folders (they are shown as such and cannot be opened), Talk, photo upload,
+editing documents, notifications. PB Cloud writes to the server only when you ask it to: through the queue, with a condition on
+every request, and never by itself.
 
 ## Requirements
 

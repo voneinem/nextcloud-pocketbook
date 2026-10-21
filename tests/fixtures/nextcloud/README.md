@@ -12,3 +12,11 @@ Rules:
 - Names are reserved example names only: hosts `example.org` / `cloud.example.org`, user `demo`, generated hex ETags.
 - XML namespace URIs (`http://owncloud.org/ns`, `http://nextcloud.org/ns`) are protocol identifiers, not servers.
 - No `Authorization` value, no real token, no real user data.
+
+## Write side (feature 002)
+
+`write/` holds the answers of the write requests (`put/`, `dav/` for `MKCOL`/`MOVE`/`COPY`/`DELETE`, `uploads/` for the chunked
+upload folder, `capabilities/` for the capability lists, `errors/` for refusals with a sabre error body). The same rules
+apply: reserved example names, the `.unverified` suffix before the extension until a live run produced the exchange, no
+`Authorization` value. Hostile and partial variants (markup and control characters in an exception class, a truncated
+multistatus) are kept here too.

@@ -1,0 +1,41 @@
+# Clear messages when the server says no (specs/002-manage-server-files US7): a full account is found out before any byte is sent and said so, a locked
+# file is refused with its own message and not retried by itself, and both stay in the queue with their reason. Run after 08-delete.walk.
+# server quota 1
+# server lock /Documents/notes.txt
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# an upload into an account with no room left
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 5
+expect pickerSelection 1 file(s)
+tap pickerUpload
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+tap folderSelect
+wait 400
+tap folderRow 3
+tap folderDelete
+waitfor folderDeleteConfirm
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+tap folderQueue
+waitfor queueRow
+tap queueSend
+waitfor queueRowCaption Failed
+wait 1000
+shot @OUT@/90-queue-refusals.png
+expect queueRowCaption storage
+# the failed items stay in the queue, and a second Send does not try them again by itself
+tap queueSend
+wait 1500
+shot @OUT@/91-queue-still-failed.png

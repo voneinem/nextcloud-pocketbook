@@ -11,6 +11,7 @@
 #include "pbc/local_files.h"
 #include "pbc/folder_service.h"
 #include "pbc/remote_path.h"
+#include "pbc/server_caps.h"
 #include "pbc/utf8.h"
 #include "worker.h"
 
@@ -112,6 +113,36 @@ QVariantMap BrowseBridge::row_map(const pbc::RemoteEntry& e, const std::string& 
     return m;
 }
 
+QVariantMap BrowseBridge::overlay_row_map(const pbc::OverlayRow& r) const {
+    QVariantMap m;
+    if (r.pending_row) {   // it exists only in the queue: no download state, no marks, nothing to look up on the card
+        const pbc::RemoteEntry& e = r.entry;
+        m["name"] = display_safe(e.name);
+        m["kind"] = e.kind == pbc::Kind::Folder ? QStringLiteral("folder") : QStringLiteral("file");
+        m["sizeText"] = e.kind == pbc::Kind::File && e.size ? human_size(*e.size) : QString();
+        m["dateText"] = QString();
+        m["availability"] = QStringLiteral("ok");
+        m["reason"] = QString();
+        m["remotePath"] = q(e.path);
+        m["folderPath"] = q(pbc::parent_of(e.path));
+        m["source"] = QString();
+        m["favorite"] = false;
+        m["state"] = QString();
+        m["kept"] = false;
+        m["keptDirect"] = false;
+    } else {
+        m = row_map(r.entry, std::string());
+        if (r.pending == "renamed") m["name"] = display_safe(r.entry.name);   // the new name; the path stays the entry's own
+    }
+    m["pending"] = q(r.pending);
+    m["syncState"] = q(r.sync_state);
+    m["itemId"] = static_cast<qlonglong>(r.item_id);
+    m["pendingRow"] = r.pending_row;
+    m["busy"] = r.item_id != 0;   // something is queued for this entry: no second change is queued on top of it
+    m["selected"] = std::find(selected_.begin(), selected_.end(), r.entry.path) != selected_.end();
+    return m;
+}
+
 void BrowseBridge::reload_flat() {
     rows_.clear();
     std::vector<FlatRow> list;
@@ -154,7 +185,12 @@ void BrowseBridge::reload() {
         return;
     }
     const auto folder = c_.store->folder(path_.toStdString());
-    has_listing_ = folder.has_value();
+    // a folder that only exists in the queue (a new folder) has no listing to fetch: what is queued for it is what there is
+    bool pending_folder = false;
+    if (!folder)
+        for (const pbc::QueueItem& item : c_.store->queue_items_for_source(path_.toStdString()))
+            if (item.kind == pbc::ItemKind::Mkdir && pbc::join_remote(item.dst_parent, item.dst_name) == path_.toStdString()) pending_folder = true;
+    has_listing_ = folder.has_value() || pending_folder;
     fetched_at_ = folder ? folder->fetched_at : std::nullopt;
     gone_ = folder ? folder->gone : false;
     rows_.clear();
@@ -165,7 +201,7 @@ void BrowseBridge::reload() {
         pbc::SortKey key = pbc::SortKey::Name;
         if (sortKey() == QLatin1String("date")) key = pbc::SortKey::Date;
         else if (sortKey() == QLatin1String("size")) key = pbc::SortKey::Size;
-        const pbc::EntryPage p = c_.store->entries_page(path_.toStdString(), key, sortAscending(), page_ * page_size_, page_size_);
+        const pbc::OverlayPage p = c_.store->entries_page_overlay(path_.toStdString(), key, sortAscending(), page_ * page_size_, page_size_);
         total = p.total;
         page_count_ = std::max(1, (total + page_size_ - 1) / page_size_);
         if (page_ >= page_count_) {   // the folder got shorter
@@ -173,7 +209,7 @@ void BrowseBridge::reload() {
             reload();
             return;
         }
-        for (const pbc::RemoteEntry& e : p.rows) rows_.append(row_map(e, std::string()));
+        for (const pbc::OverlayRow& r : p.rows) rows_.append(overlay_row_map(r));
     } else {
         page_count_ = 1;
         page_ = 0;
@@ -192,6 +228,15 @@ void BrowseBridge::setPageSize(int n) {
 
 void BrowseBridge::open(const QString& remotePath) {
     const std::string p = pbc::normalize_remote_path(remotePath.toStdString());
+    if (!c_.store->entry(p)) {   // not on the server as far as we know: a row that exists only in the queue
+        for (const pbc::QueueItem& item : c_.store->queue_items_for_source(p)) {
+            if (item.src_remote == p) continue;   // the item is about an entry of this name as a source: not a pending row
+            if (item.entry_kind == pbc::Kind::File) {
+                emit showQueueItem(static_cast<int>(item.id));
+                return;
+            }
+        }
+    }
     if (const auto entry = c_.store->entry(p)) {
         if (entry->availability != pbc::Availability::Ok) {
             emit showReason(q(entry->reason));
@@ -203,6 +248,7 @@ void BrowseBridge::open(const QString& remotePath) {
         }
     }
     if (busy_) return;
+    leave_selection();
     mode_ = QStringLiteral("folder");
     more_ = false;
     path_ = q(p);
@@ -261,6 +307,7 @@ void BrowseBridge::fetch_favorites() {
 
 void BrowseBridge::showFavorites() {
     if (busy_) return;
+    leave_selection();
     mode_ = QStringLiteral("favorites");
     more_ = false;
     page_ = 0;
@@ -380,6 +427,69 @@ void BrowseBridge::setSort(const QString& key, bool ascending) {
     c_.store->set_setting("sort_key", key.toStdString());
     c_.store->set_setting("sort_dir", ascending ? "asc" : "desc");
     page_ = 0;
+    reload();
+    emit changed();
+}
+
+QStringList BrowseBridge::selectedPaths() const {
+    QStringList out;
+    for (const std::string& p : selected_) out << q(p);
+    return out;
+}
+
+bool BrowseBridge::deleteOffered() const {
+    const auto caps = c_.store->server_caps();
+    return caps && pbc::delete_offered(*caps);
+}
+
+void BrowseBridge::leave_selection() {
+    selecting_ = false;
+    selected_.clear();
+}
+
+void BrowseBridge::setSelecting(bool on) {
+    if (on == selecting_) return;
+    selecting_ = on;
+    if (!on) selected_.clear();
+    reload();
+    emit changed();
+}
+
+void BrowseBridge::toggleSelect(const QString& remotePath) {
+    if (!selecting_ || mode_ != QLatin1String("folder")) return;
+    const std::string p = remotePath.toStdString();
+    const auto it = std::find(selected_.begin(), selected_.end(), p);
+    if (it != selected_.end()) {
+        selected_.erase(it);
+    } else {
+        bool selectable = false;
+        for (const QVariant& v : rows_) {
+            const QVariantMap m = v.toMap();
+            if (m.value("remotePath").toString().toStdString() == p && !m.value("busy").toBool() && !m.value("pendingRow").toBool() &&
+                m.value("availability").toString() == QLatin1String("ok"))
+                selectable = true;
+        }
+        if (!selectable) return;
+        selected_.push_back(p);
+    }
+    reload();
+    emit changed();
+}
+
+void BrowseBridge::selectAllOnPage() {
+    if (!selecting_ || mode_ != QLatin1String("folder")) return;
+    for (const QVariant& v : rows_) {
+        const QVariantMap m = v.toMap();
+        const std::string p = m.value("remotePath").toString().toStdString();
+        if (m.value("busy").toBool() || m.value("pendingRow").toBool() || m.value("availability").toString() != QLatin1String("ok")) continue;
+        if (std::find(selected_.begin(), selected_.end(), p) == selected_.end()) selected_.push_back(p);
+    }
+    reload();
+    emit changed();
+}
+
+void BrowseBridge::clearSelection() {
+    selected_.clear();
     reload();
     emit changed();
 }

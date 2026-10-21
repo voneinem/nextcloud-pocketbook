@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Example/folder/locked.txt</d:href>
+    <d:status>HTTP/1.1 423 Locked</d:status>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Example/folder/readonly.txt</d:href>
+    <d:status>HTTP/1.1 403 Forbidden</d:status>
+  </d:response>
+</d:multistatus>

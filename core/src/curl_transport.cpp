@@ -4,6 +4,7 @@
 
 #include "pbc/curl_session.h"
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -87,6 +88,12 @@ struct Transfer {
     // progress and cancel
     const std::function<bool(long long, long long)>* progress = nullptr;
     bool cancelled = false;
+    // the body file of an upload (Request::body_file): read with pread, so a seek (a redirect that resends the body) is only an offset
+    int body_fd = -1;
+    long long body_offset = 0;   // first byte of the range in the file
+    long long body_length = 0;
+    long long body_pos = 0;      // next byte of the range to hand to libcurl
+    bool body_read_failed = false;
 
     bool to_file() const { return !save_to.empty() && status >= 200 && status < 300; }
     // bytes that are already in the file and belong to this answer: only a 206 continues the file
@@ -104,16 +111,43 @@ struct Transfer {
     }
 };
 
-int xferinfo(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, curl_off_t) {
+int xferinfo(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
     auto* t = static_cast<Transfer*>(clientp);
     if (!t->progress || !*t->progress) return 0;
     const long long base = t->base();
-    const long long total = dltotal > 0 ? base + static_cast<long long>(dltotal) : 0;
-    if (!(*t->progress)(base + static_cast<long long>(dlnow), total)) {
+    long long done = base + static_cast<long long>(dlnow);
+    long long total = dltotal > 0 ? base + static_cast<long long>(dltotal) : 0;
+    if (t->body_fd >= 0 && ultotal > 0) {   // an upload: the progress is the body going out
+        done = static_cast<long long>(ulnow);
+        total = static_cast<long long>(ultotal);
+    }
+    if (!(*t->progress)(done, total)) {
         t->cancelled = true;
         return 1;   // aborts the transfer (CURLE_ABORTED_BY_CALLBACK)
     }
     return 0;
+}
+
+size_t read_body(char* data, size_t size, size_t nmemb, void* userdata) {
+    auto* t = static_cast<Transfer*>(userdata);
+    const long long left = t->body_length - t->body_pos;
+    if (left <= 0) return 0;
+    size_t want = size * nmemb;
+    if (static_cast<long long>(want) > left) want = static_cast<size_t>(left);
+    const ssize_t n = ::pread(t->body_fd, data, want, static_cast<off_t>(t->body_offset + t->body_pos));
+    if (n <= 0) {   // the file shrank or cannot be read: the transfer must not end as if it were complete
+        t->body_read_failed = true;
+        return CURL_READFUNC_ABORT;
+    }
+    t->body_pos += n;
+    return static_cast<size_t>(n);
+}
+
+int seek_body(void* userdata, curl_off_t offset, int origin) {
+    auto* t = static_cast<Transfer*>(userdata);
+    if (origin != SEEK_SET || offset < 0 || offset > t->body_length) return CURL_SEEKFUNC_CANTSEEK;
+    t->body_pos = offset;
+    return CURL_SEEKFUNC_OK;
 }
 
 size_t write_body(char* data, size_t size, size_t nmemb, void* userdata) {
@@ -198,17 +232,25 @@ Response CurlTransport::perform(const Request& request) {
         return out;
     }
 
-    if (!request.upload_file.empty()) {  // refuse before anything is sent
+    // The body file of an upload: opened read-only without following links and checked before anything is sent.
+    int body_fd = -1;
+    if (!request.body_file.empty()) {
         struct stat st;
-        if (::stat(request.upload_file.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || ::access(request.upload_file.c_str(), R_OK) != 0) {
-            out.error = ErrorClass::Server;
-            out.error_detail = "the upload file cannot be read";
+        body_fd = ::open(request.body_file.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        const bool usable = body_fd >= 0 && ::fstat(body_fd, &st) == 0 && S_ISREG(st.st_mode) && request.body_offset >= 0 && request.body_length >= 0 &&
+                            request.body_offset + request.body_length <= static_cast<long long>(st.st_size);
+        if (!usable) {
+            if (body_fd >= 0) ::close(body_fd);
+            out.error = ErrorClass::Storage;
+            out.error_key = "source_unreadable";
+            out.error_detail = "the file to send cannot be read";
             return out;
         }
     }
 
     CURL* curl = curl_easy_init();
     if (!curl) {
+        if (body_fd >= 0) ::close(body_fd);
         out.error = ErrorClass::Network;
         out.error_detail = "curl init failed";
         return out;
@@ -230,6 +272,7 @@ Response CurlTransport::perform(const Request& request) {
         out.error_detail = "no certificate authority file";
         curl_slist_free_all(header_list);
         curl_easy_cleanup(curl);
+        if (body_fd >= 0) ::close(body_fd);
         return out;
     }
     // The timeouts of the request replace the session defaults for this call.
@@ -242,15 +285,19 @@ Response CurlTransport::perform(const Request& request) {
         curl_easy_setopt(curl, CURLOPT_PASSWORD, request.password.c_str());
     }
 
-    curl_mime* mime = nullptr;
-    if (!request.upload_file.empty()) {  // multipart/form-data with one part: the file
-        mime = curl_mime_init(curl);
-        curl_mimepart* part = curl_mime_addpart(mime);
-        curl_mime_name(part, request.upload_field.c_str());
-        curl_mime_filedata(part, request.upload_file.c_str());
-        curl_mime_filename(part, request.upload_file_name.c_str());  // the name the server should see, not the path
-        curl_mime_type(part, "application/octet-stream");
-        curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    Transfer transfer;
+    if (body_fd >= 0) {   // a PUT (or any verb) whose body is a range of a file
+        transfer.body_fd = body_fd;
+        transfer.body_offset = request.body_offset;
+        transfer.body_length = request.body_length;
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, request.method.c_str());
+        curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+        curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(request.body_length));
+        curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_body);
+        curl_easy_setopt(curl, CURLOPT_READDATA, &transfer);
+        curl_easy_setopt(curl, CURLOPT_SEEKFUNCTION, seek_body);
+        curl_easy_setopt(curl, CURLOPT_SEEKDATA, &transfer);
+        curl_easy_setopt(curl, CURLOPT_POSTREDIR, static_cast<long>(CURL_REDIR_POST_ALL));
     } else if (request.method == "GET") {
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
     } else if (request.method == "HEAD") {
@@ -267,7 +314,6 @@ Response CurlTransport::perform(const Request& request) {
 
     std::string body;
     Headers headers;
-    Transfer transfer;
     transfer.body = &body;
     transfer.headers = &headers;
     if (request.method != "HEAD") {
@@ -298,6 +344,17 @@ Response CurlTransport::perform(const Request& request) {
     const CURLcode rc = curl_easy_perform(curl);
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+    // how far the request got (Response::delivery): the request line and headers count once libcurl sent them; a body counts by its bytes
+    {
+        long request_size = 0;
+        curl_off_t uploaded = 0;
+        curl_easy_getinfo(curl, CURLINFO_REQUEST_SIZE, &request_size);
+        curl_easy_getinfo(curl, CURLINFO_SIZE_UPLOAD_T, &uploaded);
+        if (status > 0) out.delivery = Delivery::FullySent;
+        else if (request_size <= 0 && uploaded <= 0) out.delivery = Delivery::NotSent;
+        else if (transfer.body_fd >= 0 && static_cast<long long>(uploaded) < transfer.body_length) out.delivery = Delivery::PartlySent;
+        else out.delivery = Delivery::FullySent;
+    }
     if (rc == CURLE_OK && !transfer.save_to.empty() && transfer.to_file() && !transfer.file && request.method != "HEAD") {
         transfer.file = std::fopen(transfer.save_to.c_str(), transfer.file_mode());  // an empty 2xx body is an empty file
         if (!transfer.file) transfer.storage_full = errno == ENOSPC || errno == EDQUOT || errno == EFBIG;
@@ -313,6 +370,10 @@ Response CurlTransport::perform(const Request& request) {
         out.error = ErrorClass::Tls;
         out.error_key = "redirect_other_host";
         out.error_detail = "refusing a redirect to another host";
+    } else if (transfer.body_read_failed) {   // the file to send shrank or could not be read while it was going out
+        out.error = ErrorClass::Storage;
+        out.error_key = "source_unreadable";
+        out.error_detail = "the file to send cannot be read";
     } else if (transfer.cancelled) {
         out.cancelled = true;
         out.error = ErrorClass::Cancelled;
@@ -350,7 +411,7 @@ Response CurlTransport::perform(const Request& request) {
     }
     curl_slist_free_all(header_list);
     curl_easy_cleanup(curl);
-    if (mime) curl_mime_free(mime);
+    if (body_fd >= 0) ::close(body_fd);
     return out;
 }
 

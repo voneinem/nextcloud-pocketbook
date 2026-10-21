@@ -3,6 +3,37 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.2.0 - 2026-10-21
+
+Upload and manage files on the server (specs/002-manage-server-files). Tested on the host against a fake Nextcloud server with a write side; nothing
+is verified against a real server or on a reader (`docs/live-server-checklist.md` LV-W1 ..., `docs/device-test-checklist.md` DT-W1 ...).
+
+### Upload
+- *Add > Upload files*: a file browser of the reader's storage (list or tiles, remembered) with whole folders; the picks go into a persistent
+  queue and show as **Not synced**. Sources are only ever read; links, hidden and special files are skipped and the app's own data folder can
+  never be picked.
+- A file up to 10 MiB is one request; larger files go in chunks of an upload folder of their own and are assembled by one final request. An
+  interrupted upload continues with the missing chunks, starts over when the file changed, and leaves nothing incomplete in the user's folders.
+- An upload whose outcome is unknown (the answer was lost) is kept and flagged; "Check the server", "Send again" and "Mark as done" decide.
+
+### Manage
+- New folder, rename, move, copy and delete (select mode). Delete goes to the server's trash and is not offered without one.
+- Every write request carries its condition (`If-None-Match: *`, `If-Match` with the stored version, `Overwrite: F`). A taken name asks (keep
+  both, replace after a confirmation, skip); a replace of a file is a conditional delete of the old version into the trash and a request that
+  cannot overwrite. A change on the server meanwhile holds the item as a conflict with both versions intact.
+- The reader's own records follow: a renamed or moved entry takes its downloaded copy and its offline mark along; a replacement uploaded from
+  the entry's own downloaded copy links the copy to the new version.
+
+### Queue and Auto Sync
+- The Queue screen (Send, Cancel, Retry, Resolve, Remove). **Auto Sync** (Settings; on by default, switchable) sends once, a few seconds after
+  the user's own action and only when Wi-Fi is already on; never at start, never when Wi-Fi comes back, never after a failure.
+- Own messages for a full account (also found out before any byte is sent), a forbidden name (editable), a file too large, a type the server
+  refuses, a locked file, a refused login.
+
+### Changes to 0.1.0
+- Database schema 4 (the queue, the server's capabilities). The **Update**, **Favorites** and **Search** tools moved from the Files page to the
+  start page; the Files page has Refresh, Keep offline, Add, Select, Queue and Sort.
+
 ## 0.1.0 - 2026-10-20
 
 First feature of PB Cloud: a read-only Nextcloud files client for the PocketBook InkPad One (specs/001-nextcloud-files-client). Everything

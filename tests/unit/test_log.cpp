@@ -68,6 +68,23 @@ PB_TEST(server_data_and_user_input_of_the_files_client_are_redacted) {
     PB_CHECK(contains(out, "link=[redacted]"));
 }
 
+PB_TEST(versions_checksums_and_upload_ids_of_the_write_side_are_redacted_and_the_codes_stay_plain) {
+    Capture c;
+    log::event("upload.done", {log::text("etag", "\"5f3c0a\""), log::text("src_checksum", "ab12cd34"), log::text("upload_id", "pbc-0123456789abcdef"),
+                               log::text("dst_etag", "\"zz\""), log::count("items", 3), log::text("outcome", "success")});
+    const std::string out = c.all();
+    for (const char* leaked : {"5f3c0a", "ab12cd34", "0123456789abcdef", "zz"}) PB_CHECK(!contains(out, leaked));
+    PB_CHECK(contains(out, "etag=[redacted]"));
+    PB_CHECK(contains(out, "upload_id=[redacted]"));
+    PB_CHECK(contains(out, "items=3"));
+    PB_CHECK(contains(out, "outcome=success"));
+    // no event code of the app can itself carry data: dotted lower-case words only
+    for (const char* code : pbc::log::kAllowedCodes) {
+        const std::string c2 = code;
+        PB_CHECK(std::regex_match(c2, std::regex("[a-z]+(\\.[a-z_]+)+")));
+    }
+}
+
 PB_TEST(harmless_text_fields_are_kept) {
     Capture c;
     log::event("sync.finished", {log::text("outcome", "success"), log::text("error_class", "none")});

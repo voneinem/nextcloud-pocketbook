@@ -100,6 +100,7 @@ PB_TEST(a_good_test_saves_the_account_and_the_password_and_shows_the_result) {
     PB_CHECK_EQ(creds.value.password, std::string("app-pass-0001"));
     PB_CHECK(e.store->account().has_value());
     PB_CHECK_EQ(e.store->account()->user_id, std::string("demo"));
+    PB_CHECK(e.store->server_caps().has_value());   // what the check learned about the write side is kept (feature 002)
 }
 
 PB_TEST(a_bare_host_is_completed_and_an_http_address_is_refused_without_any_request) {
@@ -226,6 +227,7 @@ PB_TEST(the_check_at_start_sends_nothing_without_wifi_or_an_account_and_exactly_
     PB_CHECK(e.server.log()[0].path.find("/cloud/capabilities") != std::string::npos);
     PB_CHECK_EQ(e.bridge->state().toStdString(), std::string("ok"));
     PB_CHECK_EQ(e.network_requests, taps);
+    PB_CHECK(e.store->server_caps().has_value());   // the check at start refreshes them too
 }
 
 PB_TEST(a_failed_check_at_start_shows_the_problem_and_two_in_a_row_stop_further_requests) {

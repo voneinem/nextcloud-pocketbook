@@ -79,6 +79,7 @@ Item {
             model: root.choices
             delegate: Item {
                 id: row
+                objectName: "choiceRow"
                 width: list.width
                 height: root.rowH
                 readonly property var choice: modelData

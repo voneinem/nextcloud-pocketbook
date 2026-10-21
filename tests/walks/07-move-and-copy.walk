@@ -1,0 +1,71 @@
+# Move and copy within the server (specs/002-manage-server-files US5): select entries, choose the destination folder on the server, confirm; the entries
+# show "Moving" / "Copying" until the server has done it; nothing passes through the reader. A destination that is the folder the entry is in is
+# refused. Run after 06-new-folder-and-rename.walk with the same server and folders.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# what the reader did to the folders itself (uploads into them) changed their versions on the server: a refresh brings the new ones
+tap folderRefresh
+wait 1500
+# move zlast.txt into Reports
+tap folderSelect
+wait 400
+tap folderRow 9
+tap folderMove
+waitfor chooserRow
+shot @OUT@/70-chooser-documents.png
+tap chooserRow 0
+waitfor chooserPath Reports
+wait 800
+shot @OUT@/71-chooser-reports.png
+tap chooserChoose
+waitfor folderMoveConfirm
+expect dialogText Move
+shot @OUT@/72-move-confirm.png
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+# copy the folder trip into Reports
+tap folderSelect
+wait 400
+tap folderRow 1
+tap folderCopy
+waitfor chooserRow
+tap chooserRow 0
+waitfor chooserPath Reports
+wait 800
+tap chooserChoose
+waitfor folderMoveConfirm
+expect dialogText Folders go with everything inside them
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+shot @OUT@/73-documents-moving-copying.png
+# moving an entry into the folder it is in is refused
+tap folderSelect
+wait 400
+tap folderRow 7
+tap folderMove
+waitfor chooserRow
+wait 500
+tap chooserChoose
+waitfor folderMoveConfirm
+tap footerButton 1
+waitfor folderRefusedMoves
+shot @OUT@/74-refused.png
+tap footerButton 0
+wait 400
+# send
+tap folderQueue
+waitfor queueRow
+shot @OUT@/75-queue-move-copy.png
+tap queueSend
+waitfor queueRowCaption Sent
+wait 1500
+shot @OUT@/76-queue-sent.png
+tap queueBack
+wait 500
+shot @OUT@/77-documents-after.png

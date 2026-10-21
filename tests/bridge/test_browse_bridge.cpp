@@ -480,4 +480,165 @@ PB_TEST(opening_a_folder_result_goes_back_to_the_folder_mode) {
     PB_CHECK_EQ(e.browse->path().toStdString(), std::string("/Books/Novels"));
 }
 
+// ---- the queue in the listing and the select mode (specs/002-manage-server-files, FR-008) ----
+
+namespace {
+pbc::QueueItem upload_item(const std::string& server, const std::string& parent, const std::string& name, int64_t size = 5) {
+    pbc::QueueItem q;
+    q.kind = pbc::ItemKind::Upload;
+    q.server = server;
+    q.user_id = "demo";
+    q.src_local = "/mnt/ext1/Downloads/" + name;
+    q.src_size = size;
+    q.dst_parent = parent;
+    q.dst_name = name;
+    return q;
+}
+QVariantMap row_named(BrowseBridge& b, const QString& name) {
+    for (const QVariant& v : b.rows())
+        if (v.toMap().value("name").toString() == name) return v.toMap();
+    return QVariantMap();
+}
+}  // namespace
+
+PB_TEST(a_queued_upload_is_a_pending_row_with_the_sync_state_and_no_request_is_made) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    e.server.clear_log();
+    PB_CHECK(e.store->queue_add(upload_item(e.server.base_url(), "/Books", "new.pdf", 2048)).ok());
+    e.browse->refreshRows();
+    const QVariantMap m = row_named(*e.browse, "new.pdf");
+    PB_CHECK(!m.isEmpty());
+    PB_CHECK_EQ(m.value("pending").toString().toStdString(), std::string("new"));
+    PB_CHECK_EQ(m.value("syncState").toString().toStdString(), std::string("queued"));
+    PB_CHECK(m.value("itemId").toInt() > 0);
+    PB_CHECK(m.value("pendingRow").toBool());
+    PB_CHECK_EQ(m.value("sizeText").toString().toStdString(), std::string("2.0 KB"));
+    PB_CHECK_EQ(m.value("state").toString().toStdString(), std::string());   // no download state for something not on the server
+    PB_CHECK(!m.value("kept").toBool());
+    PB_CHECK_EQ(m.value("remotePath").toString().toStdString(), std::string("/Books/new.pdf"));
+    // a real entry keeps its own empty pending fields
+    const QVariantMap real = row_named(*e.browse, "book0.epub");
+    PB_CHECK_EQ(real.value("pending").toString().toStdString(), std::string());
+    PB_CHECK(!real.value("pendingRow").toBool());
+    PB_CHECK_EQ(e.server.request_count(), size_t(0));
+}
+
+PB_TEST(a_pending_row_opens_its_queue_item_and_not_a_listing_or_the_details) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    const auto id = e.store->queue_add(upload_item(e.server.base_url(), "/Books", "new.pdf"));
+    PB_CHECK(id.ok());
+    e.server.clear_log();
+    QSignalSpy queue(e.browse.get(), &BrowseBridge::showQueueItem);
+    QSignalSpy details(e.browse.get(), &BrowseBridge::showDetails);
+    e.browse->open("/Books/new.pdf");
+    PB_CHECK_EQ(queue.count(), 1);
+    PB_CHECK_EQ(queue.first().at(0).toInt(), static_cast<int>(id.value));
+    PB_CHECK_EQ(details.count(), 0);
+    PB_CHECK_EQ(e.server.request_count(), size_t(0));
+}
+
+PB_TEST(a_folder_that_is_only_queued_opens_without_a_request_and_shows_what_is_queued_for_it) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    pbc::QueueItem mk;
+    mk.kind = pbc::ItemKind::Mkdir;
+    mk.entry_kind = pbc::Kind::Folder;
+    mk.server = e.server.base_url();
+    mk.user_id = "demo";
+    mk.dst_parent = "/Books";
+    mk.dst_name = "Fresh";
+    PB_CHECK(e.store->queue_add(mk).ok());
+    PB_CHECK(e.store->queue_add(upload_item(e.server.base_url(), "/Books/Fresh", "inside.txt")).ok());
+    e.browse->refreshRows();
+    PB_CHECK_EQ(row_named(*e.browse, "Fresh").value("pending").toString().toStdString(), std::string("new"));
+    e.server.clear_log();
+    e.browse->open("/Books/Fresh");
+    e.settle();
+    PB_CHECK_EQ(e.server.request_count(), size_t(0));           // it does not exist on the server yet: nothing to ask
+    PB_CHECK_EQ(e.browse->path().toStdString(), std::string("/Books/Fresh"));
+    PB_CHECK(e.browse->hasListing());
+    PB_CHECK_EQ(e.browse->listingState().toStdString(), std::string("not_synced"));
+    PB_CHECK_EQ(e.names().join(",").toStdString(), std::string("inside.txt"));
+    PB_CHECK_EQ(row_named(*e.browse, "inside.txt").value("pending").toString().toStdString(), std::string("new"));
+}
+
+PB_TEST(rows_keep_their_sort_and_paging_with_pending_rows_among_them) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    for (int i = 0; i < 3; ++i) PB_CHECK(e.store->queue_add(upload_item(e.server.base_url(), "/Books", "p" + std::to_string(i) + ".txt")).ok());
+    e.browse->setPageSize(4);
+    PB_CHECK_EQ(e.browse->pageCount(), 3);                      // Novels, six books and three pending files: ten rows in pages of four
+    e.browse->nextPage();
+    e.browse->nextPage();
+    PB_CHECK_EQ(e.browse->rows().size(), 2);
+    e.browse->setSort("name", false);
+    PB_CHECK_EQ(e.browse->page(), 0);
+    PB_CHECK_EQ(e.names().first().toStdString(), std::string("Novels"));   // folders first, whatever the direction
+}
+
+PB_TEST(select_mode_toggles_rows_by_path_and_clears_with_the_folder) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    PB_CHECK(!e.browse->selecting());
+    e.browse->setSelecting(true);
+    PB_CHECK(e.browse->selecting());
+    e.browse->toggleSelect("/Books/book0.epub");
+    e.browse->toggleSelect("/Books/book1.epub");
+    PB_CHECK_EQ(e.browse->selectedCount(), 2);
+    PB_CHECK(row_named(*e.browse, "book0.epub").value("selected").toBool());
+    PB_CHECK(!row_named(*e.browse, "book2.epub").value("selected").toBool());
+    PB_CHECK_EQ(e.browse->selectedPaths().join(",").toStdString(), std::string("/Books/book0.epub,/Books/book1.epub"));
+    e.browse->toggleSelect("/Books/book0.epub");
+    PB_CHECK_EQ(e.browse->selectedCount(), 1);
+    e.browse->selectAllOnPage();
+    PB_CHECK_EQ(e.browse->selectedCount(), e.browse->rows().size());   // every selectable row of the shown page
+    e.browse->clearSelection();
+    PB_CHECK_EQ(e.browse->selectedCount(), 0);
+    e.browse->toggleSelect("/Books/book2.epub");
+    e.browse->open("/Books/Novels");   // going to another folder leaves the select mode and drops the selection
+    e.settle();
+    PB_CHECK(!e.browse->selecting());
+    PB_CHECK_EQ(e.browse->selectedCount(), 0);
+}
+
+PB_TEST(an_entry_with_a_queued_change_is_not_selectable_for_another_one) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    pbc::QueueItem del;
+    del.kind = pbc::ItemKind::Delete;
+    del.server = e.server.base_url();
+    del.user_id = "demo";
+    del.src_remote = "/Books/book3.epub";
+    del.src_etag = e.server.etag_of("/Books/book3.epub");
+    PB_CHECK(e.store->queue_add(del).ok());
+    e.browse->setSelecting(true);
+    e.browse->toggleSelect("/Books/book3.epub");
+    PB_CHECK_EQ(e.browse->selectedCount(), 0);   // one change at a time per entry (specs/002 research R-6)
+    PB_CHECK(row_named(*e.browse, "book3.epub").value("busy").toBool());
+    e.browse->toggleSelect("/Books/new-and-pending.txt");   // a path that is not a row of the page is ignored
+    PB_CHECK_EQ(e.browse->selectedCount(), 0);
+}
+
+PB_TEST(delete_is_offered_only_when_the_last_account_check_reported_a_trash) {
+    Env e;
+    PB_CHECK(!e.browse->deleteOffered());   // nothing known: counts as no trash
+    pbc::ServerCaps caps;
+    caps.trash = true;
+    PB_CHECK(e.store->save_server_caps(caps).ok());
+    e.browse->refreshRows();
+    PB_CHECK(e.browse->deleteOffered());
+    caps.trash = false;
+    PB_CHECK(e.store->save_server_caps(caps).ok());
+    e.browse->refreshRows();
+    PB_CHECK(!e.browse->deleteOffered());
+}
+
 PB_TEST_MAIN()

@@ -17,6 +17,30 @@ QtObject {
         }
     }
 
+    // What a row says about a change that is queued for it or waits in the queue (specs/002-manage-server-files): "Not synced" until the
+    // server has confirmed it, "Moving", "Delete pending", and so on. "" for a row nothing is queued for.
+    function pendingWord(pending, syncState) {
+        if (syncState === "") return ""
+        var what = ""
+        switch (pending) {
+        case "moving": what = qsTr("Moving"); break
+        case "copying": what = qsTr("Copying"); break
+        case "deleting": what = qsTr("Delete pending"); break
+        case "renamed": what = qsTr("Rename pending"); break
+        case "replacing": what = qsTr("Replace pending"); break
+        default: break
+        }
+        var state = ""
+        switch (syncState) {
+        case "sending": state = qsTr("Sending"); break
+        case "failed": state = qsTr("Failed"); break
+        case "conflict": state = qsTr("Conflict"); break
+        case "unknown": state = qsTr("Outcome unknown"); break
+        default: state = qsTr("Not synced"); break
+        }
+        return what.length > 0 ? what + "  ·  " + state : state
+    }
+
     function sourceWord(source) {
         switch (source) {
         case "server": return qsTr("From the server")

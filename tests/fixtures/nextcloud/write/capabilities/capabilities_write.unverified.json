@@ -1,0 +1,9 @@
+{"ocs":{"meta":{"status":"ok","statuscode":100,"message":"OK"},"data":{"version":{"major":31,"minor":0,"micro":4,"string":"31.0.4","edition":"","extendedSupport":false},
+"capabilities":{"theming":{"name":"Example Cloud"},
+"dav":{"chunking":"1.0"},
+"files":{"bigfilechunking":true,"undelete":true,"versioning":true,
+"chunked_upload":{"max_size":104857600,"max_parallel_count":5},
+"forbidden_filename_characters":["\\","/","<",">",":","\"","|","?","*"],
+"forbidden_filenames":[".htaccess","CON","AUX"],
+"forbidden_filename_basenames":["con","prn","aux"],
+"forbidden_filename_extensions":[".part",".filepart"]}}}}}

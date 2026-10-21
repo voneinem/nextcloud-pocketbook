@@ -5,6 +5,7 @@
 // xml_min. Server behaviour is UNVERIFIED until a live run.
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -59,8 +60,15 @@ public:
     // The HTTP Date header of an answer is remembered (last_server_time).
     Response send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap = 8ll << 20);
 
+    // One request whose body is a range of a file (an upload or one chunk of it): like send(), with Request::body_file/offset/length and a
+    // progress callback that can cancel. The URL must lie on this session's origin; any other address sends nothing and answers status 0.
+    Response send_file(const std::string& method, const std::string& url, const std::string& file, long long offset, long long length,
+                       const Headers& headers, std::function<bool(long long, long long)> progress, long long cap = 1ll << 20);
+
     // Maps a transport failure or an HTTP status to the stable keys auth_failed, forbidden, not_found, locked (423), rate_limited (429),
-    // maintenance (503; the caller may refine it with status.php), server_error, protocol_error, too_large and the transport's own keys. A 2xx status gives an empty Error and *handled = false (the caller reads the answer).
+    // maintenance (503; the caller may refine it with status.php), server_error, protocol_error, too_large and the transport's own keys.
+    // The write side adds 409 -> target_gone, 412 -> changed_on_server, 413 -> file_too_large_server, 415 -> type_not_accepted and 507 ->
+    // server_storage_full; the keys that depend on the request (name_exists for a 405 on MKCOL, the choice for a 412) are decided by dav_write.h. A 2xx status gives an empty Error and *handled = false (the caller reads the answer).
     Error status_error(const Response& r, bool* handled = nullptr) const;
 
     std::optional<int64_t> last_server_time() const { return server_time_; }

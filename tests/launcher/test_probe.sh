@@ -20,7 +20,7 @@ out="$(sh "$SCRIPT" "$PROBE" "$tmp/data" 2>&1)" || { echo "FAIL: probe-device.sh
 # the facts (each section header and the values the open items O-1, O-6, O-7, O-8 need)
 for needle in '== libcurl' 'version:' 'protocols:' 'imaps: ' 'smtps: ' 'imap: ' 'smtp: ' \
               '== CA files' '/etc/ssl/certs' '== data directory' 'filesystem:' 'chmod 0600:' 'free:' \
-              '== system' 'TZ:' 'localtime:' 'MemTotal:' 'gconv:' 'screen:' '== charsets'; do
+              '== system' 'TZ:' 'localtime:' 'MemTotal:' 'gconv:' 'screen:' '== charsets' '== uploads: a PUT from a file range' 'put-range: skipped'; do
     check grep -qF -- "$needle" <<<"$out"
 done
 

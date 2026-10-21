@@ -78,7 +78,7 @@ Error Store::save_account(const AccountRow& row) {
         const std::string previous = st.step() == SQLITE_ROW ? st.text(0) : std::string();
         if (!previous.empty() && previous != owner) {   // the cached listings belong to another server or user
             std::string err;
-            if (!sql::exec(db_, "DELETE FROM folders; DELETE FROM favorites; DELETE FROM settings WHERE key = 'favorites_fetched_at';", &err)) return storage_error(db_, "write_failed");
+            if (!sql::exec(db_, "DELETE FROM folders; DELETE FROM favorites; DELETE FROM server_caps; DELETE FROM settings WHERE key = 'favorites_fetched_at';", &err)) return storage_error(db_, "write_failed");
         }
     }
     {
@@ -110,7 +110,7 @@ Error Store::save_account(const AccountRow& row) {
 Error Store::clear_account() {
     std::lock_guard<std::mutex> lock(mu_);
     std::string err;
-    if (!sql::exec(db_, "DELETE FROM account", &err)) return storage_error(db_, "write_failed");
+    if (!sql::exec(db_, "DELETE FROM account; DELETE FROM server_caps;", &err)) return storage_error(db_, "write_failed");
     return {};
 }
 

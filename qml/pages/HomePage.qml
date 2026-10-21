@@ -6,7 +6,7 @@ import ".."
 Item {
     id: page
 
-    StackView.onActivated: connection.refresh()   // a listing, a download or an Update may have confirmed the login meanwhile
+    StackView.onActivated: { connection.refresh(); queue.refresh() }   // a listing, a download or an Update may have confirmed the login meanwhile
 
     function push(name, props) { if (page.StackView.view) page.StackView.view.push(Qt.resolvedUrl(name), props || {}) }
 
@@ -40,6 +40,12 @@ Item {
                 text: qsTr("Search")
                 icon: "search"
                 onClicked: page.push("SearchPage.qml")
+            },
+            ToolButton {
+                objectName: "homeQueue"
+                text: qsTr("Queue")
+                icon: "list"
+                onClicked: page.push("QueuePage.qml")
             },
             ToolButton {
                 objectName: "homeStorage"
@@ -108,6 +114,16 @@ Item {
             color: Style.ink
             text: transfer.lastUpdateOutcome === "success" ? qsTr("Last update: %1").arg(transfer.lastUpdateText)
                 : qsTr("Last update: %1 (not complete)").arg(transfer.lastUpdateText)
+        }
+        Text {
+            objectName: "homeQueueLine"
+            x: 30
+            width: parent.width - 60
+            wrapMode: Text.Wrap
+            visible: queue.openCount > 0
+            font.pixelSize: Style.labelSize
+            color: Style.ink
+            text: qsTr("Queue: %n not synced", "", queue.openCount)
         }
         Text {
             objectName: "homeAction"
