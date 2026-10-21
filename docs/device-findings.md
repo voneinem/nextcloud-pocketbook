@@ -54,3 +54,14 @@ Second run, 2026-10-20 evening (database and log read from the mounted reader):
 | The upgrade of the database to schema 3 ran on the first start (`user_version` 3, `pbcloud.db.bak` kept) and an Update at 21:43 was recorded in `sync_state` | the database file | Observed |
 | "Last checked" stayed at the time of the start check because the account check runs only at start and only with Wi-Fi already on; since then any request the server accepts confirms the login | `account.checked_at` = 21:15 while the Update ran at 21:43 | Observed; behavior changed |
 
+
+## Write side (feature 002, version 0.2.0)
+
+No run of the upload, queue or manage functions on the reader or against a real Nextcloud server has happened yet. Everything below is what the design
+rests on and is therefore **unverified** (items DT-W1 ... DT-W9 in `docs/device-test-checklist.md`, LV-W1 ... LV-W12 in `docs/live-server-checklist.md`):
+
+- The bundled libcurl sends a request body from a range of a file with a 64 KiB read buffer, reports progress, can be cancelled in the middle of the
+  body, and `Response::delivery` tells "nothing sent" from "partly sent" from "fully sent" after a cut connection (DT-W1, DT-W2).
+- A chunk of 10 MiB streams without memory growth; the checksum pass over a 500 MB file is fast enough on the card (DT-W3, DT-W4).
+- The reader's real storage shows the folders the picker lists, and the download folder `PBCloud` is among them (DT-W8).
+- Auto Sync on a reader whose Wi-Fi is off leaves the queue waiting and says so (DT-W9).

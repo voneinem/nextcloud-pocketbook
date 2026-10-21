@@ -52,8 +52,16 @@ else()
         if(TARGET pbc_fake_nextcloud AND PBC_OPENSSL_CLI)
             add_test(NAME ui_walk COMMAND ${CMAKE_SOURCE_DIR}/scripts/ui-walk.sh --out ${CMAKE_BINARY_DIR}/walk-out --build ${CMAKE_BINARY_DIR}
                 ${CMAKE_SOURCE_DIR}/tests/walks/01-connect-browse-download.walk
-                ${CMAKE_SOURCE_DIR}/tests/walks/02-restart-update-favorites-search-storage.walk)
-            set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 240)
+                ${CMAKE_SOURCE_DIR}/tests/walks/02-restart-update-favorites-search-storage.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/03-upload-and-manage.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/04-unknown-outcome.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/05-collisions-and-conflicts.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/06-new-folder-and-rename.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/07-move-and-copy.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/08-delete.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/09-refusals.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/10-no-trash.walk)
+            set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 900)
             if(PBC_SANITIZE)
                 set_property(TEST ui_walk APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")
             endif()

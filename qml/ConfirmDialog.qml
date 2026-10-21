@@ -22,6 +22,7 @@ DialogFrame {
     }
 
     Text {
+        objectName: "dialogText"
         visible: root.text.length > 0
         width: parent.width
         text: root.text

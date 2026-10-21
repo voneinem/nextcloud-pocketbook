@@ -6,6 +6,8 @@
 // Prints "READY <https-url> <user> <app-password> <ca-file>" and then reads commands from stdin:
 //   approve        the user "approved" the browser login that is waiting (Login Flow v2)
 //   touch <path>   change a file on the server, so that the next Update finds it newer
+//   lose-next-answer [METHOD [part]]   the next write is done but its answer is lost (feature 002)
+//   drop-after <bytes>   cut the next upload body longer than that; quota <bytes>; lock <path>; no-trash; ignore-conditions
 //   drop           the next download loses its connection after half of the file
 //   offline|online switch the server off and on
 //   quit
@@ -183,8 +185,34 @@ int main(int argc, char** argv) {
         } else if (cmd == "offline" || cmd == "online") {
             fake->set_offline(cmd == "offline");
             std::cout << "server is " << cmd << std::endl;
+        } else if (cmd == "lose-next-answer") {   // the next write is done, but the answer never arrives: the app must call it an unknown outcome
+            std::istringstream a(arg);
+            std::string method = "PUT", part;
+            a >> method >> part;
+            fake->lose_next_answer(method, part);
+            std::cout << "the answer of the next " << method << " is lost after the server did it" << std::endl;
+        } else if (cmd == "drop-after" && !arg.empty()) {   // the next request body longer than this many bytes is cut: nothing is stored
+            fake->drop_after_bytes(std::atoll(arg.c_str()));
+            std::cout << "the next upload body longer than " << arg << " bytes is cut" << std::endl;
+        } else if (cmd == "quota" && !arg.empty()) {
+            fake->set_quota_limit(std::atoll(arg.c_str()));
+            std::cout << "the quota is " << arg << " bytes" << std::endl;
+        } else if (cmd == "lock" && !arg.empty()) {
+            if (fake->has(arg)) {
+                fake->lock(arg);
+                std::cout << "locked " << arg << std::endl;
+            } else {
+                std::cout << "no such path: " << arg << std::endl;
+            }
+        } else if (cmd == "no-trash") {
+            fake->set_trash(false);
+            std::cout << "the server has no trash now (deleting would be permanent)" << std::endl;
+        } else if (cmd == "ignore-conditions") {
+            fake->ignore_conditions_on_assemble(true);
+            std::cout << "the final MOVE of a chunked upload ignores its conditions" << std::endl;
         } else if (!cmd.empty()) {
-            std::cout << "commands: approve, touch <path>, drop, offline, online, quit" << std::endl;
+            std::cout << "commands: approve, touch <path>, drop, offline, online, lose-next-answer [METHOD [part]], drop-after <bytes>, quota <bytes>, "
+                         "lock <path>, no-trash, ignore-conditions, quit" << std::endl;
         }
     }
     return 0;

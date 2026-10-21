@@ -71,6 +71,13 @@ Downloads are saved in the folder `PBCloud/` in the root of the reader's storage
 reader's own library finds them. A download is first written under a temporary name that the library does not show, and renamed only
 when it is complete. Open a downloaded file with one tap on **Open**; the app hands it to the reader's viewer.
 
+## What the upload browser shows
+
+*Add > Upload files* lists the folders of the reader's storage that exist: `Audio Books`, `Downloads`, `Music`, `My pictures`, `Notes`,
+`Photo`, `screens` and `PBCloud` (the folder of the downloaded copies, so that a copy you edited can be sent back). Nothing else of the
+storage is shown, and the app's own data folder (the database, the credentials, the log) can never be picked. Files are only read; the app
+never changes or removes a file you pick. There is nothing to install for this.
+
 ## Passwords
 
 PB Cloud stores the **app password** as plain text in a file in `system/pbcloud/`. This reader's storage cannot make the file private, and

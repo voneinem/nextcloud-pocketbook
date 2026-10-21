@@ -238,7 +238,7 @@ UpdateReport Updater::execute(UpdatePlan& plan, Cancel& cancel, const std::funct
     st.problem_area = st.problem_key.empty() ? "" : "update";
     st.counts_json = json(rep);
     store_->write_sync_state(st);
-    log::event("update.run", {log::count("files", rep.files), log::count("added", rep.added), log::count("updated", rep.updated), log::count("failed", rep.failed)});
+    log::event("update.run", {log::count("files", rep.files), log::count("added", rep.added), log::count("updated", rep.updated), log::count("failed", rep.failed), log::text("stopped", rep.stopped_by_key)});
     return rep;
 }
 

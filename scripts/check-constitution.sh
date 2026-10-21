@@ -33,12 +33,19 @@
 #   N1 No plaintext http:// URL literal in core/, bridge/, app/ or qml/*.qml (comments excepted). XML namespace URIs of the DAV
 #        vocabularies (owncloud.org, nextcloud.org, calendarserver.org, sabredav.org, www.w3.org) are protocol identifiers, not endpoints,
 #        and are on an explicit exempt list.
-#   N2 No HTTP write method (PUT, MKCOL, MOVE, COPY, DELETE, PROPPATCH, LOCK, UNLOCK) as a string literal in the code that builds
-#        requests: core/src/nc_*.cpp, downloader.cpp, update.cpp, local_files.cpp, bridge/ and app/ (the client is read-only toward the
-#        server). The generic transport files carry any method and are not scanned.
-#   N3 No QTimer, QBasicTimer or sleep in core/ and bridge/ except core/src/downloader.cpp and its header (no background activity; the download wait).
-#   N4 No log field named href, term, user, login, token, query, search or link in core/, bridge/ and app/ (server data and user
+#   N2 HTTP write methods (PUT, MKCOL, MOVE, COPY, DELETE) as a string literal only in core/src/dav_write.cpp, queue_sender.cpp and
+#        upload_session.cpp (feature 002: every write carries its condition there, tests/integration/test_write_conditions.cpp). The
+#        generic transport (curl_transport.cpp, http_transport.cpp, dav_common.cpp) carries any method and is not scanned. PROPPATCH, LOCK
+#        and UNLOCK are never sent by this app: they appear nowhere else and not even in the audited modules. The bridge, the app and
+#        the QML name no method at all - except the device probe (app/probe/pbc_probe.cpp), a developer's console tool that sends one PUT of its
+#        own temporary file, only when PBC_PROBE_PUT_URL names a test address by hand (DT-W1); it names no other write method.
+#   N3 No QTimer, QBasicTimer or sleep in core/ and bridge/ except core/src/downloader.cpp and its header (no background activity; the
+#        download wait) and bridge/src/queue_bridge.cpp with its header, which may hold the one single-shot QTimer of Auto Sync (never sleep).
+#   N4 No log field named href, term, user, login, token, query, search, link, etag, checksum or upload_id in core/, bridge/ and app/ (server data and user
 #        input stay out of the log).
+#   N6 The files an upload reads are only ever read: no O_WRONLY, O_RDWR, O_CREAT, O_TRUNC, O_APPEND, write-mode fopen, ofstream, std::ios::out,
+#        QIODevice write modes or QFile::remove/rename/copy in core/src/queue_sender.cpp, core/src/upload_source.cpp and
+#        bridge/src/picker_bridge.cpp.
 #   N5 No unlink/remove/rename in core/src outside local_files.cpp, downloader.cpp, credentials_file.cpp, ca_selector.cpp,
 #        curl_transport.cpp and store*.cpp (all file mutation goes through the audited modules).
 #   R10 libcurl tracing is never switched on (it would write LOGIN / AUTH PLAIN passwords to the log):
@@ -165,24 +172,33 @@ scan() {
                     printf '%s\n' "$out" | sed "s#^#N1 $f:#"; bad=1; }
                 ;;
         esac
-        # N2: the client is read-only toward the server
+        # N2: write methods only in the audited modules; PROPPATCH, LOCK and UNLOCK nowhere
         case "$f" in
-            core/src/nc_*.cpp|core/src/downloader.cpp|core/src/update.cpp|core/src/local_files.cpp|bridge/*|app/*)
+            core/src/dav_write.cpp|core/src/queue_sender.cpp|core/src/upload_session.cpp)
+                report N2 "$f" "$p" '"(PROPPATCH|LOCK|UNLOCK)"' && bad=1
+                ;;
+            core/src/curl_transport.cpp|core/src/http_transport.cpp|core/src/dav_common.cpp) ;;
+            app/probe/pbc_probe.cpp)
+                report N2 "$f" "$p" '"(MKCOL|MOVE|COPY|DELETE|PROPPATCH|LOCK|UNLOCK)"' && bad=1
+                ;;
+            core/*|bridge/*|app/*|qml/*.qml)
                 report N2 "$f" "$p" '"(PUT|MKCOL|MOVE|COPY|DELETE|PROPPATCH|LOCK|UNLOCK)"' && bad=1
                 ;;
         esac
-        # N3: no background activity: no timers and no sleeping outside the download wait
+        # N3: no background activity: no timers and no sleeping outside the download wait; the queue bridge may hold its one QTimer
         case "$f" in
+            core/src/downloader.cpp|core/include/pbc/downloader.h) ;;
+            bridge/src/queue_bridge.cpp|bridge/include/queue_bridge.h)
+                report N3 "$f" "$p" '\bQBasicTimer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
+                ;;
             core/*|bridge/*)
-                if [ "$f" != core/src/downloader.cpp ] && [ "$f" != core/include/pbc/downloader.h ]; then
-                    report N3 "$f" "$p" '\bQ(Basic)?Timer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
-                fi
+                report N3 "$f" "$p" '\bQ(Basic)?Timer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
                 ;;
         esac
         # N4: server data and user input stay out of the log
         case "$f" in
             core/*|bridge/*|app/*)
-                report N4 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(href|term|user|login|token|query|search|link)(_[A-Za-z0-9_.]+)?"' && bad=1
+                report N4 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(href|term|user|login|token|query|search|link|etag|checksum|upload_id)(_[A-Za-z0-9_.]+)?"' && bad=1
                 ;;
         esac
         # N5: file mutation only in the audited modules
@@ -190,6 +206,12 @@ scan() {
             core/src/local_files.cpp|core/src/downloader.cpp|core/src/credentials_file.cpp|core/src/ca_selector.cpp|core/src/curl_transport.cpp|core/src/store*.cpp) ;;
             core/src/*.cpp)
                 report N5 "$f" "$p" '(^|[^A-Za-z0-9_.>])(::|std::)?(unlink|remove|rename)[[:space:]]*\(|filesystem::(remove|remove_all|rename)' && bad=1
+                ;;
+        esac
+        # N6: the files an upload reads are only ever read
+        case "$f" in
+            core/src/queue_sender.cpp|core/src/upload_source.cpp|bridge/src/picker_bridge.cpp)
+                report N6 "$f" "$p" 'O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND|fopen[[:space:]]*\([^)]*"[wa]b?\+?"|"r\+b?"|std::ios::out|ofstream|QIODevice::(WriteOnly|ReadWrite|Append|Truncate|NewOnly)|QFile::(remove|rename|copy)' && bad=1
                 ;;
         esac
     done < <(list_files "$root")
@@ -320,29 +342,60 @@ if [ "${1:-}" = "--self-test" ]; then
     expect pass "N1: namespace URIs and comments are allowed"; rm "$tmp/core/src/ns_ok.cpp"
     printf 'const char* u = "http://localhost:1/";\n' > "$tmp/tests/t.cpp"
     expect pass "N1: http:// literals are allowed in tests/"; rm "$tmp/tests/t.cpp"
-    # N2: no write method toward the server
+    # N2: write methods only in the audited modules (feature 002); PROPPATCH, LOCK and UNLOCK nowhere
     for m in PUT MKCOL MOVE COPY DELETE PROPPATCH LOCK UNLOCK; do
         violate core/src/nc_files.cpp "req.method = \"$m\";" "N2: method $m in a request builder"
     done
     violate core/src/downloader.cpp 'r.method = "DELETE";' "N2: DELETE in the downloader"
+    violate core/src/update.cpp 'r.method = "COPY";' "N2: COPY in the updater"
+    violate core/src/queue_helpers.cpp 'r.method = "PUT";' "N2: PUT in another core module"
+    violate core/src/store_queue.cpp 'r.method = "MOVE";' "N2: MOVE in the store"
     violate bridge/a.cpp 'r.method = "MKCOL";' "N2: MKCOL in the bridge"
+    violate bridge/src/queue_bridge.cpp 'r.method = "DELETE";' "N2: DELETE in the queue bridge"
     violate app/a.cpp 'r.method = "PUT";' "N2: PUT in the app"
-    printf 'if (request.method == "PUT") { }\n' > "$tmp/core/src/curl_transport.cpp"
-    printf 'r.method = "PROPFIND"; r.method = "GET"; r.method = "REPORT"; r.method = "SEARCH"; r.method = "POST";\n' > "$tmp/core/src/nc_listing.cpp"
-    expect pass "N2: the generic transport may name any method, read methods are allowed"
-    rm -f "$tmp/core/src/curl_transport.cpp" "$tmp/core/src/nc_listing.cpp"
-    # N3: no timers, no sleeping, except the download wait
+    violate qml/Page.qml 'Item { property string m: "MOVE" }' "N2: MOVE in QML"
+    mkdir -p "$tmp/app/probe"
+    violate app/probe/pbc_probe.cpp 'r.method = "DELETE";' "N2: DELETE in the device probe (only its one PUT is allowed)"
+    for f in dav_write queue_sender upload_session; do
+        for m in PROPPATCH LOCK UNLOCK; do
+            violate core/src/$f.cpp "req.method = \"$m\";" "N2: $m in $f.cpp (never sent by this app)"
+        done
+    done
+    for f in dav_write queue_sender upload_session curl_transport; do
+        printf 'r.method = "PUT"; r.method = "MKCOL"; r.method = "MOVE"; r.method = "COPY"; r.method = "DELETE";\n' > "$tmp/core/src/$f.cpp"
+    done
+    printf 'r.method = "PROPFIND"; r.method = "GET"; r.method = "REPORT"; r.method = "SEARCH"; r.method = "POST";\nstd::string sql = "DELETE FROM folders";\n' > "$tmp/core/src/nc_listing.cpp"
+    expect pass "N2: the audited modules may name the write verbs, read methods and SQL text are allowed"
+    rm -f "$tmp/core/src/dav_write.cpp" "$tmp/core/src/queue_sender.cpp" "$tmp/core/src/upload_session.cpp" "$tmp/core/src/curl_transport.cpp" "$tmp/core/src/nc_listing.cpp"
+    printf 'r.method = "PROPPATCH"; r.method = "LOCK"; r.method = "UNLOCK";\n' > "$tmp/core/src/curl_transport.cpp"
+    expect pass "N2: the generic transport may carry any method"
+    rm -f "$tmp/core/src/curl_transport.cpp"
+    printf 'r.method = "PUT";\n' > "$tmp/app/probe/pbc_probe.cpp"
+    expect pass "N2: the device probe may name PUT (DT-W1), nothing else"
+    rm -f "$tmp/app/probe/pbc_probe.cpp"
+    # N3: no timers, no sleeping, except the download wait and the one Auto Sync timer of the queue bridge
     violate bridge/src/a.cpp 'QTimer t;' "N3: QTimer in the bridge"
+    violate bridge/src/browse_bridge.cpp 'QTimer t;' "N3: QTimer in the browse bridge"
     violate bridge/src/a.cpp 'QBasicTimer t;' "N3: QBasicTimer in the bridge"
     violate core/src/a.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the core"
+    violate core/src/queue_sender.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the sender"
     violate core/src/a.cpp 'usleep(1000);' "N3: usleep in the core"
     violate core/src/a.cpp 'sleep(1);' "N3: sleep in the core"
+    violate bridge/src/queue_bridge.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the queue bridge"
+    violate bridge/src/queue_bridge.cpp 'QBasicTimer t;' "N3: QBasicTimer in the queue bridge (only QTimer is allowed there)"
+    violate core/src/auto_sync.cpp 'QTimer t;' "N3: QTimer in the core"
+    mkdir -p "$tmp/bridge/include"
     printf 'std::this_thread::sleep_for(std::chrono::seconds(5));\n' > "$tmp/core/src/downloader.cpp"
     printf 'int timers = 0; int sleeping = 1; bool asleep() { return false; }\n' > "$tmp/bridge/src/ok.cpp"
-    expect pass "N3: the downloader may wait; words that merely contain sleep or timer are fine"
-    rm -f "$tmp/core/src/downloader.cpp" "$tmp/bridge/src/ok.cpp"
+    printf 'QTimer* timer_ = nullptr; timer_->setSingleShot(true);\n' > "$tmp/bridge/src/queue_bridge.cpp"
+    printf 'QTimer* timer_;\n' > "$tmp/bridge/include/queue_bridge.h"
+    expect pass "N3: the downloader may wait, the queue bridge may hold its one QTimer; words that merely contain sleep or timer are fine"
+    rm -f "$tmp/core/src/downloader.cpp" "$tmp/bridge/src/ok.cpp" "$tmp/bridge/src/queue_bridge.cpp" "$tmp/bridge/include/queue_bridge.h"
     # N4: server data and user input stay out of the log
     for w in href term user login token query search link; do
+        violate core/src/a.cpp "log::text(\"$w\", v);" "N4: log key $w"
+    done
+    for w in etag checksum upload_id; do
         violate core/src/a.cpp "log::text(\"$w\", v);" "N4: log key $w"
     done
     violate bridge/a.cpp 'log::text("search_term", v);' "N4: log key search_term"
@@ -361,6 +414,22 @@ if [ "${1:-}" = "--self-test" ]; then
     for m in local_files downloader credentials_file ca_selector curl_transport store_files; do rm -f "$tmp/core/src/$m.cpp"; done
     printf 'list.remove(x); items.erase(it); remove_if(a, b, c); int removed = 0;\n' > "$tmp/core/src/ok2.cpp"
     expect pass "N5: member calls and other names are not matched"; rm "$tmp/core/src/ok2.cpp"
+    # N6: the files an upload reads are only ever read (feature 002)
+    mkdir -p "$tmp/bridge/src"
+    for lit in 'open(p, O_WRONLY)' 'open(p, O_RDWR)' 'open(p, O_RDONLY | O_CREAT)' 'open(p, O_RDONLY | O_TRUNC)' 'open(p, O_RDONLY | O_APPEND)' \
+               'fopen(p, "w")' 'fopen(p, "wb")' 'fopen(p, "a")' 'fopen(p, "r+")' 'std::ofstream f(p)' 'std::fstream f(p, std::ios::out)'; do
+        violate core/src/queue_sender.cpp "$lit;" "N6: $lit in the sender"
+        violate core/src/upload_source.cpp "$lit;" "N6: $lit in the source reader"
+    done
+    violate bridge/src/picker_bridge.cpp 'QFile f(p); f.open(QIODevice::WriteOnly);' "N6: QIODevice::WriteOnly in the picker"
+    violate bridge/src/picker_bridge.cpp 'QFile::remove(p);' "N6: QFile::remove in the picker"
+    printf 'int fd = open(p, O_RDONLY | O_NOFOLLOW | O_CLOEXEC); FILE* f = fopen(p, "rb"); QFile q(p); q.open(QIODevice::ReadOnly);\n' > "$tmp/core/src/upload_source.cpp"
+    printf 'int fd = open(p, O_RDONLY | O_NOFOLLOW);\n' > "$tmp/core/src/queue_sender.cpp"
+    printf 'QFile q(p); q.open(QIODevice::ReadOnly);\n' > "$tmp/bridge/src/picker_bridge.cpp"
+    expect pass "N6: read-only opens are fine"
+    rm -f "$tmp/core/src/upload_source.cpp" "$tmp/core/src/queue_sender.cpp" "$tmp/bridge/src/picker_bridge.cpp"
+    printf 'FILE* f = fopen(p, "w");\n' > "$tmp/core/src/downloader.cpp"
+    expect pass "N6: it concerns only the upload source modules"; rm "$tmp/core/src/downloader.cpp"
     violate docs/a.md 'see /home/someone/project/file' "R5: Linux home path"
     violate docs/a.md 'see /Users/someone/project/file' "R5: macOS home path"
     violate docs/a.md 'see C:\Users\x\file' "R5: drive-letter path"

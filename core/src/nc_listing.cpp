@@ -207,6 +207,67 @@ Result<Listing> fetch_listing(DavSession& session, std::string_view user_id, std
     return parse_listing(r, user_id, path);
 }
 
+Result<std::optional<RemoteEntry>> fetch_entry(DavSession& session, std::string_view user_id, std::string_view remote_path) {
+    Result<std::optional<RemoteEntry>> out;
+    const std::string path = normalize_remote_path(remote_path);
+    const std::string url = session.base_url() + "/remote.php/dav/files" + encode_path("/" + std::string(user_id)) + (path == "/" ? std::string("/") : encode_path(path));
+    Headers headers = dav::dav_headers("0");
+    headers.push_back({"User-Agent", std::string("PBCloud/") + version()});
+    const Response r = session.send("PROPFIND", url, listing_request_body(), headers, 1 << 20);
+    if (r.status == 404) return out;   // not there
+    if (r.body_too_large) {
+        out.error = bad("protocol_error", "the answer is larger than the limit");
+        return out;
+    }
+    bool handled = true;
+    const Error e = session.status_error(r, &handled);
+    if (handled) {
+        out.error = e;
+        return out;
+    }
+    const auto parsed = parse_flat_result(r, user_id, 4);
+    if (!parsed.ok()) {
+        out.error = parsed.error;
+        return out;
+    }
+    for (const RemoteEntry& e2 : parsed.value)
+        if (e2.path == path) {
+            out.value = e2;
+            return out;
+        }
+    out.error = bad("protocol_error", "the answer does not describe the entry");
+    return out;
+}
+
+Result<std::optional<int64_t>> fetch_free_bytes(DavSession& session, std::string_view user_id) {
+    Result<std::optional<int64_t>> out;
+    Headers headers = dav::dav_headers("0");
+    headers.push_back({"User-Agent", std::string("PBCloud/") + version()});
+    const std::string body = std::string(dav::kXmlHeader) + "<d:propfind xmlns:d=\"DAV:\"><d:prop><d:quota-available-bytes/></d:prop></d:propfind>";
+    const std::string url = session.base_url() + "/remote.php/dav/files" + encode_path("/" + std::string(user_id)) + "/";
+    const Response r = session.send("PROPFIND", url, body, headers, 1 << 20);
+    bool handled = true;
+    const Error e = session.status_error(r, &handled);
+    if (handled) {
+        out.error = e;
+        return out;
+    }
+    const auto ms = dav::parse_multistatus(r);
+    if (!ms.ok()) {
+        out.error = ms.error;
+        return out;
+    }
+    const XmlNode* response = ms.value.child(dav::kNsDav, "response");
+    const XmlNode* p = response ? dav::prop_in_ok_propstat(*response, dav::kNsDav, "quota-available-bytes") : nullptr;
+    if (!p) return out;
+    const std::string t = dav::trim(p->text);
+    if (t.empty() || t.size() > 18) return out;
+    for (char c : t)
+        if (c < '0' || c > '9') return out;   // -1, -2 and -3 (unlimited, unknown) are no number to count against
+    out.value = std::atoll(t.c_str());
+    return out;
+}
+
 std::string favorites_request_body() {
     return std::string(dav::kXmlHeader) +
            "<oc:filter-files xmlns:d=\"DAV:\" xmlns:oc=\"http://owncloud.org/ns\" xmlns:nc=\"http://nextcloud.org/ns\"><d:prop>"

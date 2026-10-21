@@ -43,6 +43,8 @@ endif()
 message(STATUS "pbcloud version: ${PBC_VERSION} (${TARGET_TYPE})")
 
 add_compile_options(-Wall -Wextra)
+# Files of 2 GiB up to the 4 GiB limit of FAT: 64-bit file offsets also on the 32-bit device (uploads read chunks of such files by offset).
+add_compile_definitions(_FILE_OFFSET_BITS=64)
 
 # Sanitizer build for the parsers and the interruption tests (Principle I, SC-010): cmake -DPBC_SANITIZE=ON
 option(PBC_SANITIZE "Build everything with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)

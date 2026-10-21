@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "pbc/queue_types.h"
+#include "pbc/server_caps.h"
 #include "pbc/store_files.h"
 #include "pbc/types.h"
 
@@ -46,7 +48,7 @@ struct SyncState {
 
 class Store {
 public:
-    static constexpr int kSchemaVersion = 3;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites
+    static constexpr int kSchemaVersion = 4;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites; 4: the queue
 
     // Creates `dir` (mode 0700) if needed and opens `dir/pbcloud.db` (0600).
     // Errors: "schema_too_new" (the file is left untouched), "migration_failed" (rolled back, backup kept),
@@ -141,6 +143,55 @@ public:
     // tap on a result can show it and download it. Replaced by every search; gone with the process.
     void set_search_results(const std::vector<RemoteEntry>& entries);
 
+    // ---- what the server told the last account check (store_queue.cpp, specs/002-manage-server-files) ----
+    // The row is replaced as a whole. save_account for another server or user, and clear_account, forget it.
+    std::optional<ServerCaps> server_caps() const;
+    Error save_server_caps(const ServerCaps& caps);
+
+    // ---- the queue of changes (store_queue.cpp, specs/002-manage-server-files/data-model.md) ----
+    // Written before any request. A row is validated (an account, a valid name that also passes the saved server lists, valid paths, a strong ETag
+    // for everything that needs one, a replace only of a file) and the queue is bounded at kMaxQueueItems rows (queue_full; done rows count until
+    // they are cleared). Errors: name_forbidden, refresh_first, queue_full, not_allowed, name_exists, protocol_error.
+    Result<int64_t> queue_add(const QueueItem& item);
+    // All rows or none. depends_on_index[i] is the index (smaller than i) of the item that item i waits for, or -1; the rows share one group id.
+    Result<std::vector<int64_t>> queue_add_group(const std::vector<QueueItem>& items, const std::vector<int>& depends_on_index);
+    std::optional<QueueItem> queue_item(int64_t id) const;
+    QueuePage queue_page(int offset, int limit) const;   // creation order
+    int queue_count_open() const;                        // every state except done
+    // Queued rows of this account whose dependency (if any) is done: what a run can take.
+    int queue_count_sendable(const std::string& server, const std::string& user_id) const;
+    std::optional<QueueItem> queue_next(const std::string& server, const std::string& user_id) const;   // the oldest of them
+    // Writes the fields a run or the user may change (state, step, the upload fields, reason, names, replace and ETags, depends_on, results). The
+    // account, the kind and the creation time never change. A new name is validated. A row that is gone is an error.
+    Error queue_update(const QueueItem& item);
+    // Removes a row. A row that is being sent is refused; the queued dependants of the removed row become failed with the reason target_gone.
+    // Idempotent for a row that is not there.
+    Error queue_remove(int64_t id);
+    Error queue_clear_done();
+    // Is `name` taken in `folder`: by an entry of the cached listing, by the target of an open item of the current account (a new file or folder, the
+    // target of a move, a copy or a rename). The server is not asked.
+    NameUse name_use(const std::string& folder, const std::string& name) const;
+    // Gives a failed or held upload, new folder, move or copy another target folder (its old one is gone, or the user chose again): the item is queued again,
+    // waits for a queued folder of the new target, and what waits for a new folder that moves with it follows (by prefix). Errors: protocol_error, name_exists.
+    Error queue_retarget(int64_t id, const std::string& new_parent);
+    // The open item that is going to create this folder (an upload into it waits for that item), if there is one.
+    std::optional<int64_t> queue_pending_mkdir(const std::string& folder_path) const;
+    // One transaction: the item becomes done with the version the server reported, and the effects of research R-10 are applied to the cache (a new file or
+    // folder enters the cached rows of its folder, a replaced one is updated) without touching the age of the listing. A folder that is not cached is not
+    // patched: the next visit fetches. A rename or move takes the entry's downloaded copy, its offline mark and its favorite along (a folder: everything
+    // below it by prefix); the file on the card is never moved. A delete removes the cached rows only. See research R-10.
+    Error queue_confirm(int64_t id, const std::string& etag, std::optional<int64_t> fileid, const ConfirmContext& context);
+    // At start, no network: Sending rows with the step prepare or chunks go back to queued, every other Sending row becomes unknown (no_answer).
+    RecoveryReport queue_recover();
+    // One page of a folder like entries_page, with the open queue items of the current account merged in: new files and folders and the targets of
+    // moves and copies appear as pending rows (also in a folder that was never cached), a rename shows the new name under the old identity, a move,
+    // a delete and a replace mark the existing row. Done items are not an overlay (their effects are in the cache). Sorting and paging are done in SQL.
+    OverlayPage entries_page_overlay(const std::string& folder, SortKey key, bool ascending, int offset, int limit) const;
+    // Open rows that name this entry as their source or their target, and open rows about anything below this folder (for the warning that a
+    // delete of the folder makes them fail).
+    std::vector<QueueItem> queue_items_for_source(const std::string& remote_path) const;
+    std::vector<QueueItem> queue_items_below(const std::string& folder) const;
+
     // Test seams (the product code uses the typed methods). debug_exec returns the
     // SQLite error text ("" on success); debug_query returns the first column of the first row as text.
     std::string debug_exec(const std::string& sql);
@@ -152,6 +203,8 @@ private:
 
     // One SQLite connection is shared by the UI thread (reads) and the worker thread (sync). Every public method
     // holds this mutex for its whole transaction, so a reader never sees a half-applied batch.
+    std::optional<ServerCaps> server_caps_locked() const;   // the mutex is already held
+    Error validate_queue_item(const QueueItem& item, const ServerCaps& caps) const;
     mutable std::mutex mu_;
     sqlite3* db_ = nullptr;
     bool search_table_ = false;   // the temporary table of search results exists in this connection

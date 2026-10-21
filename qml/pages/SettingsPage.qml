@@ -171,6 +171,36 @@ Item {
                 text: page.errorText()
             }
 
+            Head { text: qsTr("Synchronization") }
+            Item {
+                width: parent.width
+                height: 110
+                Text {
+                    x: 30
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("Auto Sync")
+                    font.pixelSize: Style.bodySize
+                    color: Style.ink
+                }
+                InkSwitch {
+                    objectName: "settingsAutoSync"
+                    anchors { right: parent.right; rightMargin: 30; verticalCenter: parent.verticalCenter }
+                    checked: queue.autoSync
+                    onToggled: function (on) { queue.autoSync = on }
+                }
+                RowDivider { anchors.bottom: parent.bottom; x: 30; width: parent.width - 60 }
+            }
+            Text {
+                objectName: "settingsAutoSyncText"
+                x: 30
+                width: parent.width - 60
+                wrapMode: Text.Wrap
+                font.pixelSize: Style.captionSize
+                color: Style.ink
+                text: queue.autoSync ? qsTr("Changes in the queue are sent a few seconds after your last action, when the reader is online. Nothing is sent at any other time.")
+                                     : qsTr("Changes stay in the queue until you tap Send on the Queue screen.")
+            }
+
             Head { text: qsTr("Security") }
             Text {
                 objectName: "settingsCustomCa"

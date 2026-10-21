@@ -37,7 +37,9 @@ pbc::Error store_account(pbc::Store& store, const std::string& base_url, const s
     pbc::Error e = pbc::save_credentials(store.directory(), creds);
     pbc::secure_wipe(creds.password);
     if (!e.ok()) return e;
-    return store.save_account(row_from(base_url, login_name, check, now));
+    e = store.save_account(row_from(base_url, login_name, check, now));
+    if (e.ok()) store.save_server_caps(check.caps);   // what the write side needs to know (a failure here costs the capabilities only)
+    return e;
 }
 
 }  // namespace
@@ -312,7 +314,7 @@ void ConnectionBridge::checkAtStart() {
                 row.checked_at = c_.clock->now();
                 row.state = "ok";
                 row.problem_key.clear();
-                c_.store->save_account(row);
+                if (c_.store->save_account(row).ok()) c_.store->save_server_caps(check.value.caps);
             }
         }
         pbc::secure_wipe(creds.value.password);

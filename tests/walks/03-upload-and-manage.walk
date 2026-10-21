@@ -1,0 +1,118 @@
+# Upload and manage files (specs/002-manage-server-files): US1 pick files and a folder in the reader's file browser; they are queued, marked
+# Not synced, and nothing is sent. Run it after 01-connect-browse-download.walk and 02-... with the same server and folders.
+# server drop-after 4000000
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# the app opens where the last walk ended (Books): up to the root, then into Documents
+tap folderUp
+wait 800
+tap folderRow 2
+waitfor folderPath Documents
+shot @OUT@/30-documents.png
+# Add -> Upload files
+tap folderAdd
+wait 500
+shot @OUT@/31-add-choice.png
+tap choiceRow 0
+waitfor pickerPath
+shot @OUT@/32-picker-root.png
+# the root lists only the folders for uploads: Downloads, Notes, PBCloud
+tap pickerRow 0
+wait 700
+tap pickerRow 1
+expect pickerSelection 1 file(s)
+shot @OUT@/33-picker-one-file.png
+# the layout toggle: tiles, remembered; a tap on a tile marks the file
+tap pickerLayout
+wait 600
+shot @OUT@/34-picker-tiles.png
+tap pickerTile 0
+expect pickerSelection 2 file(s)
+# up to the root, into Notes/trip, and add the folder with everything inside
+tap pickerUp
+wait 700
+tap pickerTile 1
+wait 700
+tap pickerTile 0
+wait 700
+expect pickerPath trip
+tap pickerAddFolder
+wait 400
+expect pickerSelection 2 folder(s)
+shot @OUT@/35-picker-folder-added.png
+tap pickerUpload
+waitfor dialogText Add them to the queue?
+expect dialogText 2 folder(s) and 4 file(s)
+shot @OUT@/36-picker-confirm.png
+tap footerButton 1
+waitfor dialogText in the queue
+expect dialogText 6 item(s)
+shot @OUT@/37-queued-notice.png
+tap footerButton 0
+wait 600
+# the queued things are in the listing of the folder, marked Not synced; nothing was sent
+expect folderRowCaption Not synced
+shot @OUT@/38-documents-with-queue.png
+
+# Auto Sync is on (the default): about ten seconds after the last action the queue is sent - not before, and not at start
+tap folderQueue
+waitfor queueRow
+expect queueRowCaption Not synced
+shot @OUT@/39-queue-before-send.png
+waitfor queueLast Last sent
+shot @OUT@/40-queue-after-auto-sync.png
+expect queueLast 6 sent
+expect queueRowCaption Sent
+tap queueBack
+wait 800
+shot @OUT@/41-documents-after-auto-sync.png
+
+# Auto Sync off in the settings: nothing is sent by itself any more
+tap folderBack
+wait 600
+tap homeSettings
+waitfor settingsAutoSync
+shot @OUT@/42-settings-auto-sync-on.png
+tap settingsAutoSync
+wait 500
+expect settingsAutoSyncText stay in the queue
+shot @OUT@/43-settings-auto-sync-off.png
+tap settingsBack
+wait 600
+tap homeFiles
+waitfor folderRow
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 2
+tap pickerTile 3
+expect pickerSelection 2 file(s)
+tap pickerUpload
+waitfor dialogText in the queue
+tap footerButton 0
+wait 12000
+tap folderQueue
+waitfor queueRow
+expect queueRowCaption Not synced
+shot @OUT@/44-queue-auto-sync-off.png
+
+# Send: the small file goes, the big one is cut in its first chunk (the connection drops): the run stops and says so, the item stays queued
+tap queueSend
+waitfor queueNotice No connection
+shot @OUT@/45-queue-connection-dropped.png
+tap queueBack
+wait 600
+tap folderQueue
+waitfor queueRow
+expect queueRowCaption Not synced
+# Send again: the upload continues in the same upload folder
+tap queueSend
+waitfor queueRowCaption Sent
+shot @OUT@/46-queue-resumed.png
+tap queueBack
+wait 600

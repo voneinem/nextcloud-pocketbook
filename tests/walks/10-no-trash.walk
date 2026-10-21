@@ -1,0 +1,24 @@
+# Delete is not offered on a server without a trash (specs/002-manage-server-files US6, research R-9): the account check at start learns that, and
+# Delete says so and queues nothing. Run after 09-refusals.walk (the full account and the lock of that walk do not matter here).
+# server no-trash
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderSelect
+wait 400
+tap folderRow 2
+tap folderDelete
+waitfor folderNoTrash
+expect dialogText has no trash
+shot @OUT@/85-no-trash.png
+tap footerButton 0
+wait 400
+tap folderSelectDone
+wait 300
+# nothing was queued for the refused delete: the queue holds only what the walk before left there
+tap folderQueue
+waitfor queueRow
+shot @OUT@/86-queue-after-no-trash.png
+tap queueBack
+wait 300

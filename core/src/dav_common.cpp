@@ -116,6 +116,32 @@ Response DavSession::send(const std::string& method, const std::string& url, con
     return answer;
 }
 
+Response DavSession::send_file(const std::string& method, const std::string& url, const std::string& file, long long offset, long long length,
+                               const Headers& headers, std::function<bool(long long, long long)> progress, long long cap) {
+    Response none;
+    if (url.empty() || origin_.empty()) return none;
+    if (url.compare(0, origin_.size(), origin_) != 0 || (url.size() > origin_.size() && url[origin_.size()] != '/')) return none;   // another host
+    Request r;
+    r.method = method;
+    r.url = url;
+    r.headers = headers;
+    r.body_file = file;
+    r.body_offset = offset;
+    r.body_length = length;
+    r.progress = std::move(progress);
+    r.username = user_;
+    r.password = password_;
+    r.max_response_bytes = cap;
+    r.total_timeout_s = 0;   // a chunk may take as long as the connection allows; libcurl's low-speed guard ends a stalled transfer
+    Response answer = http_.perform(r);
+    if (answer.status != 0) {
+        const std::string date = header_value(answer.headers, "Date");
+        if (!date.empty())
+            if (const auto t = parse_http_date(date)) server_time_ = *t;
+    }
+    return answer;
+}
+
 Error DavSession::status_error(const Response& r, bool* handled) const {
     if (handled) *handled = true;
     if (r.body_too_large) return make_error(ErrorClass::Protocol, "too_large", "the answer is larger than the limit");
@@ -126,6 +152,11 @@ Error DavSession::status_error(const Response& r, bool* handled) const {
     if (r.status == 401) return make_error(ErrorClass::Auth, "auth_failed", "the server refused the login");
     if (r.status == 403) return make_error(ErrorClass::Server, "forbidden", "the server refused the request");
     if (r.status == 404) return make_error(ErrorClass::Server, "not_found", "not found on the server");
+    if (r.status == 409) return make_error(ErrorClass::Server, "target_gone", "a folder on the path is missing on the server");
+    if (r.status == 412) return make_error(ErrorClass::Server, "changed_on_server", "the condition of the request was not met");
+    if (r.status == 413) return make_error(ErrorClass::Server, "file_too_large_server", "the server refuses a request this large");
+    if (r.status == 415) return make_error(ErrorClass::Server, "type_not_accepted", "the server does not accept this type of file");
+    if (r.status == 507) return make_error(ErrorClass::Server, "server_storage_full", "the storage on the server is full");
     if (r.status == 423) return make_error(ErrorClass::Server, "locked", "the file is locked on the server");
     if (r.status == 429) return make_error(ErrorClass::Server, "rate_limited", "the server asks for a pause");
     if (r.status == 503) return make_error(ErrorClass::Server, "maintenance", "the server is not available (maintenance or overload)");

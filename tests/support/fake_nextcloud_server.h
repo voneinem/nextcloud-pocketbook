@@ -4,11 +4,19 @@
 // more. What a test against it proves is "the app follows the contract", never "a real server behaves like this": every test that
 // includes this header invokes PBC_FAKE_SERVER_TEST() (scripts/check-fake-markers.sh).
 //
-// Sections implemented here: 1 status, 2/3 OCS capabilities and user, 4 quota, 5 folder listing, 6 plain GET. Later stories add
-// Range requests, REPORT/SEARCH and Login Flow v2 in the same class.
+// Sections implemented here: 1 status, 2/3 OCS capabilities and user, 4 quota, 5 folder listing, 6 plain GET, Range requests,
+// REPORT/SEARCH, Login Flow v2 and, for specs/002-manage-server-files, the write side (contracts/server-requests.md W3-W9): PUT, MKCOL,
+// MOVE, COPY, DELETE with the conditions If-Match, If-None-Match and Overwrite, the trash, quota, locks, size and type limits, forbidden
+// names, 207 partial failures, the chunked-upload area (/remote.php/dav/uploads/) and failure injection (lost answers, dropped bodies,
+// ignored conditions, changes between a listing and a send).
 //
 // Everything is reachable through a few knobs: the tree (add_folder, add_file, set_file, remove), the account (user, app password,
 // quota, version, maintenance), failure injection (set_offline, set_interceptor, fail_next) and counters (request_count, count).
+
+#include <fcntl.h>
+#include <openssl/evp.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cstring>
@@ -17,7 +25,9 @@
 #include <ctime>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -46,6 +56,8 @@ public:
         // a listing entry the server reports in a broken way (research R-7): "" = normal
         std::string listing_quirk;      // "no_propstat_ok" | "no_etag_no_type"
         bool weak_etag = false;         // the server (or a proxy) reports a weak ETag (W/...)
+        bool locked = false;            // a lock held by someone else: writes answer 423
+        std::string sha256;             // of an uploaded file (hex), "" otherwise
 
         int64_t size() const { return synthetic_size >= 0 ? synthetic_size : static_cast<int64_t>(content.size()); }
         std::string bytes(int64_t offset, int64_t length) const {
@@ -140,6 +152,91 @@ public:
     void set_login_server_url(std::string url) { login_server_url_ = std::move(url); }   // the "server" of the final answer
     void set_login_poll_status(long status) { login_poll_status_ = status; }              // any status for the poll (0 = normal)
 
+    // ---- the write side (specs/002-manage-server-files) ----
+    void set_trash(std::optional<bool> on) { trash_cap_ = on; trash_enabled_ = on.value_or(false); }   // nullopt: the capability is absent (unknown)
+    void set_chunking(bool on) { chunking_cap_ = on; }
+    void set_max_chunk(std::optional<int64_t> n) { max_chunk_cap_ = n; }
+    // The lists the capabilities state and the server enforces (400 with an InvalidPath body).
+    void set_forbidden(std::string chars, std::vector<std::string> names = {}, std::vector<std::string> basenames = {}, std::vector<std::string> extensions = {}) {
+        forbidden_chars_ = std::move(chars);
+        forbidden_names_ = std::move(names);
+        forbidden_basenames_ = std::move(basenames);
+        forbidden_extensions_ = std::move(extensions);
+    }
+    void set_state_forbidden_in_caps(bool on) { forbidden_in_caps_ = on; }   // false: the server enforces the lists but does not state them
+    // A real quota: writes that would exceed `total` bytes in the tree answer 507; PROPFIND reports used and available from it.
+    void set_keep_bytes_limit(long long n) { keep_limit_ = n; }   // uploads (and chunks) longer than this are hashed and counted, not kept (budget tests)
+    void set_quota_limit(std::optional<int64_t> total) { quota_limit_ = total; }
+    void set_max_file_size(std::optional<int64_t> n) { max_file_size_ = n; }              // 413 above it
+    void set_blocked_extensions(std::vector<std::string> exts) { blocked_ext_ = std::move(exts); }   // 415, e.g. ".exe"
+    void lock(const std::string& path, bool on = true) { node(path).locked = on; }
+    void set_opaque_file_ids(bool on) { opaque_ids_ = on; }          // OC-FileId like "00000123ocabc" instead of a plain number
+    void set_answer_etag_headers(bool on) { answer_etag_headers_ = on; }   // false: PUT/MKCOL/MOVE answers carry no OC-Etag/ETag (the app asks with a PROPFIND)
+    int64_t trash_count() const { return static_cast<int64_t>(trash_.size()); }
+    bool trash_has(const std::string& path) const {
+        for (const auto& t : trash_)
+            if (t.path == pbc::normalize_remote_path(path)) return true;
+        return false;
+    }
+    int overwrites() const { return overwrites_; }                    // targets removed by Overwrite: T
+    int permanent_deletes() const { return permanent_deletes_; }       // deletes that happened with no trash to catch them
+    std::string sha256_of(const std::string& path) const { return tree_.at(pbc::normalize_remote_path(path)).sha256; }
+    long long bytes_uploaded() const { return bytes_uploaded_; }       // request body bytes the server read
+    long long bytes_downloaded() const { return bytes_downloaded_; }   // GET body bytes it sent
+    // The chunked-upload area.
+    size_t upload_sessions() const { return sessions_.size(); }
+    std::vector<std::string> upload_session_ids() const {
+        std::vector<std::string> ids;
+        for (const auto& kv : sessions_) ids.push_back(kv.first);
+        return ids;
+    }
+    std::vector<std::string> chunk_names(const std::string& id) const {
+        std::vector<std::string> names;
+        auto it = sessions_.find(id);
+        if (it != sessions_.end())
+            for (const auto& kv : it->second.chunks) names.push_back(kv.first);
+        return names;
+    }
+    long long chunk_size_of(const std::string& id, const std::string& name) const { return sessions_.at(id).chunks.at(name).size; }
+    void expire_uploads() { sessions_.clear(); }                        // the 24 hours passed
+    // A chunk the server holds with the wrong size (a body that was cut): the next listing of the upload folder shows it.
+    void plant_partial_chunk(const std::string& id, const std::string& name, long long size) {
+        Chunk c;
+        c.size = size;
+        c.bytes.assign(static_cast<size_t>(std::min<long long>(size, 1 << 20)), 'x');
+        sessions_.at(id).chunks[name] = c;
+    }
+    // Failure injection for the write side.
+    // The next request of this method whose URL contains url_part is processed in full and then the transport reports a timeout: no answer.
+    void lose_next_answer(const std::string& method, const std::string& url_part = std::string()) {
+        lose_method_ = method;
+        lose_part_ = url_part;
+        lose_armed_ = true;
+    }
+    // The next request body longer than `bytes` is cut after that many bytes: nothing is stored, the transport reports a dropped connection.
+    void drop_after_bytes(long long bytes) { drop_after_ = bytes; }
+    // true: a cut chunk body leaves a partial chunk in the upload folder (a server that keeps what arrived)
+    void set_partial_chunks_visible(bool on) { partial_visible_ = on; }
+    // The next request of this method whose URL contains url_part answers `status` (with Retry-After when given) without being processed.
+    void answer_next(const std::string& method, const std::string& url_part, long status, int count = 1, const std::string& retry_after = std::string()) {
+        answer_method_ = method;
+        answer_part_ = url_part;
+        answer_status_ = status;
+        answer_count_ = count;
+        answer_retry_ = retry_after;
+    }
+    // The server ignores If-Match, If-None-Match and Overwrite on the final MOVE of a chunked upload (and, with the second switch, on MOVE and COPY).
+    void ignore_conditions_on_assemble(bool on) { ignore_assemble_conditions_ = on; }
+    void ignore_conditions_on_move(bool on) { ignore_move_conditions_ = on; }
+    // Runs `fn` just before the next request of this method whose URL contains url_part is handled (a change between a listing and a send).
+    // `skip` matching requests pass first (before_next("PROPFIND", part, fn, 1) acts before the second one).
+    void before_next(const std::string& method, const std::string& url_part, std::function<void()> fn, int skip = 0) {
+        before_method_ = method;
+        before_part_ = url_part;
+        before_fn_ = std::move(fn);
+        before_skip_ = skip;
+    }
+
     // ---- failure injection and counters ----
     void set_offline(bool on) { offline_ = on; }
     // Called before the normal handling; a returned response replaces it (the request is still counted).
@@ -156,6 +253,9 @@ public:
     }
     struct Logged {
         std::string method, path, depth;
+        // the conditions and headers of a write request (specs/002-manage-server-files): "" = not sent
+        std::string if_match, if_none_match, overwrite, destination, total_length, mtime_header, checksum_header;
+        long long body_bytes = 0;
     };
     const std::vector<Logged>& log() const { return log_; }
     void clear_log() { log_.clear(); }
@@ -173,6 +273,27 @@ public:
 
 private:
     using Response = pbc::Response;
+
+    // ---- the write side ----
+    struct Chunk {
+        std::string bytes;
+        long long size = 0;
+    };
+    struct Session {
+        std::string destination;           // the final path in the files tree
+        long long total_length = -1;
+        std::map<std::string, Chunk> chunks;
+        std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> running{EVP_MD_CTX_new(), EVP_MD_CTX_free};   // SHA-256 over the chunks in order
+        int next_in_order = 1;
+        bool running_valid = true;
+        Session() { EVP_DigestInit_ex(running.get(), EVP_sha256(), nullptr); }
+    };
+    struct Trashed {
+        std::string path;
+        bool folder = false;
+        int64_t size = 0;
+    };
+
 
     static Node folder_node() {
         Node n;
@@ -279,13 +400,51 @@ private:
         }
         path = r.url.substr(base.size());
         entry.path = path;
+        entry.if_match = pbc::header_value(r.headers, "If-Match");
+        entry.if_none_match = pbc::header_value(r.headers, "If-None-Match");
+        entry.overwrite = pbc::header_value(r.headers, "Overwrite");
+        entry.destination = pbc::header_value(r.headers, "Destination");
+        entry.total_length = pbc::header_value(r.headers, "OC-Total-Length");
+        entry.mtime_header = pbc::header_value(r.headers, "X-OC-MTime");
+        if (entry.mtime_header.empty()) entry.mtime_header = pbc::header_value(r.headers, "X-OC-Mtime");
+        entry.checksum_header = pbc::header_value(r.headers, "OC-Checksum");
+        entry.body_bytes = r.body_file.empty() ? static_cast<long long>(r.body.size()) : r.body_length;
         log_.push_back(entry);
+        if (before_fn_ && r.method == before_method_ && (before_part_.empty() || r.url.find(before_part_) != std::string::npos)) {
+            if (before_skip_ > 0) {
+                --before_skip_;
+            } else {
+                auto fn = std::move(before_fn_);
+                before_fn_ = nullptr;
+                fn();
+            }
+        }
+        if (answer_count_ > 0 && r.method == answer_method_ && (answer_part_.empty() || r.url.find(answer_part_) != std::string::npos)) {
+            --answer_count_;
+            Response injected = reply(answer_status_, "", "application/xml");
+            if (!answer_retry_.empty()) injected.headers.push_back({"Retry-After", answer_retry_});
+            return injected;
+        }
         if (fail_count_ > 0 && (fail_part_.empty() || r.url.find(fail_part_) != std::string::npos)) {
             --fail_count_;
             return reply(fail_status_, "{\"message\":\"injected\"}");
         }
         if (interceptor_)
             if (auto injected = interceptor_(r)) return *injected;
+        if (lose_armed_ && r.method == lose_method_ && (lose_part_.empty() || r.url.find(lose_part_) != std::string::npos)) {
+            lose_armed_ = false;
+            (void)dispatch(r, path);   // the server did the work ...
+            Response lost;             // ... and the answer never arrived
+            lost.error = pbc::ErrorClass::Network;
+            lost.error_key = "timeout";
+            lost.error_detail = "no answer";
+            lost.delivery = pbc::Delivery::FullySent;
+            return lost;
+        }
+        return dispatch(r, path);
+    }
+
+    Response dispatch(const pbc::Request& r, const std::string& path) {
 
         const std::string route = path.substr(0, path.find('?'));
         if (route == "/status.php") return status_php();
@@ -295,6 +454,8 @@ private:
         const std::string files = "/remote.php/dav/files/";
         if (route.compare(0, files.size(), files) == 0) return dav(r, route);
         if ((route == "/remote.php/dav/" || route == "/remote.php/dav") && r.method == "SEARCH") return search(r);
+        const std::string uploads = "/remote.php/dav/uploads/";
+        if (route.compare(0, uploads.size(), uploads) == 0) return uploads_area(r, route);
         return reply(404, "{\"message\":\"not found\"}");
     }
 
@@ -354,7 +515,7 @@ private:
             while (parts.size() < 3) parts.push_back("0");
             return reply(200, ok + "{\"version\":{\"major\":" + parts[0] + ",\"minor\":" + parts[1] + ",\"micro\":" + parts[2] +
                                   ",\"string\":\"" + parts[0] + "." + parts[1] + "." + parts[2] + "\",\"edition\":\"\"},\"capabilities\":{\"theming\":{\"name\":\"" +
-                                  quote_json(server_name_) + "\"},\"dav\":{\"chunking\":\"1.0\"}}}}}");
+                                  quote_json(server_name_) + "\"}," + dav_and_files_caps() + "}}}}");
         }
         if (route.find("/cloud/user") != std::string::npos)
             return reply(200, ok + "{\"id\":\"" + quote_json(user_id_) + "\",\"display-name\":\"Demo User\"}}}");
@@ -379,8 +540,8 @@ private:
         x += std::string("<oc:favorite>") + (n.favorite ? "1" : "0") + "</oc:favorite>";
         if (n.encrypted) x += "<nc:is-encrypted>1</nc:is-encrypted>";
         if (with_quota) {
-            const int64_t used = quota_ ? quota_->first : folder_size("/");
-            const int64_t avail = quota_ ? quota_->second : -3;
+            const int64_t used = quota_limit_ ? folder_size("/") : (quota_ ? quota_->first : folder_size("/"));
+            const int64_t avail = quota_limit_ ? std::max<int64_t>(*quota_limit_ - used, 0) : (quota_ ? quota_->second : -3);
             x += "<d:quota-used-bytes>" + std::to_string(used) + "</d:quota-used-bytes>";
             x += "<d:quota-available-bytes>" + std::to_string(avail) + "</d:quota-available-bytes>";
         }
@@ -406,6 +567,10 @@ private:
         if (r.method == "PROPFIND") return propfind(r, p);
         if (r.method == "REPORT") return report(r, p);
         if (r.method == "GET") return get(r, p);
+        if (r.method == "PUT") return put_file(r, p);
+        if (r.method == "MKCOL") return mkcol(r, p);
+        if (r.method == "MOVE" || r.method == "COPY") return move_copy(r, p);
+        if (r.method == "DELETE") return delete_entry(r, p);
         return reply(405, "", "application/xml");
     }
 
@@ -478,6 +643,473 @@ private:
         return reply(207, xml, "application/xml; charset=utf-8");
     }
 
+    // =================================================================================================================================
+    // The write side (specs/002-manage-server-files, contracts/server-requests.md W3-W9). UNVERIFIED against a real server (LV-W*).
+    // =================================================================================================================================
+
+    long long keep_limit_ = 64ll << 20;   // larger uploads are hashed and counted, not kept
+
+    static std::string lower_text(std::string v) {
+        for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return v;
+    }
+    static std::string sabre_body(const std::string& cls) {
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\">\n  <s:exception>Sabre\\DAV\\Exception\\" + cls +
+               "</s:exception>\n  <s:message>refused</s:message>\n</d:error>\n";
+    }
+    Response sabre_error(long status, const std::string& cls) { return reply(status, sabre_body(cls), "application/xml; charset=utf-8"); }
+    Response cut_response() {   // the connection broke while the body was going out
+        Response r;
+        r.error = pbc::ErrorClass::Network;
+        r.error_key = "connection_lost";
+        r.error_detail = "the connection was cut";
+        r.delivery = pbc::Delivery::PartlySent;
+        return r;
+    }
+    Response cancelled_response() {
+        Response r;
+        r.cancelled = true;
+        r.error = pbc::ErrorClass::Cancelled;
+        r.error_key = "cancelled";
+        r.error_detail = "cancelled by the user";
+        r.delivery = pbc::Delivery::PartlySent;
+        return r;
+    }
+    std::string file_id_text(int64_t id) const {
+        if (!opaque_ids_) return std::to_string(id);
+        std::string n = std::to_string(id);
+        return std::string(n.size() < 8 ? 8 - n.size() : 0, '0') + n + "ocabc";
+    }
+    // 201/204 answer of a write: the new ETag and file id of the node, as the real server sends them in headers
+    Response written(long status, const Node& n) {
+        Response r = reply(status, "", "application/xml");
+        if (answer_etag_headers_) {
+            r.headers.push_back({"OC-Etag", n.etag});
+            r.headers.push_back({"OC-FileId", file_id_text(n.fileid)});
+        }
+        r.headers.push_back({"X-OC-MTime", "accepted"});
+        return r;
+    }
+
+    bool name_forbidden(const std::string& name) const {
+        for (char c : name)
+            if (forbidden_chars_.find(c) != std::string::npos) return true;
+        const std::string low = lower_text(name);
+        for (const std::string& n : forbidden_names_)
+            if (low == lower_text(n)) return true;
+        const std::string base = low.substr(0, low.find('.'));
+        for (const std::string& b : forbidden_basenames_)
+            if (base == lower_text(b)) return true;
+        for (std::string e : forbidden_extensions_) {
+            e = lower_text(e);
+            if (!e.empty() && e[0] != '.') e = "." + e;
+            if (low.size() > e.size() && low.compare(low.size() - e.size(), e.size(), e) == 0) return true;
+        }
+        return false;
+    }
+    bool blocked_type(const std::string& name) const {
+        const std::string low = lower_text(name);
+        for (std::string e : blocked_ext_) {
+            e = lower_text(e);
+            if (low.size() > e.size() && low.compare(low.size() - e.size(), e.size(), e) == 0) return true;
+        }
+        return false;
+    }
+    static bool if_match_ok(const std::string& header, const Node* n) {
+        if (!n) return false;
+        if (header == "*") return true;
+        if (header.compare(0, 2, "W/") == 0) return false;   // a weak validator never matches If-Match
+        return !n->weak_etag && header == n->etag;
+    }
+    int64_t free_bytes() const { return quota_limit_ ? std::max<int64_t>(*quota_limit_ - folder_size("/"), 0) : INT64_MAX; }
+
+    std::vector<std::string> subtree(const std::string& p) const {
+        std::vector<std::string> out;
+        for (const auto& kv : tree_)
+            if (kv.first == p || kv.first.compare(0, p.size() + 1, p + "/") == 0) out.push_back(kv.first);
+        return out;
+    }
+    std::vector<std::string> locked_members(const std::string& p) const {
+        std::vector<std::string> out;
+        for (const std::string& sp : subtree(p))
+            if (tree_.at(sp).locked) out.push_back(sp);
+        return out;
+    }
+    Response partial_207(const std::vector<std::string>& failed) {
+        std::string xml = multistatus_open();
+        for (const std::string& f : failed)
+            xml += "<d:response><d:href>/remote.php/dav/files" + pbc::encode_path("/" + user_id_) + pbc::encode_path(f) + "</d:href><d:status>HTTP/1.1 423 Locked</d:status></d:response>";
+        return reply(207, xml + "</d:multistatus>", "application/xml; charset=utf-8");
+    }
+    bool destination_path(const std::string& destination, std::string* out) const {
+        const std::string prefix = base_url() + "/remote.php/dav/files/";
+        if (destination.compare(0, prefix.size(), prefix) != 0) return false;
+        const auto decoded = pbc::decode_href(destination.substr(base_url().size()), user_id_);
+        if (!decoded.ok()) return false;
+        *out = decoded.value;
+        return true;
+    }
+
+    struct Collector {
+        std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx{EVP_MD_CTX_new(), EVP_MD_CTX_free};
+        std::string bytes;
+        bool keep = true;
+        long long size = 0;
+        explicit Collector(bool keep_bytes) : keep(keep_bytes) { EVP_DigestInit_ex(ctx.get(), EVP_sha256(), nullptr); }
+        void add(const char* p, size_t n) {
+            EVP_DigestUpdate(ctx.get(), p, n);
+            if (keep) bytes.append(p, n);
+            size += static_cast<long long>(n);
+        }
+        std::string hex() {
+            unsigned char md[EVP_MAX_MD_SIZE];
+            unsigned int len = 0;
+            EVP_DigestFinal_ex(ctx.get(), md, &len);
+            return hex_of(md, len);
+        }
+    };
+    static std::string hex_of(const unsigned char* md, unsigned int len) {
+        static const char* kHex = "0123456789abcdef";
+        std::string out;
+        for (unsigned int i = 0; i < len; ++i) {
+            out.push_back(kHex[md[i] >> 4]);
+            out.push_back(kHex[md[i] & 15]);
+        }
+        return out;
+    }
+
+    enum class BodyResult { Done, Cancelled, Dropped };
+    // Reads the request body (in memory or a range of a file) in pieces of 1 MiB, honoring the progress callback (cancel) and drop_after_bytes.
+    BodyResult read_body(const pbc::Request& r, const std::function<void(const char*, size_t)>& sink, long long* got, long long length) {
+        long long limit = length;
+        bool drop = false;
+        if (drop_after_ >= 0 && drop_after_ < length) {
+            limit = drop_after_;
+            drop_after_ = -1;
+            drop = true;
+        }
+        long long done = 0;
+        if (r.body_file.empty()) {
+            while (done < limit) {
+                const size_t n = static_cast<size_t>(std::min<long long>(1 << 20, limit - done));
+                sink(r.body.data() + done, n);
+                done += static_cast<long long>(n);
+                bytes_uploaded_ += static_cast<long long>(n);
+                if (r.progress && !r.progress(done, length)) {
+                    *got = done;
+                    return BodyResult::Cancelled;
+                }
+            }
+        } else {
+            const int fd = ::open(r.body_file.c_str(), O_RDONLY | O_CLOEXEC);
+            if (fd < 0) {
+                *got = 0;
+                return BodyResult::Dropped;
+            }
+            std::vector<char> buf(1 << 20);
+            while (done < limit) {
+                const ssize_t n = ::pread(fd, buf.data(), static_cast<size_t>(std::min<long long>(static_cast<long long>(buf.size()), limit - done)),
+                                          static_cast<off_t>(r.body_offset + done));
+                if (n <= 0) break;
+                sink(buf.data(), static_cast<size_t>(n));
+                done += n;
+                bytes_uploaded_ += n;
+                if (r.progress && !r.progress(done, length)) {
+                    ::close(fd);
+                    *got = done;
+                    return BodyResult::Cancelled;
+                }
+            }
+            ::close(fd);
+        }
+        *got = done;
+        return drop ? BodyResult::Dropped : BodyResult::Done;
+    }
+    static long long body_length_of(const pbc::Request& r) { return r.body_file.empty() ? static_cast<long long>(r.body.size()) : r.body_length; }
+
+    Response put_file(const pbc::Request& r, const std::string& p) {
+        if (p == "/") return reply(405, "", "application/xml");
+        const std::string name = p.substr(p.rfind('/') + 1), parent = pbc::parent_of(p);
+        if (parent != "/" && !tree_.count(parent)) return reply(409, "", "application/xml");
+        auto it = tree_.find(p);
+        const bool exists = it != tree_.end();
+        if (exists && it->second.folder) return reply(405, "", "application/xml");
+        if (exists && it->second.locked) return sabre_error(423, "FileLocked");
+        if (name_forbidden(name)) return sabre_error(400, "InvalidPath");
+        if (blocked_type(name)) return sabre_error(415, "UnsupportedMediaType");
+        const std::string if_match = pbc::header_value(r.headers, "If-Match");
+        const std::string if_none_match = pbc::header_value(r.headers, "If-None-Match");
+        if (!if_none_match.empty() && exists && if_none_match == "*") return reply(412, "", "application/xml");
+        if (!if_match.empty() && !if_match_ok(if_match, exists ? &it->second : nullptr)) return reply(412, "", "application/xml");
+        const long long length = body_length_of(r);
+        if (max_file_size_ && length > *max_file_size_) return sabre_error(413, "EntityTooLarge");
+        if (length - (exists ? it->second.size() : 0) > free_bytes()) return sabre_error(507, "InsufficientStorage");
+        Collector c(length <= keep_limit_);
+        long long got = 0;
+        const BodyResult res = read_body(r, [&](const char* d, size_t n) { c.add(d, n); }, &got, length);
+        if (res == BodyResult::Cancelled) return cancelled_response();
+        if (res == BodyResult::Dropped) return cut_response();
+        Node n;
+        n.mime = "application/octet-stream";
+        n.content = c.bytes;
+        if (!c.keep) n.synthetic_size = c.size;
+        n.sha256 = c.hex();
+        const std::string mtime = pbc::header_value(r.headers, "X-OC-MTime");
+        n.mtime = mtime.empty() ? server_time_ : std::atoll(mtime.c_str());
+        n.checksum = pbc::header_value(r.headers, "OC-Checksum");
+        if (exists) {
+            n.fileid = it->second.fileid;
+            n.favorite = it->second.favorite;
+            n.etag = next_etag();
+            tree_[p] = n;
+            touch(parent);
+        } else {
+            put(p, n);
+        }
+        return written(exists ? 204 : 201, tree_.at(p));
+    }
+
+    Response mkcol(const pbc::Request&, const std::string& p) {
+        if (p == "/" || tree_.count(p)) return reply(405, "", "application/xml");
+        const std::string parent = pbc::parent_of(p);
+        if (parent != "/" && !tree_.count(parent)) return reply(409, "", "application/xml");
+        if (name_forbidden(p.substr(p.rfind('/') + 1))) return sabre_error(400, "InvalidPath");
+        put(p, folder_node());
+        return written(201, tree_.at(p));
+    }
+
+    Response move_copy(const pbc::Request& r, const std::string& src) {
+        const bool is_move = r.method == "MOVE";
+        auto s = tree_.find(src);
+        if (src == "/" || s == tree_.end()) return reply(404, "", "application/xml");
+        std::string dst;
+        if (!destination_path(pbc::header_value(r.headers, "Destination"), &dst)) return reply(400, "", "application/xml");
+        const bool conditions = !ignore_move_conditions_;
+        const std::string if_match = pbc::header_value(r.headers, "If-Match");
+        if (conditions && !if_match.empty() && !if_match_ok(if_match, &s->second)) return reply(412, "", "application/xml");
+        const bool overwrite = pbc::header_value(r.headers, "Overwrite") != "F";
+        const std::string dparent = pbc::parent_of(dst);
+        if (dparent != "/" && !tree_.count(dparent)) return reply(409, "", "application/xml");
+        if (dst == src || dst == "/" || (s->second.folder && dst.compare(0, src.size() + 1, src + "/") == 0)) return sabre_error(403, "Forbidden");
+        if (name_forbidden(dst.substr(dst.rfind('/') + 1))) return sabre_error(400, "InvalidPath");
+        const bool dst_exists = tree_.count(dst) == 1;
+        if (conditions && dst_exists && !overwrite) return reply(412, "", "application/xml");
+        std::vector<std::string> locked = locked_members(src);
+        if (dst_exists)
+            for (const std::string& l : locked_members(dst)) locked.push_back(l);
+        if (!locked.empty()) {
+            if (locked.size() == 1 && locked[0] == src && !s->second.folder) return sabre_error(423, "FileLocked");
+            return partial_207(locked);
+        }
+        if (!is_move && folder_size(src) + (s->second.folder ? 0 : s->second.size()) > free_bytes()) return sabre_error(507, "InsufficientStorage");
+        if (dst_exists) {
+            for (const std::string& sp : subtree(dst)) tree_.erase(sp);
+            ++overwrites_;
+        }
+        std::map<std::string, Node> placed;
+        for (const std::string& sp : subtree(src)) {
+            Node n = tree_.at(sp);
+            n.etag = next_etag();
+            if (!is_move) n.fileid = ++next_id_;
+            placed[dst + sp.substr(src.size())] = n;
+        }
+        if (is_move)
+            for (const std::string& sp : subtree(src)) tree_.erase(sp);
+        for (auto& kv : placed) tree_[kv.first] = kv.second;
+        touch(pbc::parent_of(src));
+        touch(dparent);
+        return written(dst_exists ? 204 : 201, tree_.at(dst));
+    }
+
+    Response delete_entry(const pbc::Request& r, const std::string& p) {
+        auto it = tree_.find(p);
+        if (p == "/") return sabre_error(403, "Forbidden");
+        if (it == tree_.end()) return reply(404, "", "application/xml");
+        const std::string if_match = pbc::header_value(r.headers, "If-Match");
+        if (!if_match.empty() && !if_match_ok(if_match, &it->second)) return reply(412, "", "application/xml");
+        const auto locked = locked_members(p);
+        if (!locked.empty()) {
+            if (locked.size() == 1 && locked[0] == p && !it->second.folder) return sabre_error(423, "FileLocked");
+            return partial_207(locked);
+        }
+        for (const std::string& sp : subtree(p)) {
+            const Node& n = tree_.at(sp);
+            if (trash_enabled_) trash_.push_back({sp, n.folder, n.size()});
+            else ++permanent_deletes_;
+        }
+        for (const std::string& sp : subtree(p)) tree_.erase(sp);
+        touch(pbc::parent_of(p));
+        return reply(204, "", "application/xml");
+    }
+
+    // ---- /remote.php/dav/uploads/<uid>/: chunked upload v2 ----
+    static bool five_digits(const std::string& s) {
+        if (s.size() != 5) return false;
+        for (char c : s)
+            if (c < '0' || c > '9') return false;
+        const int n = std::atoi(s.c_str());
+        return n >= 1 && n <= 10000;
+    }
+    Response uploads_area(const pbc::Request& r, const std::string& route) {
+        if (maintenance_) return reply(503, "", "application/xml");
+        if (!authorized(r)) return reply(401, "", "application/xml");
+        const std::string prefix = "/remote.php/dav/uploads/" + user_id_ + "/";
+        if (route.compare(0, prefix.size(), prefix) != 0) return reply(404, "", "application/xml");
+        std::string rest = route.substr(prefix.size());
+        while (!rest.empty() && rest.back() == '/') rest.pop_back();
+        if (rest.empty()) return reply(405, "", "application/xml");
+        const size_t slash = rest.find('/');
+        const std::string id = rest.substr(0, slash);
+        const std::string name = slash == std::string::npos ? std::string() : rest.substr(slash + 1);
+        const std::string destination_header = pbc::header_value(r.headers, "Destination");
+        if (name.empty()) {
+            if (r.method == "MKCOL") {
+                std::string dst;
+                if (!destination_path(destination_header, &dst)) return reply(400, "", "application/xml");
+                if (sessions_.count(id)) return reply(405, "", "application/xml");
+                Session& se = sessions_[id];
+                se.destination = dst;
+                const std::string total = pbc::header_value(r.headers, "OC-Total-Length");
+                se.total_length = total.empty() ? -1 : std::atoll(total.c_str());
+                return reply(201, "", "application/xml");
+            }
+            if (r.method == "DELETE") {
+                if (!sessions_.erase(id)) return reply(404, "", "application/xml");
+                return reply(204, "", "application/xml");
+            }
+            if (r.method == "PROPFIND") {
+                const std::string depth = pbc::header_value(r.headers, "Depth");
+                if (depth != "0" && depth != "1") return reply(403, "", "application/xml");
+                auto it = sessions_.find(id);
+                if (it == sessions_.end()) return reply(404, "", "application/xml");
+                std::string xml = multistatus_open();
+                const std::string href = prefix + id + "/";
+                xml += "<d:response><d:href>" + href + "</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+                if (depth == "1")
+                    for (const auto& kv : it->second.chunks)
+                        xml += "<d:response><d:href>" + href + kv.first + "</d:href><d:propstat><d:prop><d:getcontentlength>" + std::to_string(kv.second.size) +
+                               "</d:getcontentlength><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+                return reply(207, xml + "</d:multistatus>", "application/xml; charset=utf-8");
+            }
+            return reply(405, "", "application/xml");
+        }
+        auto it = sessions_.find(id);
+        if (it == sessions_.end()) return reply(404, "", "application/xml");
+        Session& se = it->second;
+        if (r.method == "PUT") {
+            if (!five_digits(name)) return reply(400, "", "application/xml");
+            std::string dst;
+            if (!destination_path(destination_header, &dst) || dst != se.destination) return reply(400, "", "application/xml");
+            const std::string total_header = pbc::header_value(r.headers, "OC-Total-Length");
+            if (!total_header.empty() && std::atoll(total_header.c_str()) > free_bytes()) return sabre_error(507, "InsufficientStorage");
+            const long long length = body_length_of(r);
+            Chunk c;
+            long long got = 0;
+            const bool keep = length <= keep_limit_;
+            const BodyResult res = read_body(r, [&](const char* d, size_t n) {
+                if (keep) c.bytes.append(d, n);
+                if (se.running_valid && std::atoi(name.c_str()) == se.next_in_order) EVP_DigestUpdate(se.running.get(), d, n);
+            }, &got, length);
+            if (res != BodyResult::Done) {
+                if (partial_visible_ && res == BodyResult::Dropped) {
+                    c.size = got;
+                    se.chunks[name] = c;
+                }
+                return res == BodyResult::Cancelled ? cancelled_response() : cut_response();
+            }
+            c.size = got;
+            if (std::atoi(name.c_str()) == se.next_in_order) ++se.next_in_order;
+            else se.running_valid = false;
+            se.chunks[name] = c;
+            return reply(201, "", "application/xml");
+        }
+        if (r.method == "MOVE" && name == ".file") return assemble(r, id, se);
+        return reply(405, "", "application/xml");
+    }
+
+    Response assemble(const pbc::Request& r, const std::string& id, Session& se) {
+        std::string dst;
+        if (!destination_path(pbc::header_value(r.headers, "Destination"), &dst) || dst != se.destination) return reply(400, "", "application/xml");
+        const std::string parent = pbc::parent_of(dst);
+        if (parent != "/" && !tree_.count(parent)) return reply(409, "", "application/xml");
+        const std::string name = dst.substr(dst.rfind('/') + 1);
+        if (name_forbidden(name)) return sabre_error(400, "InvalidPath");
+        if (blocked_type(name)) return sabre_error(415, "UnsupportedMediaType");
+        auto existing = tree_.find(dst);
+        const bool exists = existing != tree_.end();
+        if (exists && existing->second.folder) return reply(405, "", "application/xml");
+        if (exists && existing->second.locked) return sabre_error(423, "FileLocked");
+        long long total = 0;
+        for (const auto& kv : se.chunks) total += kv.second.size;
+        const std::string want = pbc::header_value(r.headers, "OC-Total-Length");
+        if (!want.empty() && std::atoll(want.c_str()) != total) return reply(400, "", "application/xml");
+        if (max_file_size_ && total > *max_file_size_) return sabre_error(413, "EntityTooLarge");
+        if (total - (exists ? existing->second.size() : 0) > free_bytes()) return sabre_error(507, "InsufficientStorage");
+        if (!ignore_assemble_conditions_) {
+            const std::string overwrite = pbc::header_value(r.headers, "Overwrite");
+            const std::string if_match = pbc::header_value(r.headers, "If-Match");
+            if (exists && overwrite == "F") return reply(412, "", "application/xml");
+            if (!if_match.empty() && !if_match_ok(if_match, exists ? &existing->second : nullptr)) return reply(412, "", "application/xml");
+        }
+        Node n;
+        n.mime = "application/octet-stream";
+        const bool keep = total <= keep_limit_;
+        if (keep) {
+            for (const auto& kv : se.chunks) n.content += kv.second.bytes;
+            Collector c(false);
+            c.add(n.content.data(), n.content.size());
+            n.sha256 = c.hex();
+        } else {
+            n.synthetic_size = total;
+            if (se.running_valid && static_cast<int>(se.chunks.size()) + 1 == se.next_in_order) {
+                unsigned char md[EVP_MAX_MD_SIZE];
+                unsigned int len = 0;
+                EVP_DigestFinal_ex(se.running.get(), md, &len);
+                n.sha256 = hex_of(md, len);
+            }
+        }
+        const std::string mtime = pbc::header_value(r.headers, "X-OC-Mtime").empty() ? pbc::header_value(r.headers, "X-OC-MTime") : pbc::header_value(r.headers, "X-OC-Mtime");
+        n.mtime = mtime.empty() ? server_time_ : std::atoll(mtime.c_str());
+        n.checksum = pbc::header_value(r.headers, "OC-Checksum");
+        if (exists) {
+            n.fileid = existing->second.fileid;
+            n.favorite = existing->second.favorite;
+            n.etag = next_etag();
+            tree_[dst] = n;
+            touch(parent);
+        } else {
+            put(dst, n);
+        }
+        sessions_.erase(id);
+        return written(exists ? 204 : 201, tree_.at(dst));
+    }
+
+    std::string dav_and_files_caps() const {
+        auto array = [](const std::vector<std::string>& v) {
+            std::string out = "[";
+            for (size_t i = 0; i < v.size(); ++i) out += (i ? ",\"" : "\"") + quote_json(v[i]) + "\"";
+            return out + "]";
+        };
+        std::string files;
+        auto add = [&](const std::string& piece) {
+            if (!files.empty()) files += ",";
+            files += piece;
+        };
+        if (trash_cap_) add(std::string("\"undelete\":") + (*trash_cap_ ? "true" : "false"));
+        if (max_chunk_cap_) add("\"chunked_upload\":{\"max_size\":" + std::to_string(*max_chunk_cap_) + "}");
+        if (forbidden_in_caps_) {
+            if (!forbidden_chars_.empty()) {
+                std::vector<std::string> chars;
+                for (char c : forbidden_chars_) chars.push_back(std::string(1, c));
+                add("\"forbidden_filename_characters\":" + array(chars));
+            }
+            if (!forbidden_names_.empty()) add("\"forbidden_filenames\":" + array(forbidden_names_));
+            if (!forbidden_basenames_.empty()) add("\"forbidden_filename_basenames\":" + array(forbidden_basenames_));
+            if (!forbidden_extensions_.empty()) add("\"forbidden_filename_extensions\":" + array(forbidden_extensions_));
+        }
+        return std::string("\"dav\":{") + (chunking_cap_ ? "\"chunking\":\"1.0\"" : "") + "},\"files\":{" + files + "}";
+    }
+
     static std::string etag_header(const Node& n) { return n.weak_etag ? "W/" + n.etag : n.etag; }
 
     Response get(const pbc::Request& req, const std::string& p) {
@@ -509,6 +1141,7 @@ private:
                 return r;
             }
         }
+        bytes_downloaded_ += n.size();
         Response r = reply(200, n.bytes(0, n.size()), n.mime);
         r.headers.push_back({"ETag", etag_header(n)});
         r.headers.push_back({"Last-Modified", http_date(n.mtime)});
@@ -535,6 +1168,26 @@ private:
     std::string login_variant_, issued_token_, login_server_url_, pending_login_name_, pending_app_password_;
     bool login_approved_ = false, login_delivered_ = false;
     long login_poll_status_ = 0;
+    // write side state
+    std::optional<bool> trash_cap_ = true;
+    bool trash_enabled_ = true, chunking_cap_ = true, forbidden_in_caps_ = true, opaque_ids_ = false, answer_etag_headers_ = true, partial_visible_ = false;
+    std::optional<int64_t> max_chunk_cap_, quota_limit_, max_file_size_;
+    std::string forbidden_chars_;
+    std::vector<std::string> forbidden_names_, forbidden_basenames_, forbidden_extensions_, blocked_ext_;
+    std::vector<Trashed> trash_;
+    int permanent_deletes_ = 0, overwrites_ = 0;
+    long long bytes_uploaded_ = 0, bytes_downloaded_ = 0;
+    std::map<std::string, Session> sessions_;
+    std::string lose_method_, lose_part_;
+    bool lose_armed_ = false;
+    long long drop_after_ = -1;
+    std::string answer_method_, answer_part_, answer_retry_;
+    long answer_status_ = 0;
+    int answer_count_ = 0;
+    bool ignore_assemble_conditions_ = false, ignore_move_conditions_ = false;
+    std::string before_method_, before_part_;
+    std::function<void()> before_fn_;
+    int before_skip_ = 0;
     FakeTransport inner_;
 };
 

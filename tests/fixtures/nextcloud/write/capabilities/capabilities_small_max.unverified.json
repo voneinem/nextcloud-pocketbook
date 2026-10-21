@@ -1,0 +1,1 @@
+{"ocs":{"meta":{"status":"ok","statuscode":100},"data":{"version":{"string":"31.0.4"},"capabilities":{"dav":{"chunking":"1.0"},"files":{"undelete":true,"chunked_upload":{"max_size":7340032}}}}}}

@@ -52,8 +52,8 @@ PB_TEST(open_sets_the_pragmas_and_the_user_version) {
     PB_CHECK_EQ(s->debug_query("PRAGMA synchronous"), std::string("2"));  // FULL
     PB_CHECK_EQ(s->debug_query("PRAGMA foreign_keys"), std::string("1"));
     PB_CHECK_EQ(s->debug_query("PRAGMA secure_delete"), std::string("1"));
-    PB_CHECK_EQ(s->debug_query("PRAGMA user_version"), std::string("3"));
-    PB_CHECK_EQ(s->schema_version(), 3);
+    PB_CHECK_EQ(s->debug_query("PRAGMA user_version"), std::string("4"));
+    PB_CHECK_EQ(s->schema_version(), 4);
     PB_CHECK(s->check_integrity().ok());
 }
 
@@ -126,7 +126,7 @@ PB_TEST(a_newer_database_is_refused_and_left_byte_identical) {
     {
         sqlite3* db = nullptr;
         PB_CHECK(sqlite3_open(path.c_str(), &db) == SQLITE_OK);
-        PB_CHECK(sqlite3_exec(db, "CREATE TABLE future(x); PRAGMA user_version = 4;", nullptr, nullptr, nullptr) == SQLITE_OK);
+        PB_CHECK(sqlite3_exec(db, "CREATE TABLE future(x); PRAGMA user_version = 5;", nullptr, nullptr, nullptr) == SQLITE_OK);
         sqlite3_close(db);
     }
     const std::string before = read_file(path);

@@ -152,6 +152,21 @@ bool is_valid_name(std::string_view name) {
     return !has_control(name);
 }
 
+bool is_valid_remote_path(std::string_view path) {
+    if (path.empty() || path[0] != '/' || normalize_remote_path(path) != path) return false;
+    for (unsigned char c : path)
+        if (c < 0x20 || c == 0x7f) return false;
+    size_t pos = 1;
+    while (pos <= path.size()) {   // no "." or ".." segment
+        const size_t slash = path.find('/', pos);
+        const std::string_view seg = path.substr(pos, slash == std::string_view::npos ? std::string_view::npos : slash - pos);
+        if (seg == "." || seg == "..") return false;
+        if (slash == std::string_view::npos) break;
+        pos = slash + 1;
+    }
+    return true;
+}
+
 bool parse_url_origin(std::string_view url, std::string* scheme, std::string* host, int* port) {
     const size_t sep = url.find("://");
     if (sep == std::string_view::npos || sep == 0) return false;

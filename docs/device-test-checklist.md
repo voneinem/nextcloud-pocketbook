@@ -70,6 +70,22 @@ Added by `specs/001-nextcloud-files-client/`. Same legend as above.
 | DT-NC-10 | Number of e-ink refreshes during a download | few (progress text updates at most every 2 s or 5 %) | U | | |
 | DT-NC-11 | The launcher filter (`pbcloud.app`) on the reader's shell: open a downloaded book, then read `system/pbcloud/pbcloud.log` | no line holds the name or path of the book (a notice stands in its place); the exit code of the app is still logged; the first run of 0.1.0 showed `iv_OpenBook filename = <path>` lines without the filter | U | | |
 
+## Upload and manage (feature 002)
+
+Added by `specs/002-manage-server-files/`. Same legend as above.
+
+| ID | Item | Expected | Status | Date | Value / note |
+|----|------|----------|--------|------|--------------|
+| DT-W1 | The bundled libcurl on the reader: a `PUT` from a file range with progress and cancel (probe with `PBC_PROBE_PUT_URL` and a throw-away file of a test account: it is overwritten) | the range is sent exactly (the server reports 1 MiB for the second MiB); cancel stops the transfer | U | | |
+| DT-W2 | `Response::delivery` after a cut Wi-Fi in the middle of a request body | `not_sent`, `partly_sent` and `fully_sent` are told apart (the probe prints `delivery` of every `PUT`; a cut Wi-Fi is done by hand); if not, every unanswered write is treated as outcome unknown | U | | |
+| DT-W3 | Chunk size (10 MiB) against memory and time on the device | peak `VmHWM` <= 150 MB, no stall | U | | |
+| DT-W4 | Speed of the SHA-256 pass on a 500 MB file | 20 MB/s or better; note MB/s | U | | |
+| DT-W5 | A 500 MB upload with a Wi-Fi drop and return | only the missing chunks are sent; the file on the server is identical | U | | |
+| DT-W6 | Power loss during an upload | the queue is intact after restart; items are `unknown` only where expected; no partial file on the server | U | | |
+| DT-W7 | Number of e-ink refreshes during an upload | few (progress text at most every 2 s or 5 %) | U | | |
+| DT-W8 | The picker's real top level and the `PBCloud` folder | the eight folders are listed when they exist; nothing else | U | | |
+| DT-W9 | Auto Sync on a reader whose Wi-Fi is off | the queue waits and the user is told; note the experience (owner point 2 of plan.md) | U | | |
+
 ## Recording
 
 For each measured value write the build version (About) and the date. Findings that change a design decision

@@ -40,6 +40,7 @@ Column {
         TextMenu { target: field }
     }
     Text {
+        objectName: "inkFieldError"
         visible: root.errorText.length > 0
         width: parent.width
         text: "✗ " + root.errorText

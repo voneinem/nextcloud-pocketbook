@@ -15,6 +15,9 @@ inline constexpr const char* kAllowedCodes[] = {
     "about.opened",
     "about.text_unavailable",
     "account.test",
+    "autosync.arm",
+    "autosync.drop",
+    "autosync.start",
     "ca.selected",
     "cache.cleared",
     "cache.evict",
@@ -32,6 +35,7 @@ inline constexpr const char* kAllowedCodes[] = {
     "font.ui",
     "listing.refresh",
     "network.connect",
+    "queue.send",
     "rotate.begin",
     "rotate.done",
     "rotate.geometry_failed",
@@ -42,6 +46,10 @@ inline constexpr const char* kAllowedCodes[] = {
     "store.write_failed",
     "tz.unavailable",
     "update.run",
+    "upload.done",
+    "upload.fail",
+    "upload.start",
+    "upload.unknown",
 };
 
 inline bool is_allowed_code(const std::string& code) {

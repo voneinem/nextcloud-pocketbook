@@ -1,39 +1,78 @@
 # German interface texts (T175). One line per text of the app: the English source, a TAB, the German text.
 # \n and \t are written as escapes; "||" in the German part separates the singular from the plural form (for texts with %n).
 # scripts/extract-strings.py --check lists texts without a translation and translations without a text.
+"%1" has changed on the server since you last saw it (now %2, %3). Apply the change anyway?	„%1“ hat sich auf dem Server seit Ihrem letzten Blick geändert (jetzt %2, %3). Die Änderung trotzdem ausführen?
+"%1" has changed on the server since you last saw it (now %2, %3). Delete it anyway? It goes to the server's trash.	„%1“ hat sich auf dem Server seit Ihrem letzten Blick geändert (jetzt %2, %3). Trotzdem löschen? Es kommt in den Papierkorb des Servers.
+"%1" is already in %2.	„%1“ ist in %2 schon vorhanden.
+"%1" is already waiting in the queue for %2.	„%1“ wartet für %2 schon in der Warteschlange.
+"%1" is not on the server any more. It will be uploaded as a new file.	„%1“ ist nicht mehr auf dem Server. Es wird als neue Datei hochgeladen.
+"%1" is not on the server any more. Nothing can be applied to it.	„%1“ ist nicht mehr auf dem Server. Darauf lässt sich nichts mehr anwenden.
+"%1" is not on the server any more. The change will be applied without replacing anything.	„%1“ ist nicht mehr auf dem Server. Die Änderung wird ausgeführt, ohne etwas zu ersetzen.
+"%1" is on the server (now %2, %3). Replace it with this entry anyway? The old version goes to the server's trash.	„%1“ liegt auf dem Server (jetzt %2, %3). Trotzdem durch diesen Eintrag ersetzen? Die alte Version kommt in den Papierkorb des Servers.
+"%1" on the server has changed since you last saw it (now %2, %3). Replace it anyway?	„%1“ auf dem Server hat sich seit Ihrem letzten Blick geändert (jetzt %2, %3). Trotzdem ersetzen?
+%1 and %2	%1 und %2
 %1 needed, %2 free.	%1 nötig, %2 frei.
 %1 of %2 used	%1 von %2 belegt
 %1 used	%1 belegt
 %1 used, no limit	%1 belegt, keine Grenze
+%1, %2. Add them to the queue?	%1, %2. In die Warteschlange legen?
 %n entries could not be read.	%n Eintrag konnte nicht gelesen werden.||%n Einträge konnten nicht gelesen werden.
+%n entry(ies)	%n Eintrag||%n Einträge
+%n file(s)	%n Datei||%n Dateien
+%n folder(s)	%n Ordner||%n Ordner
+%n item(s) are in the queue, marked Not synced. Nothing has been sent yet.	%n Eintrag ist in der Warteschlange und als Nicht synchronisiert markiert. Es wurde noch nichts gesendet.||%n Einträge sind in der Warteschlange und als Nicht synchronisiert markiert. Es wurde noch nichts gesendet.
+%n queued item(s) inside will fail.	%n Eintrag in der Warteschlange darin wird fehlschlagen.||%n Einträge in der Warteschlange darin werden fehlschlagen.
 (the reader's clock may be wrong)	(die Uhr des Readers geht möglicherweise falsch)
+A change of this entry is waiting in the queue already.	Für diesen Eintrag wartet schon eine Änderung in der Warteschlange.
+A different file with this name is on the server. Send it again to be asked what to do, or remove the item.	Auf dem Server liegt eine andere Datei mit diesem Namen. Senden Sie erneut, um zu entscheiden, oder entfernen Sie den Eintrag.
+A file or folder with this name is already there.	Eine Datei oder ein Ordner mit diesem Namen ist schon da.
+A folder named "%1" is already in %2. A file cannot replace it.	Ein Ordner „%1“ ist in %2 schon vorhanden. Eine Datei kann ihn nicht ersetzen.
 A link or a file is in the way in the download folder.	Im Download-Ordner steht ein Link oder eine Datei im Weg.
 About	Info
 About %n minute(s) left.	Noch etwa %n Minute.||Noch etwa %n Minuten.
 About this app	Über diese App
 About, licenses	Info, Lizenzen
 Account	Konto
+Add	Hinzufügen
+Add this folder	Diesen Ordner hinzufügen
+Add to the queue?	In die Warteschlange legen?
+Added to the queue	In die Warteschlange gelegt
 Also search the server	Auch auf dem Server suchen
 An app password is needed.	Ein App-Passwort ist nötig.
+Another account	Anderes Konto
 App password	App-Passwort
+Apply	Ausführen
+Apply anyway	Trotzdem ausführen
 Ask the administrator of the server.	Fragen Sie den Administrator des Servers.
+Ask the owner of the folder or the administrator of the server.	Fragen Sie den Besitzer des Ordners oder den Administrator des Servers.
 Author: %1	Autor: %1
+Auto Sync	Auto Sync
 Automatic	Automatisch
 Back	Zurück
 Browser login	Browser-Login
 Cancel	Abbrechen
 Changed on the reader	Auf dem Lesegerät geändert
+Changed on the server	Auf dem Server geändert
+Changes in the queue are sent a few seconds after your last action, when the reader is online. Nothing is sent at any other time.	Änderungen in der Warteschlange werden einige Sekunden nach Ihrer letzten Aktion gesendet, wenn das Lesegerät online ist. Zu anderen Zeiten wird nichts gesendet.
+Changes stay in the queue until you tap Send on the Queue screen.	Änderungen bleiben in der Warteschlange, bis Sie in der Warteschlange auf Senden tippen.
 Check	Prüfen
 Check the Wi-Fi connection and try again.	Prüfen Sie die WLAN-Verbindung und versuchen Sie es erneut.
 Check the address and the Wi-Fi connection.	Prüfen Sie die Adresse und die WLAN-Verbindung.
 Check the address you typed.	Prüfen Sie die eingegebene Adresse.
 Check the address. The administrator may have switched off WebDAV.	Prüfen Sie die Adresse. Der Administrator hat WebDAV möglicherweise abgeschaltet.
 Check the download folder on the reader.	Prüfen Sie den Download-Ordner auf dem Reader.
+Check the file on the reader.	Prüfen Sie die Datei auf dem Reader.
 Check the memory card and try again.	Prüfen Sie die Speicherkarte und versuchen Sie es erneut.
 Check the reader's date and time first. If they are right, the certificate of the server needs to be renewed.	Prüfen Sie zuerst Datum und Uhrzeit des Readers. Wenn sie stimmen, muss das Zertifikat des Servers erneuert werden.
+Check the server	Server prüfen
+Check the server before you send it again.	Prüfen Sie den Server, bevor Sie es erneut senden.
 Checking what you keep offline...	Offline gehaltene Dateien werden geprüft ...
 Checking...	Prüfe ...
+Choose a folder	Ordner wählen
 Choose a value	Wert wählen
+Choose another folder	Anderen Ordner wählen
+Choose another name, or keep both.	Wählen Sie einen anderen Namen oder behalten Sie beide.
+Choose this folder	Diesen Ordner wählen
 Choose what to do with your copy.	Wählen Sie, was mit Ihrer Kopie geschehen soll.
 Clear	Leeren
 Clear lists	Listen leeren
@@ -42,12 +81,23 @@ Close	Schließen
 Conflict	Konflikt
 Connected to %1	Verbunden mit %1
 Copy	Kopieren
+Copy %1 to "%2"?	%1 nach „%2“ kopieren?
+Copying	Wird kopiert
 Create one in Nextcloud under Settings > Security and use it here instead of your account password.	Erstellen Sie eines in Nextcloud unter Einstellungen > Sicherheit und verwenden Sie es hier statt Ihres Kontopassworts.
 Cut	Ausschneiden
 Date, newest first	Datum, neueste zuerst
 Date, oldest first	Datum, älteste zuerst
 Decrease	Verringern
 Delete	Löschen
+Delete "%1" and everything inside it? It goes to the server's trash.	„%1“ und alles darin löschen? Es kommt in den Papierkorb des Servers.
+Delete "%1"? It goes to the server's trash.	„%1“ löschen? Es kommt in den Papierkorb des Servers.
+Delete %n entries? They go to the server's trash.	%n Eintrag löschen? Er kommt in den Papierkorb des Servers.||%n Einträge löschen? Sie kommen in den Papierkorb des Servers.
+Delete anyway	Trotzdem löschen
+Delete pending	Löschen wartet
+Deleting here would be permanent, so PB Cloud does not offer it.	Löschen wäre hier endgültig, deshalb bietet PB Cloud es nicht an.
+Discard	Verwerfen
+Do the same for the other %n name(s)	Dasselbe für den anderen Namen tun||Dasselbe für die anderen %n Namen tun
+Done	Fertig
 Download	Herunterladen
 Download again	Erneut herunterladen
 Downloaded	Heruntergeladen
@@ -56,17 +106,23 @@ Downloading...	Lade herunter ...
 Downloading: %1	Lade herunter: %1
 Downloading: %1 of %2 (%3 %)	Lade herunter: %1 von %2 (%3 %)
 Downloading: %1 of %2 files	Wird heruntergeladen: %1 von %2 Dateien
+Edit name	Name ändern
 Every connection is checked against the usual authorities. For a server with your own authority, put its certificate as custom-ca.pem in the app's data folder (see the README).	Jede Verbindung wird gegen die üblichen Zertifizierungsstellen geprüft. Für einen Server mit eigener Zertifizierungsstelle legen Sie dessen Zertifikat als custom-ca.pem im Datenordner der App ab (siehe README).
 Failed	Fehlgeschlagen
 Favorites	Favoriten
+File changed since queued	Datei seit dem Vormerken geändert
 Files	Dateien
 Files checked	Geprüfte Dateien
 Files of 4 GB or more cannot be stored on this reader.	Dateien ab 4 GB können auf diesem Reader nicht gespeichert werden.
 Folder	Ordner
+Folder not found	Ordner nicht gefunden
+Folder, selected with everything inside	Ordner, mit allem darin ausgewählt
+Folders go with everything inside them.	Ordner gehen mit allem, was darin liegt.
 Folders not checked	Nicht geprüfte Ordner
 For your safety the app does not follow it. Use the address of the server itself.	Zu Ihrer Sicherheit folgt die App dem nicht. Verwenden Sie die Adresse des Servers selbst.
 Free on the reader	Frei auf dem Lesegerät
 Free some space on the reader and try again.	Schaffen Sie Platz auf dem Reader und versuchen Sie es erneut.
+Free some space on the server or ask the administrator to raise your quota.	Schaffen Sie Platz auf dem Server oder bitten Sie den Administrator, Ihr Kontingent zu erhöhen.
 From a downloaded file	Aus einer heruntergeladenen Datei
 From the server	Vom Server
 From this reader	Von diesem Lesegerät
@@ -76,35 +132,53 @@ If your account uses two-factor authentication, an app password is needed: creat
 If your server uses your own certificate authority, put its certificate as custom-ca.pem in the app's data folder. The check cannot be switched off.	Wenn Ihr Server eine eigene Zertifizierungsstelle nutzt, legen Sie deren Zertifikat als custom-ca.pem im Datenordner der App ab. Die Prüfung lässt sich nicht abschalten.
 In the app package	Im App-Paket
 Increase	Erhöhen
+It is kept and not sent. Connect that account again to send it.	Es bleibt erhalten und wird nicht gesendet. Verbinden Sie dieses Konto erneut, um es zu senden.
+It is not on the server. Send it again, or remove the item.	Es liegt nicht auf dem Server. Senden Sie es erneut oder entfernen Sie den Eintrag.
+It is on the server. Mark the item as done?	Es liegt auf dem Server. Eintrag als erledigt markieren?
+It is sent again from its new content.	Es wird mit dem neuen Inhalt erneut gesendet.
 Keep both	Beide behalten
 Keep my copy	Meine Kopie behalten
 Keep offline	Offline halten
+Keep the entry	Eintrag behalten
 Kept offline	Offline gehalten
 Language	Sprache
 Language of the app	Sprache der App
 Large file	Große Datei
 Large update	Großes Update
 Last checked: %1	Zuletzt geprüft: %1
+Last sent: %1 (%n sent)	Zuletzt gesendet: %1 (%n gesendet)||Zuletzt gesendet: %1 (%n gesendet)
+Last sent: %1 (%n sent, %2 need you)	Zuletzt gesendet: %1 (%n gesendet, %2 brauchen Sie)||Zuletzt gesendet: %1 (%n gesendet, %2 brauchen Sie)
 Last update: %1	Letztes Update: %1
 Last update: %1 (not complete)	Letztes Update: %1 (nicht vollständig)
+Layout	Ansicht
 License	Lizenz
 License: %1	Lizenz: %1
 Loading...	Lade ...
 Log in with a browser	Mit einem Browser anmelden
+Mark as done	Als erledigt markieren
 Missing on the reader	Auf dem Lesegerät fehlt die Datei
 Modified	Geändert
 More results exist. Type more of the name to narrow the search.	Es gibt weitere Treffer. Geben Sie mehr vom Namen ein, um die Suche einzugrenzen.
+Move	Verschieben
+Move %1 to "%2"?	%1 nach „%2“ verschieben?
+Moving	Wird verschoben
 Name	Name
+Name already taken	Name schon vergeben
+Name not accepted	Name nicht akzeptiert
 Name, A to Z	Name, A bis Z
 Name, Z to A	Name, Z bis A
 New	Neu
+New folder	Neuer Ordner
 Newer	Neuer
 Next page	Nächste Seite
 Nextcloud 30 or newer is needed. Ask the administrator to update the server.	Nextcloud 30 oder neuer ist nötig. Bitten Sie den Administrator, den Server zu aktualisieren.
 No	Nein
+No connection. The queue waits until you tap Send with a connection.	Keine Verbindung. Die Warteschlange wartet, bis Sie mit einer Verbindung auf Senden tippen.
+Not added	Nicht hinzugefügt
 Not approved yet. Approve the login on your other device, then tap Check again.	Noch nicht bestätigt. Bestätigen Sie die Anmeldung auf Ihrem anderen Gerät und tippen Sie dann erneut auf Prüfen.
 Not available	Nicht verfügbar
 Not connected	Nicht verbunden
+Not done	Nicht ausgeführt
 Not downloaded	Nicht heruntergeladen
 Not removed	Nicht entfernt
 Not synced	Nicht synchronisiert
@@ -112,43 +186,82 @@ Not tested yet	Noch nicht getestet
 Nothing found on this reader.	Auf diesem Lesegerät wurde nichts gefunden.
 Nothing is downloaded yet.	Es wurde noch nichts heruntergeladen.
 Nothing is kept offline yet. Open a folder or a file and tap Keep offline.	Noch nichts wird offline gehalten. Öffnen Sie einen Ordner oder eine Datei und tippen Sie auf „Offline halten“.
+Nothing is waiting to be sent.	Es wartet nichts auf das Senden.
+Nothing selected	Nichts ausgewählt
+Nothing to browse here. None of the folders for uploads were found.	Hier gibt es nichts zu durchsuchen. Keiner der Ordner für Uploads wurde gefunden.
 Nothing to paste. Only text copied in this app can be pasted.	Nichts zum Einfügen. Nur in dieser App kopierter Text kann eingefügt werden.
 OK	OK
 Offline, not checked	Offline, nicht geprüft
 Offline. 	Offline. 
+Offline. Your changes are kept and nothing is lost.	Offline. Ihre Änderungen bleiben erhalten, nichts geht verloren.
+Offline: only folders the reader has stored are shown.	Offline: Es werden nur Ordner gezeigt, die das Lesegerät gespeichert hat.
 On the reader	Auf dem Reader
+On the server: %1	Auf dem Server: %1
 On your phone or computer, open this link, log in to your Nextcloud and allow the access. Then tap Check here.	Öffnen Sie auf Ihrem Telefon oder Computer diesen Link, melden Sie sich bei Ihrer Nextcloud an und erlauben Sie den Zugriff. Tippen Sie dann hier auf Prüfen.
 Only https addresses are accepted.	Es werden nur https-Adressen akzeptiert.
 Only the first 2000 favorites are kept.	Nur die ersten 2000 Favoriten werden behalten.
 Open	Öffnen
 Open Settings and test the connection.	Öffnen Sie die Einstellungen und testen Sie die Verbindung.
 Open Settings to connect to your Nextcloud.	Öffnen Sie die Einstellungen, um sich mit Ihrer Nextcloud zu verbinden.
+Open this folder in the Nextcloud web interface.	Öffnen Sie diesen Ordner in der Nextcloud-Weboberfläche.
+Outcome unknown	Ausgang unbekannt
 Outdated	Veraltet
 PB Cloud	PB Cloud
 Page down	Seite nach unten
 Page up	Seite nach oben
 Paste	Einfügen
+Pick a file from your own folders.	Wählen Sie eine Datei aus Ihren eigenen Ordnern.
 Please sign in again	Bitte erneut anmelden
+Please sign in again in Settings. Nothing was lost.	Bitte melden Sie sich in den Einstellungen erneut an. Es ging nichts verloren.
+Preparing...	Vorbereiten ...
 Previous page	Vorige Seite
 Provided by the reader	Vom Reader bereitgestellt
+Queue	Warteschlange
+Queue (%1)	Warteschlange (%1)
+Queue again	Erneut vormerken
+Queue: %n not synced	Warteschlange: %n nicht synchronisiert||Warteschlange: %n nicht synchronisiert
 Refresh	Aktualisieren
+Refresh the folder and choose another one.	Aktualisieren Sie den Ordner und wählen Sie einen anderen.
+Refresh the folder to see what happened.	Aktualisieren Sie den Ordner, um zu sehen, was passiert ist.
 Refresh the folder to see what is there now.	Aktualisieren Sie den Ordner, um zu sehen, was jetzt darin ist.
+Refresh the folder, then choose what to do.	Aktualisieren Sie den Ordner und entscheiden Sie dann, was geschehen soll.
+Refresh the folder, then try again.	Aktualisieren Sie den Ordner und versuchen Sie es dann erneut.
 Remove	Entfernen
 Remove downloaded files on the Storage page and try again.	Entfernen Sie heruntergeladene Dateien auf der Seite Speicher und versuchen Sie es erneut.
+Remove from the queue	Aus der Warteschlange entfernen
 Remove from the reader	Vom Lesegerät entfernen
+Remove it from the queue, or ask the administrator.	Nehmen Sie es aus der Warteschlange oder fragen Sie den Administrator.
+Remove this folder	Diesen Ordner entfernen
 Removed on the server	Auf dem Server entfernt
 Removed on the server. This is the last list the reader knows.	Auf dem Server entfernt. Das ist die letzte Liste, die der Reader kennt.
+Rename	Umbenennen
+Rename pending	Umbenennen wartet
 Rename the folder on the server.	Benennen Sie den Ordner auf dem Server um.
 Replace	Ersetzen
+Replace "%1" on the server? The file on the server will be replaced by yours.	„%1“ auf dem Server ersetzen? Die Datei auf dem Server wird durch Ihre ersetzt.
+Replace anyway	Trotzdem ersetzen
 Replace my copy	Meine Kopie ersetzen
+Replace on the server	Auf dem Server ersetzen
+Replace pending	Ersetzen wartet
 Replace your copy?	Ihre Kopie ersetzen?
+Resolve	Klären
 Resume	Fortsetzen
 Retry	Erneut versuchen
 Same	Gleich
 Saved lists and records	Gespeicherte Listen und Einträge
 Search	Suche
 Security	Sicherheit
+Select	Auswählen
 Select all	Alles auswählen
+Selected	Ausgewählt
+Send	Senden
+Send a smaller file, or ask the administrator about the upload limit.	Senden Sie eine kleinere Datei oder fragen Sie den Administrator nach der Upload-Grenze.
+Send again	Erneut senden
+Send the queue first, or remove items you do not need.	Senden Sie zuerst die Warteschlange oder entfernen Sie Einträge, die Sie nicht brauchen.
+Send the queue first, or remove the waiting change.	Senden Sie zuerst die Warteschlange oder entfernen Sie die wartende Änderung.
+Sending	Wird gesendet
+Sending...	Senden ...
+Sent	Gesendet
 Server	Server
 Server address	Serveradresse
 Server version	Serverversion
@@ -159,6 +272,10 @@ Sign out?	Abmelden?
 Size	Größe
 Size, largest first	Größe, größte zuerst
 Size, smallest first	Größe, kleinste zuerst
+Skip	Überspringen
+Some entries could not be changed.	Einige Einträge konnten nicht geändert werden.
+Some entries were left out	Einige Einträge wurden ausgelassen
+Some files were left out	Einige Dateien wurden ausgelassen
 Something went wrong.	Etwas ist schiefgegangen.
 Sort	Sortieren
 Sort by	Sortieren nach
@@ -166,8 +283,14 @@ Start the login again.	Starten Sie die Anmeldung erneut.
 State	Zustand
 Storage	Speicher
 Storage space	Speicherplatz
+Switch on Wi-Fi and send again.	Schalten Sie das WLAN ein und senden Sie erneut.
 Switch on Wi-Fi and try again.	Schalten Sie das WLAN ein und versuchen Sie es erneut.
+Synchronization	Synchronisierung
+Target folder	Zielordner
 Test	Testen
+That entry was left out. Nothing else to do.	Dieser Eintrag wurde ausgelassen. Sonst ist nichts zu tun.
+That name is taken as well.	Dieser Name ist auch schon vergeben.
+The QR code holds more text than the app accepts.	Der QR-Code enthält mehr Text, als die App annimmt.
 The address is not valid.	Die Adresse ist ungültig.
 The answer of the server could not be understood.	Die Antwort des Servers wurde nicht verstanden.
 The app password is kept as plain text in a file on the reader; whether the storage keeps that file private is checked when it is saved. Anyone who gets the reader's storage could use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.	Das App-Passwort liegt als Klartext in einer Datei auf dem Reader; ob der Speicher die Datei schützt, wird beim Speichern geprüft. Wer den Speicher des Readers in die Hand bekommt, könnte das App-Passwort nutzen, bis Sie es in Nextcloud entfernen (Einstellungen > Sicherheit). Ihr Kontopasswort wird nie gespeichert.
@@ -175,7 +298,10 @@ The app password is kept as plain text in a file that only this app can read. An
 The app password is kept as plain text in a file that only this app can read. Anyone who gets the reader's storage could still use it until you remove the app password in Nextcloud (Settings > Security). Your account password is never stored.	Das App-Passwort liegt als Klartext in einer Datei, die nur diese App lesen kann. Wer den Speicher des Readers in die Hand bekommt, könnte es trotzdem nutzen, bis Sie das App-Passwort in Nextcloud entfernen (Einstellungen > Sicherheit). Ihr Kontopasswort wird nie gespeichert.
 The app password is kept as plain text in a file, and this reader's storage cannot make that file private: anyone with USB access to the reader can read it and use the app password until you remove it in Nextcloud (Settings > Security). Your account password is never stored.	Das App-Passwort liegt als Klartext in einer Datei, und der Speicher dieses Readers kann diese Datei nicht schützen: Jeder mit USB-Zugriff auf den Reader kann sie lesen und das App-Passwort nutzen, bis Sie es in Nextcloud entfernen (Einstellungen > Sicherheit). Ihr Kontopasswort wird nie gespeichert.
 The app password is removed from the reader. The files you downloaded stay on the reader. To make the app password useless on the server too, remove it in Nextcloud under Settings > Security.	Das App-Passwort wird vom Reader entfernt. Heruntergeladene Dateien bleiben auf dem Reader. Damit das App-Passwort auch auf dem Server unbrauchbar wird, entfernen Sie es in Nextcloud unter Einstellungen > Sicherheit.
+The app writes to your server only when you ask it to, and never by itself.	Die App schreibt nur dann auf Ihren Server, wenn Sie es verlangen, und nie von selbst.
 The certificate does not belong to this address.	Das Zertifikat gehört nicht zu dieser Adresse.
+The change is dropped and will not be sent. Files on the reader and on the server are not touched.	Die Änderung wird verworfen und nicht gesendet. Dateien auf dem Lesegerät und auf dem Server bleiben unberührt.
+The check did not work. Try again when there is a connection.	Die Prüfung hat nicht funktioniert. Versuchen Sie es erneut, wenn eine Verbindung besteht.
 The connection was lost.	Die Verbindung ist abgebrochen.
 The connection works.	Die Verbindung funktioniert.
 The copy on the reader has been changed.	Die Kopie auf dem Reader wurde geändert.
@@ -189,53 +315,83 @@ The download was cancelled.	Der Download wurde abgebrochen.
 The download was cancelled. Nothing was kept.	Der Download wurde abgebrochen. Es wurde nichts behalten.
 The downloaded file did not match the checksum of the server.	Die heruntergeladene Datei stimmt nicht mit der Prüfsumme des Servers überein.
 The downloaded file has the wrong size.	Die heruntergeladene Datei hat die falsche Größe.
+The entry is no longer on the server.	Der Eintrag ist nicht mehr auf dem Server.
 The favorites are not available offline. Connect to the network and tap Refresh.	Die Favoriten sind offline nicht verfügbar. Verbinden Sie sich mit dem Netzwerk und tippen Sie auf „Aktualisieren“.
 The file custom-ca.pem could not be used and is ignored. Every connection is checked against the usual authorities; there is no way to skip the check.	Die Datei custom-ca.pem konnte nicht verwendet werden und wird ignoriert. Jede Verbindung wird gegen die üblichen Zertifizierungsstellen geprüft; die Prüfung lässt sich nicht umgehen.
 The file is locked on the server.	Die Datei ist auf dem Server gesperrt.
 The file is no longer on the server.	Die Datei ist nicht mehr auf dem Server.
+The file on the reader changed while it was being sent.	Die Datei auf dem Reader hat sich beim Senden geändert.
 The file was discarded. Try again.	Die Datei wurde verworfen. Versuchen Sie es erneut.
+The files on the server with these names will be replaced by yours.	Die Dateien auf dem Server mit diesen Namen werden durch Ihre ersetzt.
+The folder is no longer on the server.	Der Ordner ist nicht mehr auf dem Server.
+The folder needs a refresh first.	Der Ordner muss zuerst aktualisiert werden.
 The folder path is too long for the reader's storage.	Der Ordnerpfad ist für den Speicher des Readers zu lang.
 The list of third-party licenses is unavailable.	Die Liste der Lizenzen von Drittanbietern ist nicht verfügbar.
 The login did not finish.	Die Anmeldung wurde nicht abgeschlossen.
 The login ran out of time.	Die Zeit für die Anmeldung ist abgelaufen.
 The login ran out of time. Go back and start it again.	Die Zeit für die Anmeldung ist abgelaufen. Gehen Sie zurück und starten Sie sie erneut.
+The queue is full.	Die Warteschlange ist voll.
+The reader could not tell whether this reached the server.	Der Reader konnte nicht feststellen, ob das den Server erreicht hat.
+The reader does not know yet whether the server has a trash. Tap Test in Settings with a connection, then try again.	Das Lesegerät weiß noch nicht, ob der Server einen Papierkorb hat. Tippen Sie in den Einstellungen mit Verbindung auf Test und versuchen Sie es dann erneut.
 The reader's clock differs from the server's by about %n minute(s). Check the date and time in the reader's settings.	Die Uhr des Readers weicht um etwa %n Minute von der des Servers ab. Prüfen Sie Datum und Uhrzeit in den Einstellungen des Readers.||Die Uhr des Readers weicht um etwa %n Minuten von der des Servers ab. Prüfen Sie Datum und Uhrzeit in den Einstellungen des Readers.
 The reader's date and time are wrong.	Datum und Uhrzeit des Readers sind falsch.
 The reader's storage cannot be written to.	Auf den Speicher des Readers kann nicht geschrieben werden.
 The saved folder lists are deleted and will be loaded again when you open a folder. Downloaded files, favorites and offline marks stay.	Die gespeicherten Ordnerlisten werden gelöscht und beim Öffnen eines Ordners neu geladen. Heruntergeladene Dateien, Favoriten und Offline-Markierungen bleiben erhalten.
 The server asks for a pause.	Der Server bittet um eine Pause.
+The server asks for a pause. Tap Send later.	Der Server bittet um eine Pause. Tippen Sie später auf Senden.
 The server cannot be reached.	Der Server ist nicht erreichbar.
 The server did not answer in time.	Der Server hat nicht rechtzeitig geantwortet.
 The server did not let the app read this entry.	Der Server hat der App das Lesen dieses Eintrags nicht erlaubt.
+The server does not accept a file this large.	Der Server nimmt keine so große Datei an.
+The server does not accept this name.	Der Server nimmt diesen Namen nicht an.
+The server does not accept this type of file.	Der Server nimmt diese Art von Datei nicht an.
 The server has no file access at this address.	Der Server bietet unter dieser Adresse keinen Dateizugriff.
 The server is in maintenance mode.	Der Server befindet sich im Wartungsmodus.
+The server is in maintenance mode. Tap Send later.	Der Server befindet sich im Wartungsmodus. Tippen Sie später auf Senden.
+The server named a place outside your files.	Der Server nannte einen Ort außerhalb Ihrer Dateien.
 The server refused access to your files.	Der Server hat den Zugriff auf Ihre Dateien verweigert.
 The server refused the login twice. Open Settings and test the connection with the right app password.	Der Server hat die Anmeldung zweimal abgelehnt. Öffnen Sie die Einstellungen und testen Sie die Verbindung mit dem richtigen App-Passwort.
+The server refused this without saying why.	Der Server hat das abgelehnt, ohne einen Grund zu nennen.
 The server reported a problem.	Der Server meldet ein Problem.
 The server shows this entry in a state the app does not support.	Der Server zeigt diesen Eintrag in einem Zustand, den die App nicht unterstützt.
 The server wants to send you to another address.	Der Server will Sie an eine andere Adresse weiterleiten.
 The server's certificate is expired or not valid yet.	Das Zertifikat des Servers ist abgelaufen oder noch nicht gültig.
 The server's certificate is not trusted by this reader.	Dieser Reader vertraut dem Zertifikat des Servers nicht.
 The setting could not be saved.	Die Einstellung konnte nicht gespeichert werden.
+The storage on the server is full.	Der Speicher auf dem Server ist voll.
 The update is finished.	Das Update ist abgeschlossen.
 The update was stopped.	Das Update wurde angehalten.
 The update will download %1. %2 are free on the reader. Continue?	Das Update lädt %1 herunter. Auf dem Lesegerät sind %2 frei. Fortfahren?
 The user name or the app password is wrong.	Der Benutzername oder das App-Passwort ist falsch.
+There are no folders in this one.	In diesem Ordner liegen keine Ordner.
+There is no connection.	Es gibt keine Verbindung.
 There is no network connection.	Es besteht keine Netzwerkverbindung.
 There is not enough free space on the reader.	Auf dem Reader ist nicht genug Platz frei.
 These are no longer on the server. The copy stays on the reader.	Diese Dateien sind nicht mehr auf dem Server. Die Kopie bleibt auf dem Lesegerät.
 Third-party licenses	Lizenzen von Drittanbietern
 This Nextcloud version is too old.	Diese Nextcloud-Version ist zu alt.
 This address does not answer like a Nextcloud.	Diese Adresse antwortet nicht wie eine Nextcloud.
+This belongs to another account.	Das gehört zu einem anderen Konto.
+This changed on the server since you last saw it.	Das hat sich auf dem Server geändert, seit Sie es zuletzt gesehen haben.
 This could not be saved on the reader.	Das konnte nicht auf dem Reader gespeichert werden.
 This entry is not available.	Dieser Eintrag ist nicht verfügbar.
+This file cannot be uploaded from here.	Diese Datei kann von hier nicht hochgeladen werden.
 This file is %1. Downloading it can take a long time and uses the battery. Download it?	Diese Datei ist %1 groß. Das Herunterladen kann lange dauern und belastet den Akku. Herunterladen?
+This file is empty or cannot be read.	Diese Datei ist leer oder kann nicht gelesen werden.
 This file is too large for the reader's storage.	Diese Datei ist für den Speicher des Readers zu groß.
+This folder has too many entries for the reader.	Dieser Ordner hat zu viele Einträge für das Lesegerät.
+This folder holds too many files to add at once. Pick a smaller folder.	Dieser Ordner enthält zu viele Dateien, um sie auf einmal hinzuzufügen. Wählen Sie einen kleineren Ordner.
+This folder is empty or cannot be read.	Dieser Ordner ist leer oder kann nicht gelesen werden.
 This folder is empty.	Dieser Ordner ist leer.
 This folder is end-to-end encrypted. The app cannot open it.	Dieser Ordner ist Ende-zu-Ende-verschlüsselt. Die App kann ihn nicht öffnen.
 This folder is not available offline. Connect to the network and open it again.	Dieser Ordner ist offline nicht verfügbar. Verbinden Sie sich mit dem Netzwerk und öffnen Sie ihn erneut.
+This folder is not stored on the reader. Connect to the network and open it again.	Dieser Ordner ist nicht auf dem Lesegerät gespeichert. Verbinden Sie sich mit dem Netzwerk und öffnen Sie ihn erneut.
 This is an unofficial app. It is not made by or connected with Nextcloud GmbH.	Dies ist eine inoffizielle App. Sie stammt nicht von der Nextcloud GmbH und steht in keiner Verbindung zu ihr.
+This server has no trash.	Dieser Server hat keinen Papierkorb.
+This server has no trash. Deleting here would be permanent, so PB Cloud does not offer it. Delete in the web interface if you are sure.	Dieser Server hat keinen Papierkorb. Löschen wäre hier endgültig, deshalb bietet PB Cloud es nicht an. Löschen Sie in der Weboberfläche, wenn Sie sicher sind.
 Time zone data: release %1	Zeitzonendaten: Version %1
+To replace it, refresh this folder first.	Zum Ersetzen aktualisieren Sie zuerst diesen Ordner.
+Try again later, or ask the administrator.	Versuchen Sie es später erneut oder fragen Sie den Administrator.
 Try again later.	Versuchen Sie es später erneut.
 Try again.	Versuchen Sie es erneut.
 Try again. If it keeps failing, this server may not be supported.	Versuchen Sie es erneut. Schlägt es weiter fehl, wird dieser Server möglicherweise nicht unterstützt.
@@ -243,6 +399,7 @@ Type	Typ
 Type part of a name.	Geben Sie einen Teil eines Namens ein.
 Type the address of your server, for example cloud.example.org.	Geben Sie die Adresse Ihres Servers ein, zum Beispiel cloud.example.org.
 Type the address with https:// or just the name of the server.	Geben Sie die Adresse mit https:// oder nur den Namen des Servers ein.
+Type the app password by hand instead.	Geben Sie das App-Passwort stattdessen von Hand ein.
 Unchanged	Unverändert
 Up	Nach oben
 Update	Update
@@ -252,15 +409,21 @@ Updated %n day(s) ago	Vor %n Tag aktualisiert||Vor %n Tagen aktualisiert
 Updated %n hour(s) ago	Vor %n Stunde aktualisiert||Vor %n Stunden aktualisiert
 Updated %n minute(s) ago	Vor %n Minute aktualisiert||Vor %n Minuten aktualisiert
 Updated just now	Gerade aktualisiert
+Upload	Hochladen
+Upload files	Dateien hochladen
+Upload to %1	Hochladen nach %1
+Use another name.	Verwenden Sie einen anderen Namen.
 Use the address you open in the browser to reach your files.	Verwenden Sie die Adresse, mit der Sie im Browser auf Ihre Dateien zugreifen.
 Used by downloads	Von Downloads belegt
 User name	Benutzername
 Version	Version
 Version %1	Version %1
 Wait a few minutes and try again.	Warten Sie einige Minuten und versuchen Sie es erneut.
+Waiting for %1	Wartet auf %1
 Waiting for the connection. It continues by itself, or tap Cancel.	Warte auf die Verbindung. Der Download geht von selbst weiter, oder tippen Sie auf Abbrechen.
 Waiting for your answer.	Wartet auf Ihre Antwort.
 Yes	Ja
+You are not allowed to do this here.	Das dürfen Sie hier nicht tun.
 You are not allowed to read this.	Sie dürfen dies nicht lesen.
 You changed the copy of this file on the reader, and the server has another version. Nothing is replaced until you choose.	Sie haben die Kopie dieser Datei auf dem Reader geändert, und der Server hat eine andere Version. Nichts wird ersetzt, bevor Sie wählen.
 You changed this copy on the reader. Your changes will be lost. The file stays on your server. Remove the copy?	Sie haben diese Kopie auf dem Lesegerät geändert. Ihre Änderungen gehen verloren. Die Datei bleibt auf Ihrem Server. Kopie entfernen?
@@ -270,5 +433,6 @@ Your copy	Ihre Kopie
 Your copy (%1, changed %2) will be lost and replaced by the version from the server.	Ihre Kopie (%1, geändert %2) geht verloren und wird durch die Version vom Server ersetzt.
 Your copy was changed	Ihre Kopie wurde geändert
 Your own certificate authority is loaded (%n certificate(s)). Every connection is still checked; a certificate that cannot be verified is refused.	Ihre eigene Zertifizierungsstelle ist geladen (%n Zertifikat). Jede Verbindung wird weiterhin geprüft; ein Zertifikat, das sich nicht prüfen lässt, wird abgelehnt.||Ihre eigene Zertifizierungsstelle ist geladen (%n Zertifikate). Jede Verbindung wird weiterhin geprüft; ein Zertifikat, das sich nicht prüfen lässt, wird abgelehnt.
+and %n more	und %n weitere
 unavailable	nicht verfügbar
 unknown	unbekannt

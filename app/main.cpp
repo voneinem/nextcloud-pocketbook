@@ -23,6 +23,9 @@
 #include <vector>
 
 #include "about_bridge.h"
+#include "picker_bridge.h"
+#include "folder_chooser_bridge.h"
+#include "queue_bridge.h"
 #include "browse_bridge.h"
 #include "connection_bridge.h"
 #include "qr_image_provider.h"
@@ -159,6 +162,9 @@ int main(int argc, char** argv) {
     std::unique_ptr<BrowseBridge> browseBridge;
     std::unique_ptr<TransferBridge> transferBridge;
     std::unique_ptr<SpaceBridge> spaceBridge;
+    std::unique_ptr<PickerBridge> pickerBridge;
+    std::unique_ptr<QueueBridge> queueBridge;
+    std::unique_ptr<FolderChooserBridge> chooserBridge;
     // where the downloads go: a folder the reader's library scans on the device, a throw-away folder on the host
 #ifdef PLATFORM_POCKETBOOK
     const QString download_root = QStringLiteral("/mnt/ext1/PBCloud");
@@ -237,6 +243,45 @@ int main(int argc, char** argv) {
         sc.storage = &storage;
         sc.download_root = download_root.toStdString();
         spaceBridge = std::make_unique<SpaceBridge>(sc);
+
+        // Uploads and the queue (specs/002-manage-server-files): what may be picked is decided by the core against these rules - the reader's
+        // storage root, and the app's own data folder (database, credentials, log) which can never be a source.
+        pbc::SourceRules source_rules;
+#ifdef PLATFORM_POCKETBOOK
+        source_rules.root = "/mnt/ext1";
+#else
+        source_rules.root = QDir(qEnvironmentVariable("PBC_PICKER_ROOT", QStringLiteral("./pbcloud-picker"))).absolutePath().toStdString();
+        QDir().mkpath(QString::fromStdString(source_rules.root));
+#endif
+        source_rules.deny = {data_dir.toStdString()};
+        PickerBridge::Config pc;
+        pc.store = store.get();
+        pc.rules = source_rules;
+        // the seven folders of the attach browser of PB Notes, and this app's own download folder (so that an edited copy can be sent back)
+        pc.topFolders = {QStringLiteral("Audio Books"), QStringLiteral("Downloads"), QStringLiteral("Music"), QStringLiteral("My pictures"),
+                         QStringLiteral("Notes"), QStringLiteral("Photo"), QStringLiteral("screens"), QStringLiteral("PBCloud")};
+        pickerBridge = std::make_unique<PickerBridge>(pc);
+
+        QueueBridge::Config qc;
+        qc.store = store.get();
+        qc.worker = &worker;
+        qc.http = http.get();
+        qc.clock = &clock;
+        qc.rules = source_rules;
+        qc.wifi_up = cc.wifi_up;
+        qc.ensure_network = cc.ensure_network;
+        qc.format_date_time = tc.format_date_time;
+        qc.download_root = download_root.toStdString();
+        queueBridge = std::make_unique<QueueBridge>(qc);
+
+        FolderChooserBridge::Config fc;
+        fc.store = store.get();
+        fc.worker = &worker;
+        fc.http = http.get();
+        fc.clock = &clock;
+        fc.wifi_up = cc.wifi_up;
+        fc.ensure_network = cc.ensure_network;
+        chooserBridge = std::make_unique<FolderChooserBridge>(fc);
     }
 
     // About screens: the manifest and the license texts live in pbcloud-licenses/ next to the app on the reader,
@@ -291,6 +336,9 @@ int main(int argc, char** argv) {
     if (browseBridge) engine.rootContext()->setContextProperty(QStringLiteral("browse"), browseBridge.get());
     if (transferBridge) engine.rootContext()->setContextProperty(QStringLiteral("transfer"), transferBridge.get());
     if (spaceBridge) engine.rootContext()->setContextProperty(QStringLiteral("space"), spaceBridge.get());
+    if (pickerBridge) engine.rootContext()->setContextProperty(QStringLiteral("picker"), pickerBridge.get());
+    if (queueBridge) engine.rootContext()->setContextProperty(QStringLiteral("queue"), queueBridge.get());
+    if (chooserBridge) engine.rootContext()->setContextProperty(QStringLiteral("chooser"), chooserBridge.get());
     if (connectionBridge) {
         engine.rootContext()->setContextProperty(QStringLiteral("connection"), connectionBridge.get());
         engine.addImageProvider(QStringLiteral("qr"), new QrImageProvider(connectionBridge.get()));   // the engine owns it
@@ -323,6 +371,24 @@ int main(int argc, char** argv) {
                     ++failed;
                 }
                 delete page;
+            }
+            // the dialogs and widgets of the feature 002 screens (singletons and the main file are loaded by the engine itself)
+            for (const QString& name : QDir(QStringLiteral(":/qml")).entryList(QStringList() << QStringLiteral("*.qml"))) {
+                if (name == QLatin1String("Main.qml") || name == QLatin1String("Style.qml") || name == QLatin1String("Problems.qml") || name == QLatin1String("EntryWords.qml")) continue;
+                QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/qml/") + name));
+                QObject* widget = component.isError() ? nullptr : component.create();
+                if (!widget) {
+                    std::cerr << "[pbcloud] component failed: " << name.toStdString() << " " << component.errorString().toStdString() << std::endl;
+                    ++failed;
+                }
+                delete widget;
+            }
+            // the pages and the dialog that the queue, the picker and the chooser stand on must be in the package
+            for (const char* required : {"pages/QueuePage.qml", "pages/FolderChooserPage.qml", "pages/FilePickerPage.qml", "CollisionDialog.qml"}) {
+                if (!QFile::exists(QStringLiteral(":/qml/") + QLatin1String(required))) {
+                    std::cerr << "[pbcloud] missing from the package: " << required << std::endl;
+                    ++failed;
+                }
             }
             // a blank screen (no page shown) is a failure too
             auto* window = engine.rootObjects().isEmpty() ? nullptr : engine.rootObjects().first();

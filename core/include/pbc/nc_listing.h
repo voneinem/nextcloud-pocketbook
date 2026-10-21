@@ -4,6 +4,7 @@
 // path segment are skipped, entries the user cannot use are marked, and no input makes the parser fail in any way but with an error key.
 // Server behaviour is UNVERIFIED (docs/live-server-checklist.md LV-N5). Qt-free.
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,15 @@ Result<Listing> parse_listing(const Response& r, std::string_view user_id, std::
 
 // One request: PROPFIND Depth 1 on the folder. Errors are those of DavSession::status_error plus the parser's; a 404 is not_found.
 Result<Listing> fetch_listing(DavSession& session, std::string_view user_id, std::string_view remote_path);
+
+// One PROPFIND with Depth 0 on a single path (specs/002-manage-server-files W9: the checks before a conditional write, the version after a write whose
+// answer carried none, the "Check the server" action). A 404 is not an error: the value is empty ("not there"). Other errors are those of
+// DavSession::status_error and the parser's.
+Result<std::optional<RemoteEntry>> fetch_entry(DavSession& session, std::string_view user_id, std::string_view remote_path);
+
+// The free space of the account (specs/002-manage-server-files W2, FR-038): one PROPFIND Depth 0 on the home for quota-available-bytes. nullopt = unknown or
+// unlimited. Errors are those of DavSession::status_error and the parser's; the caller treats a failure as "unknown", never as fatal.
+Result<std::optional<int64_t>> fetch_free_bytes(DavSession& session, std::string_view user_id);
 
 // ---- favorites and server search (contracts/server-requests.md sections 7 and 8) ----
 

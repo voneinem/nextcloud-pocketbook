@@ -4,6 +4,7 @@ singleton EntryWords 1.0 EntryWords.qml
 FlatList 1.0 FlatList.qml
 ChoiceDialog 1.0 ChoiceDialog.qml
 ConfirmDialog 1.0 ConfirmDialog.qml
+CollisionDialog 1.0 CollisionDialog.qml
 PageButtons 1.0 PageButtons.qml
 SelectableText 1.0 SelectableText.qml
 SelectionHandle 1.0 SelectionHandle.qml

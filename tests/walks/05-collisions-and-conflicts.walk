@@ -1,0 +1,74 @@
+# Never overwrite silently (specs/002-manage-server-files US3): a name that is taken asks (keep both, replace after a confirmation, skip); a replace
+# whose server file changed meanwhile is held as a conflict with both versions intact until the user decides. Run after 04-unknown-outcome.walk
+# with the same server and folders (Auto Sync is off by then, so Send is a tap).
+# server touch /Documents/report.pdf
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# report.pdf is in Documents (uploaded by an earlier walk): picking it again asks
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 1
+expect pickerSelection 1 file(s)
+tap pickerUpload
+waitfor collisionText report.pdf
+expect collisionText is already in
+shot @OUT@/51-collision.png
+# keep both: the proposed name can be edited; here it is taken as it is
+tap footerButton 1
+waitfor folderKeepBothName
+shot @OUT@/52-keep-both-name.png
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+# the same file once more: replace it (a second confirmation names the file)
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 1
+tap pickerUpload
+waitfor collisionText report.pdf
+tap footerButton 2
+waitfor folderReplaceConfirm
+expect dialogText Replace "report.pdf" on the server
+shot @OUT@/53-replace-confirm.png
+tap footerButton 1
+waitfor dialogText in the queue
+tap footerButton 0
+wait 400
+shot @OUT@/54-documents-two-pending.png
+# Send: the keep-both copy goes; the replace is held because the server file was changed after the reader's listing
+tap folderQueue
+waitfor queueRow
+tap queueSend
+waitfor queueRowCaption Conflict
+shot @OUT@/55-queue-conflict.png
+tap queueRow 1
+tap queueResolve
+waitfor choiceRow
+shot @OUT@/56-conflict-choices.png
+# replace anyway: the server version is looked at again and shown before the user confirms
+tap choiceRow 1
+waitfor dialogText has changed since you last saw it
+shot @OUT@/57-replace-anyway-confirm.png
+tap footerButton 1
+wait 800
+tap queueSend
+wait 2500
+shot @OUT@/58-queue-resolved.png
+tap queueBack
+wait 500
+tap folderQueue
+waitfor queueEmpty
+shot @OUT@/59-queue-empty.png
+tap queueBack
+wait 400

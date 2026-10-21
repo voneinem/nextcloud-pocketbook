@@ -52,8 +52,32 @@ Added by `specs/001-nextcloud-files-client/`. Same legend and rules as above. Th
 | LV-N8 | Favorites `REPORT` with `oc:filter-files` | the starred files and folders are returned with the requested properties | U | U |
 | LV-N9 | `SEARCH` with `d:like` on `displayname`, with `%`, `_` and `\` in the term | name matches within the account, limit honoured; note how the three characters behave | U | U |
 
+## Nextcloud files client write side (feature 002)
+
+Added by `specs/002-manage-server-files/`. Same legend and rules as above. The expected behaviour is the contract in
+`specs/002-manage-server-files/contracts/server-requests.md`.
+
+| ID | Item | Expected | Nextcloud | OpenCloud |
+|----|------|----------|-----------|-----------|
+| LV-W1 | Capabilities for the write side: `dav.chunking`, `files.undelete`, `files.chunked_upload.max_size`, the four forbidden-name lists | present with the assumed JSON paths; note what a missing key means | U | U |
+| LV-W2 | `If-Match` and `If-None-Match: *` on `PUT` | a stale ETag and an existing name give 412; a `W/` ETag never matches `If-Match` | U | U |
+| LV-W3 | `MOVE` and `COPY` with `Overwrite: F` and `If-Match` | 412 for an existing target or a changed source (note which); folders; a target inside the source is refused | U | U |
+| LV-W4 | `MKCOL` answers | 201 with `OC-Etag` and `OC-FileId`; 405 for an existing name; 409 for a missing parent | U | U |
+| LV-W5 | Chunked upload v2 end to end | `MKCOL`, five-digit chunk `PUT`s, final `MOVE`, abort `DELETE`; early 507 through `OC-Total-Length` | U | U |
+| LV-W6 | Which of `If-Match`, `If-None-Match`, `Overwrite`, `OC-Checksum` the final chunk `MOVE` honors | the conditions the app sends are enforced, or the finding is recorded and the app keeps its `PROPFIND` pre-check | U | U |
+| LV-W7 | `PROPFIND` of an upload folder and the 24-hour expiry | chunk names and sizes listed; an expired folder is gone | U | U |
+| LV-W8 | `OC-Checksum` and `X-OC-MTime` | the checksum is reported back in `oc:checksums`; the modification time is applied (accepted marker) | U | U |
+| LV-W9 | `DELETE` of a file and of a folder | lands in the trash; `If-Match` on `DELETE` is enforced; 404 for a path that is gone | U | U |
+| LV-W10 | The capability lists of forbidden names, characters, base names and extensions | JSON paths and contents as assumed | U | U |
+| LV-W11 | The status code of every refusal: quota, size, type, locked, forbidden name, missing parent, permission, also after a write behind a reverse proxy (500/502/504) | the mapping of the contract holds; note the exception classes seen | U | U |
+| LV-W12 | `207` member failures on a folder `DELETE`, `MOVE` and `COPY` | the members that failed are listed; nothing else is changed | U | U |
+
 ## Recording
 
 For every `V` or `F` add the date and one line (no addresses, no host names that identify the owner). Put
 anonymized transcripts in `tests/fixtures/` with the suffix `.unverified` until a live run has produced
 them; then rename. Findings that change a decision go into `docs/device-findings.md`.
+
+Note on LV-W3 and LV-W6 (implementation, 2026-10-21): the app never relies on `Overwrite: T`. A replace of a file is a conditional `DELETE` of the old version
+(`If-Match`, into the trash; refused where there is no trash) followed by the `MOVE` or `COPY` with `Overwrite: F`; a replace by a small `PUT` is `If-Match`.
+The final chunk `MOVE` is always `Overwrite: F` and is preceded by a `PROPFIND` of the target, because which conditions that request honors is unverified.

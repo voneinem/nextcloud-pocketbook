@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "pbc/http_transport.h"
+#include "pbc/server_caps.h"
 #include "pbc/types.h"
 
 namespace pbc {
@@ -35,6 +36,7 @@ struct AccountCheck {
     std::optional<int64_t> server_time;            // from the HTTP Date header, if the server sent one
     int clock_warning_minutes = 0;                 // 0 = the clocks agree within ten minutes (or there is no Date header)
     std::optional<int64_t> retry_after_s;          // set on a failure with 429/503 that carries Retry-After (capped at 900)
+    ServerCaps caps;                               // what the capabilities say about the write side (unknown where they are silent)
 };
 
 // The address as the user typed it: https only, a bare host or host:port is completed with https://, one trailing slash is dropped,

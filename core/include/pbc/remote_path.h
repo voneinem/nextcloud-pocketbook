@@ -33,5 +33,7 @@ bool same_https_origin(std::string_view a, std::string_view b);
 
 // A name can be one path segment: 1..1024 bytes, not "." or "..", no "/", no control characters (U+0000..U+001F, U+007F).
 bool is_valid_name(std::string_view name);
+// A remote path as the queue and the actions use it: absolute, already normalized, no "." or ".." segment, no control character.
+bool is_valid_remote_path(std::string_view path);
 
 }  // namespace pbc

@@ -34,6 +34,14 @@ server_pid=""
 cleanup() { exec 3>&- 2>/dev/null || true; [ -n "$server_pid" ] && kill "$server_pid" 2>/dev/null || true; rm -rf "$tmp"; }
 trap cleanup EXIT
 mkdir -p "$tmp/data" "$tmp/downloads" "$tmp/server"
+# the reader's storage for the Upload walk (specs/002-manage-server-files): the folders the picker lists, with a few files
+picker="$tmp/picker"
+mkdir -p "$picker/Downloads" "$picker/Notes/trip/photos" "$picker/PBCloud" "$picker/system"
+printf 'report' >"$picker/Downloads/report.pdf"; printf 'my diary' >"$picker/Downloads/diary.txt"
+printf 'plan of the trip' >"$picker/Notes/trip/plan.md"; printf 'image' >"$picker/Notes/trip/photos/a.jpg"; printf 'x' >"$picker/Downloads/.hidden"
+# later in the picker's order than the first walk's picks: a small file, a file that goes in chunks (24 MiB, sparse) and one for the unknown outcome
+printf 'for the full account' >"$picker/Downloads/zz-quota.txt"
+printf 'second' >"$picker/Downloads/second.txt"; truncate -s 24M "$picker/Downloads/zebra.bin"; printf 'last' >"$picker/Downloads/zlast.txt"
 mkfifo "$tmp/console"
 "$SERVER" "$tmp/server" <"$tmp/console" >"$tmp/server.log" 2>&1 &
 server_pid=$!
@@ -50,7 +58,7 @@ for walk in "$@"; do
     sed -e "s#@ADDRESS@#${url#https://}#g" -e "s#@USER@#$user#g" -e "s#@PASSWORD@#$password#g" -e "s#@OUT@#$OUT#g" "$walk" >"$tmp/walk.txt"
     rc=0
     LC_ALL=C.UTF-8 LANG=C.UTF-8 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
-        PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" PBC_UI_SCRIPT="$tmp/walk.txt" "$APP" >"$tmp/app.log" 2>&1 || rc=$?
+        PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" PBC_PICKER_ROOT="$picker" PBC_UI_SCRIPT="$tmp/walk.txt" "$APP" >"$tmp/app.log" 2>&1 || rc=$?
     grep -E '^\[walk\]|QML|warning' "$tmp/app.log" || true
     [ "$rc" -eq 0 ] || { echo "walk failed with exit code $rc: $walk" >&2; status=1; }
 done

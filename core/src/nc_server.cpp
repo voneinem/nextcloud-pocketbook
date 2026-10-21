@@ -147,6 +147,8 @@ Error read_capabilities(DavSession& session, const std::string& base_url, const 
         out->server.version = v;
         out->server.major = major_of(v);
     }
+    if (const JsonValue* caps = path(*data, {"capabilities"})) out->caps = server_caps_from_capabilities(*caps);
+    out->caps.checked_at = clock.now();
     if (const JsonValue* theming = path(*data, {"capabilities", "theming", "name"}))
         if (theming->type == JsonValue::Type::String) {
             const std::string name = sanitize_name(theming->text);

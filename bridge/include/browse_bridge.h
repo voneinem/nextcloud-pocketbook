@@ -4,6 +4,7 @@
 // never fetched, and when the user taps Refresh. Names from the server pass display_safe() before they reach QML.
 
 #include <QObject>
+#include <QStringList>
 
 #include <vector>
 #include <QString>
@@ -46,6 +47,11 @@ class BrowseBridge : public QObject {
     Q_PROPERTY(bool folderKept READ folderKept NOTIFY changed)             // this folder is kept offline (itself or through a folder above)
     Q_PROPERTY(bool folderKeptDirect READ folderKeptDirect NOTIFY changed)  // ... by its own mark
     Q_PROPERTY(int skippedCount READ skippedCount NOTIFY changed)   // entries of the last answer that could not be used
+    // select mode (specs/002-manage-server-files): rows with check marks, the tools Rename, Move, Copy and Delete act on the selection
+    Q_PROPERTY(bool selecting READ selecting NOTIFY changed)
+    Q_PROPERTY(int selectedCount READ selectedCount NOTIFY changed)
+    Q_PROPERTY(QStringList selectedPaths READ selectedPaths NOTIFY changed)
+    Q_PROPERTY(bool deleteOffered READ deleteOffered NOTIFY changed)   // the last account check reported a trash; unknown counts as none
 
 public:
     struct Config {
@@ -88,6 +94,10 @@ public:
     bool busy() const { return busy_; }
     QString errorKey() const { return error_; }
     int skippedCount() const { return skipped_; }
+    bool selecting() const { return selecting_; }
+    int selectedCount() const { return static_cast<int>(selected_.size()); }
+    QStringList selectedPaths() const;
+    bool deleteOffered() const;
 
     // A folder: shows the cached listing, fetching it once if it was never fetched. A file: showDetails. An entry the user cannot use:
     // showReason (it does not navigate).
@@ -107,10 +117,17 @@ public:
     Q_INVOKABLE void searchServer(const QString& term);
     // Back to the folder that was shown (the pages of favorites and search call it when they close); no request.
     Q_INVOKABLE void showFolder();
+    // Select mode. Only rows of the shown page can be selected, and an entry that already has a queued change is not selectable (one change at a
+    // time per entry). Opening another folder or leaving the folder view ends the mode and drops the selection.
+    Q_INVOKABLE void setSelecting(bool on);
+    Q_INVOKABLE void toggleSelect(const QString& remotePath);
+    Q_INVOKABLE void selectAllOnPage();
+    Q_INVOKABLE void clearSelection();
 
 signals:
     void changed();
     void showDetails(const QString& remotePath);
+    void showQueueItem(int itemId);   // a tap on a row that exists only in the queue
     void showReason(const QString& reasonKey);
 
 private:
@@ -123,6 +140,8 @@ private:
     void reload();   // reads the shown page from the store (no request)
     void reload_flat();
     QVariantMap row_map(const pbc::RemoteEntry& e, const std::string& source) const;
+    QVariantMap overlay_row_map(const pbc::OverlayRow& r) const;
+    void leave_selection();
 
     Config c_;
     QString mode_ = QStringLiteral("folder");
@@ -143,4 +162,6 @@ private:
     int skipped_ = 0;
     std::optional<int64_t> fetched_at_;
     bool gone_ = false;
+    bool selecting_ = false;
+    std::vector<std::string> selected_;   // remote paths, in the order they were selected
 };

@@ -10,6 +10,8 @@
 #   touch <path>   change a file on the server (then tap Update in the app)
 #   drop           the next download loses its connection half way
 #   offline|online switch the server off and on
+#   lose-next-answer [METHOD [part]]  the next write is done on the server but its answer is lost (an upload with an unknown outcome)
+#   drop-after <bytes>  the next upload body longer than that is cut; quota <bytes>; lock <path>; no-trash; ignore-conditions
 #   quit           close the demo
 # Everything is removed when the demo ends. The server is a fake of the tests: nothing here proves anything about a real Nextcloud.
 set -euo pipefail
@@ -33,6 +35,12 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$tmp/data" "$tmp/downloads" "$tmp/server"
+# the reader's storage for the Upload action (specs/002-manage-server-files): the folders the file browser lists, with some files in them
+picker="$tmp/picker"
+mkdir -p "$picker/Downloads" "$picker/Notes/trip/photos" "$picker/PBCloud" "$picker/system"
+printf 'report' >"$picker/Downloads/report.pdf"; printf 'my notes' >"$picker/Downloads/notes.txt"
+printf 'plan of the trip' >"$picker/Notes/trip/plan.md"; printf 'image' >"$picker/Notes/trip/photos/a.jpg"
+truncate -s 300M "$picker/Downloads/big.bin"   # a file that is sent in chunks
 mkfifo "$tmp/console"
 "$SERVER" "$tmp/server" <"$tmp/console" >"$tmp/server.log" 2>&1 &
 server_pid=$!
@@ -50,9 +58,10 @@ echo "Fake Nextcloud:  ${url#https://}"
 echo "User name:       $user"
 echo "App password:    $password"
 echo "Downloads go to: $tmp/downloads"
-echo "Commands: approve | touch <path> | drop | offline | online | quit"
+echo "Uploads come from: $tmp/picker (Downloads, Notes, PBCloud)"
+echo "Commands: approve | touch <path> | drop | offline | online | lose-next-answer [METHOD [part]] | drop-after <bytes> | quota <bytes> | lock <path> | no-trash | ignore-conditions | quit"
 
-PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" "$APP" &
+PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" PBC_PICKER_ROOT="$picker" "$APP" &
 app_pid=$!
 
 # commands for the server until the app closes or "quit" is typed

@@ -1,0 +1,36 @@
+# Upload and manage files (specs/002-manage-server-files US2): a write whose answer is lost is kept as "Outcome unknown", no run repeats it, and the
+# user decides after "Check the server". Run after 03-upload-and-manage.walk (Auto Sync is off by then) with the same server and folders.
+# server lose-next-answer PUT zlast
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderAdd
+wait 500
+tap choiceRow 0
+waitfor pickerPath
+tap pickerTile 0
+wait 700
+tap pickerTile 4
+expect pickerSelection 1 file(s)
+tap pickerUpload
+waitfor dialogText in the queue
+tap footerButton 0
+tap folderQueue
+waitfor queueRow
+expect queueRowCaption Not synced
+tap queueSend
+waitfor queueRowCaption Outcome unknown
+shot @OUT@/47-queue-unknown.png
+tap queueRow 0
+tap queueResolve
+waitfor choiceRow
+shot @OUT@/48-queue-unknown-choices.png
+tap choiceRow 0
+waitfor dialogText It is on the server
+shot @OUT@/49-queue-check-result.png
+tap footerButton 1
+waitfor queueRowCaption Sent
+shot @OUT@/50-queue-marked-done.png
+tap queueBack
+wait 600

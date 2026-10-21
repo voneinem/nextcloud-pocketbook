@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE d:error [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"><s:exception>&b;</s:exception></d:error>
