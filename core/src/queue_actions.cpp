@@ -1,6 +1,8 @@
 #include "pbc/queue_actions.h"
 
 #include <algorithm>
+#include <functional>
+#include <map>
 #include <set>
 
 #include "pbc/error_keys.h"
@@ -119,6 +121,135 @@ AddResult QueueActions::add_uploads(const std::string& target_folder, const std:
     }
     out.queued = ids.value;
     return out;
+}
+
+Result<SyncGroup> QueueActions::add_sync_uploads(int64_t pair_id, const std::string& remote_folder, const std::vector<SyncUploadSpec>& specs,
+                                                  const std::set<std::string>& existing_folders) {
+    Result<SyncGroup> out;
+    if (!is_valid_remote_path(remote_folder)) {
+        out.error = make_error(ErrorClass::Protocol, "protocol_error", "the server folder is not a valid path");
+        return out;
+    }
+    const auto account = store_->account();
+    if (!account) {
+        out.error = make_error(ErrorClass::Auth, "auth_failed", "there is no account");
+        return out;
+    }
+    const auto pair = store_->sync_pair(pair_id);
+    if (!pair || pair->server != account->base_url || pair->user_id != account->user_id) {
+        out.error = error_from_key("not_found");
+        return out;
+    }
+    std::vector<QueueItem> items;
+    std::vector<int> deps;
+    std::vector<int> upload_index(specs.size(), -1);   // spec -> index in `items`
+    std::map<std::string, int> made;                    // server folder -> the index of its mkdir in `items`; -1: it exists on the server already
+    // The mkdir chain of one folder below remote_folder, shallowest first. Returns the index of the item that creates `folder`, or -1.
+    std::function<int(const std::string&)> ensure_folder = [&](const std::string& folder) -> int {
+        if (folder == remote_folder || folder.size() <= remote_folder.size()) return -1;
+        const auto it = made.find(folder);
+        if (it != made.end()) return it->second;
+        const auto known = store_->entry(folder);
+        if (existing_folders.count(folder) == 1 || (known && known->kind == Kind::Folder)) return made[folder] = -1;
+        const std::string parent = parent_of(folder);
+        const int parent_dep = ensure_folder(parent);
+        QueueItem q = base_item(*account);
+        q.kind = ItemKind::Mkdir;
+        q.entry_kind = Kind::Folder;
+        q.dst_parent = parent;
+        q.dst_name = base_name(folder);
+        q.pair_id = pair_id;
+        if (parent_dep < 0) q.depends_on = store_->queue_pending_mkdir(parent);
+        items.push_back(std::move(q));
+        deps.push_back(parent_dep);
+        return made[folder] = static_cast<int>(items.size()) - 1;
+    };
+    for (size_t i = 0; i < specs.size(); ++i) {
+        const SyncUploadSpec& sp = specs[i];
+        const auto identity = inspect_source(sp.local_abs, rules_);
+        if (!identity.ok()) {
+            out.value.refused.push_back({sp.rel, identity.error.key});
+            continue;
+        }
+        const auto canonical = check_source_path(sp.local_abs, rules_);
+        const int dep = ensure_folder(sp.dst_parent);
+        QueueItem q = base_item(*account);
+        q.kind = ItemKind::Upload;
+        q.entry_kind = Kind::File;
+        q.src_local = canonical.ok() ? canonical.value : sp.local_abs;
+        q.src_size = identity.value.size;
+        q.src_mtime = identity.value.mtime;
+        q.dst_parent = sp.dst_parent;
+        q.dst_name = sp.dst_name;
+        if (sp.replace_etag) {
+            q.replace = true;
+            q.dst_etag = *sp.replace_etag;
+        }
+        q.pair_id = pair_id;
+        q.sync_rel = sp.rel;
+        q.sync_role = sp.role;
+        if (dep < 0) q.depends_on = store_->queue_pending_mkdir(sp.dst_parent);
+        items.push_back(std::move(q));
+        deps.push_back(dep);
+        upload_index[i] = static_cast<int>(items.size()) - 1;
+    }
+    out.value.items.assign(specs.size(), 0);
+    if (items.empty()) return out;
+    if (static_cast<int>(items.size()) > headroom()) {
+        out.error = make_error(ErrorClass::Storage, "queue_full", "the plan's uploads do not fit into the queue");
+        out.value = SyncGroup();
+        return out;
+    }
+    const auto ids = store_->queue_add_group(items, deps);
+    if (!ids.ok()) {
+        out.error = ids.error;
+        out.value = SyncGroup();
+        return out;
+    }
+    for (size_t i = 0; i < specs.size(); ++i)
+        if (upload_index[i] >= 0) out.value.items[i] = ids.value[static_cast<size_t>(upload_index[i])];
+    if (const auto first = store_->queue_item(ids.value.front())) out.value.group_id = first->group_id.value_or(0);
+    return out;
+}
+
+Result<int64_t> QueueActions::add_sync_delete(int64_t pair_id, const std::string& remote_path, const std::string& etag, Kind entry_kind) {
+    Result<int64_t> out;
+    const auto account = store_->account();
+    if (!account) {
+        out.error = make_error(ErrorClass::Auth, "auth_failed", "there is no account");
+        return out;
+    }
+    const auto pair = store_->sync_pair(pair_id);
+    if (!pair || pair->server != account->base_url || pair->user_id != account->user_id) {
+        out.error = error_from_key("not_found");
+        return out;
+    }
+    if (!delete_offered(store_->server_caps().value_or(ServerCaps()))) {   // without a trash a delete would be permanent: not offered (002 research R-9)
+        out.error = error_from_key("trash_unavailable");
+        return out;
+    }
+    const std::string prefix = pair->remote_folder == "/" ? std::string("/") : pair->remote_folder + "/";
+    if (!is_valid_remote_path(remote_path) || remote_path.size() <= prefix.size() || remote_path.compare(0, prefix.size(), prefix) != 0) {
+        out.error = make_error(ErrorClass::Protocol, "protocol_error", "the entry is not below the pair's server folder");
+        return out;
+    }
+    if (!strong_etag(etag)) {
+        out.error = error_from_key("refresh_first");
+        return out;
+    }
+    if (!store_->queue_items_for_source(remote_path).empty()) {
+        out.error = error_from_key("change_pending");
+        return out;
+    }
+    QueueItem q = base_item(*account);
+    q.kind = ItemKind::Delete;
+    q.entry_kind = entry_kind;
+    q.src_remote = remote_path;
+    q.src_etag = etag;
+    q.pair_id = pair_id;
+    q.sync_rel = remote_path.substr(prefix.size());
+    q.sync_role = "delete";
+    return store_->queue_add(q);
 }
 
 FolderPick QueueActions::count_folder_pick(const std::string& target_folder, const std::vector<std::string>& picked_folders) const {

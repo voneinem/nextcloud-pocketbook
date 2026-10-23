@@ -436,3 +436,312 @@ Your own certificate authority is loaded (%n certificate(s)). Every connection i
 and %n more	und %n weitere
 unavailable	nicht verfügbar
 unknown	unbekannt
+
+# folder synchronization (specs/003-folder-sync): the messages of Problems.qml
+There are already 8 pairs.	Es gibt schon 8 Paare.
+Remove a pair you do not need first.	Entfernen Sie zuerst ein Paar, das Sie nicht brauchen.
+This folder overlaps with another pair.	Dieser Ordner überschneidet sich mit einem anderen Paar.
+Choose a folder that no other pair uses.	Wählen Sie einen Ordner, den kein anderes Paar verwendet.
+This folder cannot be used for a pair.	Dieser Ordner kann für kein Paar verwendet werden.
+Choose a folder of your own, not the app's data or download folder.	Wählen Sie einen eigenen Ordner, nicht den Datenordner oder den Download-Ordner der App.
+These limits cannot be used.	Diese Grenzen sind nicht zulässig.
+Use 1 to 5,000 files and 1 MB to 64 GB.	Verwenden Sie 1 bis 5.000 Dateien und 1 MB bis 64 GB.
+This needs your confirmation.	Dazu ist Ihre Bestätigung nötig.
+Confirm that files may be sent to the server.	Bestätigen Sie, dass Dateien an den Server gesendet werden dürfen.
+A sync is already running for this pair.	Für dieses Paar läuft schon ein Abgleich.
+Wait until it has finished.	Warten Sie, bis er fertig ist.
+The comparison is too old.	Der Vergleich ist zu alt.
+Compare again before you approve.	Vergleichen Sie erneut, bevor Sie freigeben.
+This plan cannot be approved as it is.	Dieser Plan kann so nicht freigegeben werden.
+Read the reason shown and compare again.	Lesen Sie den angezeigten Grund und vergleichen Sie erneut.
+There are too many changes to review at once.	Es sind zu viele Änderungen für eine einzige Prüfung.
+Use a smaller folder, or split the pair into two.	Verwenden Sie einen kleineren Ordner oder teilen Sie das Paar auf.
+The plan is over the limit of the pair.	Der Plan überschreitet die Grenze des Paares.
+Raise the limit, or take entries out of the plan.	Erhöhen Sie die Grenze oder nehmen Sie Einträge aus dem Plan.
+The sync cannot keep track of more files.	Der Abgleich kann sich nicht noch mehr Dateien merken.
+Remove a pair you do not need.	Entfernen Sie ein Paar, das Sie nicht brauchen.
+This changed while the sync was running.	Das hat sich während des Abgleichs geändert.
+It is looked at again at the next sync.	Beim nächsten Abgleich wird es erneut geprüft.
+Already in sync.	Schon abgeglichen.
+Nothing to do.	Nichts zu tun.
+The direction of this pair does not allow it.	Die Richtung dieses Paares erlaubt das nicht.
+Change the direction of the pair if you want this.	Ändern Sie die Richtung des Paares, wenn Sie das möchten.
+Both versions are kept.	Beide Fassungen bleiben erhalten.
+Nothing more happens to them.	Mit ihnen geschieht nichts weiter.
+You took this out of the plan.	Sie haben das aus dem Plan genommen.
+It comes back at the next sync.	Es kommt beim nächsten Abgleich wieder.
+The server did not name the version of this file.	Der Server hat die Fassung dieser Datei nicht genannt.
+Refresh the folder and compare again.	Aktualisieren Sie den Ordner und vergleichen Sie erneut.
+You cannot use this entry on the server.	Sie können diesen Eintrag auf dem Server nicht nutzen.
+Ask the owner of the folder.	Fragen Sie den Besitzer des Ordners.
+There is not enough space on the server for this file.	Auf dem Server ist nicht genug Platz für diese Datei.
+Free some space on the server or ask the administrator.	Schaffen Sie Platz auf dem Server oder fragen Sie den Administrator.
+There is not enough free space on the reader for this.	Auf dem Lesegerät ist dafür nicht genug Platz frei.
+Remove downloaded files, or take entries out of the plan.	Entfernen Sie heruntergeladene Dateien oder nehmen Sie Einträge aus dem Plan.
+This would use the space the sync keeps free.	Das würde den Platz belegen, den der Abgleich freihält.
+Take entries out of the plan.	Nehmen Sie Einträge aus dem Plan.
+Another file already has this name.	Eine andere Datei hat diesen Namen schon.
+Rename one of them.	Benennen Sie eine von beiden um.
+The server folder is gone.	Der Ordner auf dem Server ist nicht mehr da.
+Check the folder on the server, or change the pair.	Prüfen Sie den Ordner auf dem Server oder ändern Sie das Paar.
+The reader folder is not available.	Der Ordner auf dem Lesegerät ist nicht verfügbar.
+Insert the memory card, or change the pair.	Setzen Sie die Speicherkarte ein oder ändern Sie das Paar.
+This pair belongs to another account.	Dieses Paar gehört zu einem anderen Konto.
+Remove the pair, or connect that account again.	Entfernen Sie das Paar oder verbinden Sie jenes Konto erneut.
+# folder synchronization (specs/003-folder-sync): the texts of the sync bridge
+%1 of %2 files, %3 of %4	%1 von %2 Dateien, %3 von %4
+Comparing	Wird verglichen
+Download only	Nur herunterladen
+Download only: files from the server are copied to the reader. Nothing on the reader is sent.	Nur herunterladen: Dateien vom Server werden auf das Lesegerät kopiert. Vom Lesegerät wird nichts gesendet.
+In sync	Abgeglichen
+Interrupted	Unterbrochen
+Interrupted: %1 of %2 done	Unterbrochen: %1 von %2 erledigt
+Last sync: %1	Letzter Abgleich: %1
+Never synced	Noch nie abgeglichen
+Other account	Anderes Konto
+Plan ready	Plan bereit
+Reader folder not available	Ordner auf dem Lesegerät nicht verfügbar
+Server folder not found	Ordner auf dem Server nicht gefunden
+Sign in again	Erneut anmelden
+Syncing	Wird abgeglichen
+Two-way	In beide Richtungen
+Two-way: new and changed files are copied in both directions. Nothing is ever deleted automatically.	In beide Richtungen: Neue und geänderte Dateien werden in beide Richtungen kopiert. Es wird nie automatisch etwas gelöscht.
+Up to %1 files, %2	Bis zu %1 Dateien, %2
+Upload only	Nur hochladen
+Upload only: new files from the reader are sent to the server. Nothing from the server is copied.	Nur hochladen: Neue Dateien vom Lesegerät werden an den Server gesendet. Vom Server wird nichts kopiert.
+Waiting: the reader is offline	Warten: Das Lesegerät ist offline
+# folder synchronization (specs/003-folder-sync): the pages
+%1 GB	%1 GB
+%1 MB	%1 MB
+Add pair	Paar hinzufügen
+Available soon	Bald verfügbar
+Choose	Wählen
+Choose the folder for the pair	Ordner für das Paar wählen
+Choose the reader folder first.	Wählen Sie zuerst den Ordner auf dem Lesegerät.
+Choose the server folder first.	Wählen Sie zuerst den Ordner auf dem Server.
+Compares shortly after a change you make here. Nothing changes until you approve.	Vergleicht kurz nach einer Änderung, die Sie hier machen. Es ändert sich nichts, bis Sie freigeben.
+Compares when the app starts and Wi-Fi is on. Nothing changes until you approve.	Vergleicht beim Start der App, wenn WLAN an ist. Es ändert sich nichts, bis Sie freigeben.
+Continue	Fortfahren
+Direction	Richtung
+Files in "%1" can be sent to "%2". Continue?	Dateien aus „%1“ können an „%2“ gesendet werden. Fortfahren?
+Files on both sides stay where they are.	Dateien auf beiden Seiten bleiben, wo sie sind.
+Limits	Grenzen
+Most data	Höchstens Daten
+Most files	Höchstens Dateien
+New pair	Neues Paar
+No pairs yet. A pair links a folder on the server with a folder on this reader. Nothing is copied until you look at a plan and approve it.	Noch keine Paare. Ein Paar verbindet einen Ordner auf dem Server mit einem Ordner auf diesem Lesegerät. Es wird nichts kopiert, bis Sie einen Plan ansehen und freigeben.
+Not available for a pair	Für ein Paar nicht verfügbar
+Offline. Pairs can be set up now; comparing needs the network.	Offline. Paare lassen sich jetzt einrichten; zum Vergleichen wird das Netz gebraucht.
+Pair	Paar
+Reader folder	Ordner auf dem Lesegerät
+Remove pair	Paar entfernen
+Remove this pair?	Dieses Paar entfernen?
+Save	Speichern
+Send files to the server?	Dateien an den Server senden?
+Server folder	Ordner auf dem Server
+Sync	Abgleich
+Sync all	Alle abgleichen
+Sync at start	Abgleich beim Start
+There are no folders in this one. Use New folder to make one.	In diesem Ordner gibt es keine Ordner. Mit „Neuer Ordner“ legen Sie einen an.
+Use 1 MB to 64 GB.	Verwenden Sie 1 MB bis 64 GB.
+Use a number from 1 to 5,000.	Verwenden Sie eine Zahl von 1 bis 5.000.
+for example 500 MB or 2 GB	zum Beispiel 500 MB oder 2 GB
+Reader	Lesegerät
+This file is managed by a Sync pair.	Diese Datei wird von einem Abgleichspaar verwaltet.
+Change or remove the pair on the Sync screen.	Ändern oder entfernen Sie das Paar im Abgleich.
+Managed by Sync	Vom Abgleich verwaltet
+The same on both sides.	Auf beiden Seiten gleich.
+It is remembered as in sync when you approve the plan.	Es wird als abgeglichen vermerkt, wenn Sie den Plan freigeben.
+Names that start with a dot are hidden and are not synchronized.	Namen, die mit einem Punkt beginnen, sind versteckt und werden nicht abgeglichen.
+Rename it on the server if you want it on the reader.	Benennen Sie es auf dem Server um, wenn Sie es auf dem Lesegerät haben möchten.
+# folder synchronization (specs/003-folder-sync): the plan, the result and the Sync screen
+%1 downloaded, %2 uploaded, %3 skipped, %4 kept both, %5 proposals open, %6 failed	%1 heruntergeladen, %2 hochgeladen, %3 übersprungen, %4 beide behalten, %5 Vorschläge offen, %6 fehlgeschlagen
+%n day(s)	%n Tag||%n Tage
+%n download(s)	%n Download||%n Downloads
+%n file(s): %1	%n Datei: %1||%n Dateien: %1
+%n folder(s) were not compared; deletions are not proposed.	%n Ordner wurde nicht verglichen; Löschungen werden nicht vorgeschlagen.||%n Ordner wurden nicht verglichen; Löschungen werden nicht vorgeschlagen.
+%n hour(s)	%n Stunde||%n Stunden
+%n in sync	%n abgeglichen||%n abgeglichen
+%n kept both	%n beide behalten||%n beide behalten
+%n minute(s)	%n Minute||%n Minuten
+%n plan(s) ready	%n Plan bereit||%n Pläne bereit
+%n skipped	%n übersprungen||%n übersprungen
+%n upload(s)	%n Upload||%n Uploads
+Approve	Freigeben
+Compare again	Erneut vergleichen
+Compared %1 ago. Compare again before approving.	Vor %1 verglichen. Vergleichen Sie erneut, bevor Sie freigeben.
+Compared %n day(s) ago.	Vor %n Tag verglichen.||Vor %n Tagen verglichen.
+Compared %n hour(s) ago.	Vor %n Stunde verglichen.||Vor %n Stunden verglichen.
+Compared %n minute(s) ago.	Vor %n Minute verglichen.||Vor %n Minuten verglichen.
+Compared just now.	Gerade eben verglichen.
+Comparing...	Vergleiche...
+Deletion proposal	Löschvorschlag
+Downloading %1 of %2	Lade %1 von %2 herunter
+Uploading %1 of %2	Lade %1 von %2 hoch
+Free on the reader: %1 (a reserve of %2 is kept).	Frei auf dem Lesegerät: %1 (eine Reserve von %2 bleibt frei).
+From stored listings, not current. Nothing can be approved from here.	Aus gespeicherten Listen, nicht aktuell. Hier kann nichts freigegeben werden.
+It took %n second(s).	Es dauerte %n Sekunde.||Es dauerte %n Sekunden.
+It took a moment.	Es dauerte einen Moment.
+Last result	Letztes Ergebnis
+Nothing is skipped.	Nichts wird übersprungen.
+Nothing to do: everything is in sync.	Nichts zu tun: alles ist abgeglichen.
+Nothing would be transferred.	Es würde nichts übertragen.
+Open plan	Plan öffnen
+Plan ready - %1 downloads, %2 uploads	Plan bereit - %1 Downloads, %2 Uploads
+Plan ready, over the limit	Plan bereit, über der Grenze
+Preview offline	Vorschau offline
+Proposals	Vorschläge
+Result	Ergebnis
+Review	Prüfen
+Review before anything changes. Nothing has been changed yet.	Prüfen, bevor sich etwas ändert. Es wurde noch nichts geändert.
+Skipped	Übersprungen
+Skipped entries come back in the next plan if they can still be synced.	Übersprungene Einträge kommen im nächsten Plan wieder, wenn sie noch abgeglichen werden können.
+Stop	Stopp
+Sync (%1)	Abgleich (%1)
+Sync again	Erneut abgleichen
+Sync: %n plan(s) ready	Abgleich: %n Plan bereit||Abgleich: %n Pläne bereit
+Syncing...	Gleiche ab...
+Taken out of the plan	Aus dem Plan genommen
+The sync was stopped. What was done stays done; the next sync finishes the rest.	Der Abgleich wurde gestoppt. Was erledigt ist, bleibt erledigt; der nächste Abgleich erledigt den Rest.
+There are no proposals.	Es gibt keine Vorschläge.
+Transfers	Übertragungen
+a moment	einem Moment
+on the reader as "%1"	auf dem Lesegerät als „%1“
+Also applies to pair syncs (they only compare).	Gilt auch für Paar-Abgleiche (sie vergleichen nur).
+Some files wait in the Queue. Open it to decide what happens to them.	Einige Dateien warten in der Warteschlange. Öffnen Sie sie, um zu entscheiden, was damit geschieht.
+Sync: %1	Abgleich: %1
+adds "%1" on the reader and "%2" on the server	fügt „%1“ auf dem Lesegerät und „%2“ auf dem Server hinzu
+adds "%1" on the reader	fügt „%1“ auf dem Lesegerät hinzu
+adds "%1" on the server	fügt „%1“ auf dem Server hinzu
+Changed on both sides. Both versions are kept: the other version is added next to the file under a new name.	Auf beiden Seiten geändert. Beide Versionen bleiben erhalten: Die andere Version wird neben der Datei unter einem neuen Namen hinzugefügt.
+Apply choices	Auswahl anwenden
+Choose what to do with at least one proposal first.	Wählen Sie zuerst für mindestens einen Vorschlag, was geschehen soll.
+Copy it back	Zurückkopieren
+Delete "%1" from the reader? It cannot be recovered with this app.	„%1“ vom Lesegerät löschen? Mit dieser App lässt es sich nicht wiederherstellen.
+Delete "%1" on the server? It goes to the server's trash.	„%1“ auf dem Server löschen? Es kommt in den Papierkorb des Servers.
+Delete on the reader	Auf dem Lesegerät löschen
+Delete on the server (goes to the trash)	Auf dem Server löschen (kommt in den Papierkorb)
+Delete the folder "%1" and its synced files on the %2? Files that changed or are new stay.	Ordner „%1“ und seine abgeglichenen Dateien auf %2 löschen? Geänderte oder neue Dateien bleiben.
+Deleted on the reader	Auf dem Lesegerät gelöscht
+Deleted on the server	Auf dem Server gelöscht
+Leave as it is	So lassen
+No choice yet	Noch keine Auswahl
+Proposal	Vorschlag
+Send it to the server again	Erneut an den Server senden
+a folder with %n synced file(s)	ein Ordner mit %n abgeglichenen Datei||ein Ordner mit %n abgeglichenen Dateien
+reader	dem Lesegerät
+server	dem Server
+Over the file limit by %1.	Über dem Dateilimit um %1.
+Over the size limit by %1.	Über dem Größenlimit um %1.
+Folders are compared only at start, when you tap Sync, or shortly after your own change; never in the background.	Ordner werden nur beim Start, beim Tippen auf „Abgleich“ oder kurz nach Ihrer eigenen Änderung verglichen, nie im Hintergrund.
+The pair may then hold up to %1 files and %2. Continue?	Das Paar darf dann bis zu %1 Dateien und %2 enthalten. Fortfahren?
+Raise the limits?	Limits erhöhen?
+%n deleted	%n gelöscht||%n gelöscht
+This server does not offer sharing.	Dieser Server bietet kein Teilen an.
+Nothing else in the app is affected.	Alles andere in der App funktioniert weiter.
+Public links are not allowed on this server.	Öffentliche Links sind auf diesem Server nicht erlaubt.
+Ask the server's administrator. Shares with users and groups are still listed.	Fragen Sie den Administrator. Freigaben für Benutzer und Gruppen werden weiter angezeigt.
+This server requires a password for links.	Dieser Server verlangt für Links ein Passwort.
+Enter a password.	Geben Sie ein Passwort ein.
+This server requires an expiry date for links.	Dieser Server verlangt für Links ein Ablaufdatum.
+Enter a date.	Geben Sie ein Datum ein.
+The date is too far away.	Das Datum liegt zu weit in der Zukunft.
+Choose an earlier date.	Wählen Sie ein früheres Datum.
+This server does not allow uploads through public links.	Dieser Server erlaubt kein Hochladen über öffentliche Links.
+Choose read only.	Wählen Sie „Nur lesen“.
+This item cannot be shared.	Dieses Objekt kann nicht geteilt werden.
+Choose another item or ask the administrator.	Wählen Sie ein anderes Objekt oder fragen Sie den Administrator.
+This item no longer exists where it was.	Dieses Objekt gibt es dort nicht mehr.
+Refresh the folder.	Aktualisieren Sie den Ordner.
+You may not change this share.	Sie dürfen diese Freigabe nicht ändern.
+It belongs to someone else.	Sie gehört jemand anderem.
+This link no longer exists.	Dieser Link existiert nicht mehr.
+The list is shown again.	Die Liste wird neu angezeigt.
+This link was changed meanwhile.	Dieser Link wurde inzwischen geändert.
+Check the current settings and confirm again.	Prüfen Sie die aktuellen Einstellungen und bestätigen Sie erneut.
+The request was sent, but no answer arrived. The list may be out of date.	Die Anfrage wurde gesendet, aber es kam keine Antwort. Die Liste ist möglicherweise veraltet.
+Tap Refresh. Creating again may make a second link.	Tippen Sie auf „Aktualisieren“. Erneutes Erstellen kann einen zweiten Link anlegen.
+More shares exist than can be listed here.	Es gibt mehr Freigaben, als hier aufgelistet werden können.
+Open the item in the web interface.	Öffnen Sie das Objekt in der Weboberfläche.
+The server refused the request.	Der Server hat die Anfrage abgelehnt.
+The date is not valid. Use YYYY-MM-DD.	Das Datum ist nicht gültig. Verwenden Sie JJJJ-MM-TT.
+Correct the entry. Nothing was sent.	Korrigieren Sie die Eingabe. Es wurde nichts gesendet.
+The date has passed.	Das Datum liegt in der Vergangenheit.
+Choose a date from today on. Nothing was sent.	Wählen Sie ein Datum ab heute. Es wurde nichts gesendet.
+The password is not valid. Use 1 to 256 characters.	Das Passwort ist nicht gültig. Verwenden Sie 1 bis 256 Zeichen.
+This permission is not possible for a file.	Diese Berechtigung ist für eine Datei nicht möglich.
+Choose read only. Nothing was sent.	Wählen Sie „Nur lesen“. Es wurde nichts gesendet.
+Read only	Nur lesen
+Read and upload	Lesen und hochladen
+Upload only (existing link)	Nur hochladen (bestehender Link)
+Custom permission	Eigene Berechtigung
+Password set	Passwort gesetzt
+No password	Kein Passwort
+Expires %1	Läuft ab am %1
+No expiry	Kein Ablaufdatum
+Expiry date unreadable	Ablaufdatum nicht lesbar
+Public link	Öffentlicher Link
+Public link: %1	Öffentlicher Link: %1
+User: %1	Benutzer: %1
+Group: %1	Gruppe: %1
+Other kind of share	Andere Art von Freigabe
+Password	Passwort
+Not yours	Nicht von Ihnen
+From a parent folder	Von einem übergeordneten Ordner
+Details not available	Details nicht verfügbar
+End-to-end encrypted folders cannot be shared.	Ende-zu-Ende-verschlüsselte Ordner können nicht geteilt werden.
+You may not use this entry, so you cannot share it.	Sie dürfen diesen Eintrag nicht verwenden und können ihn daher nicht teilen.
+You may not share this item.	Sie dürfen dieses Objekt nicht teilen.
+Share	Teilen
+Sharing needs a connection.	Teilen braucht eine Verbindung.
+Nothing is shared.	Nichts ist geteilt.
+Loading...	Wird geladen ...
+Create link	Link erstellen
+Refresh	Aktualisieren
+Close	Schließen
+Code %1	Code %1
+At most %n days from today.	Höchstens %n Tag ab heute.||Höchstens %n Tage ab heute.
+Shares from parent folders could not be read.	Freigaben übergeordneter Ordner konnten nicht gelesen werden.
+The list may be out of date. Tap Refresh.	Die Liste ist möglicherweise veraltet. Tippen Sie auf „Aktualisieren“.
+This item already has a public link. A new link is a second one.	Dieses Objekt hat bereits einen öffentlichen Link. Ein neuer Link ist ein zweiter.
+Anyone who has this link can read this file.	Jeder, der diesen Link hat, kann diese Datei lesen.
+Anyone who has this link can read this folder.	Jeder, der diesen Link hat, kann diesen Ordner lesen.
+Anyone who has this link can read this folder and add files to it.	Jeder, der diesen Link hat, kann diesen Ordner lesen und Dateien hinzufügen.
+No password is set.	Es ist kein Passwort gesetzt.
+A password is set.	Ein Passwort ist gesetzt.
+The link stops working after %1.	Der Link funktioniert nach dem %1 nicht mehr.
+The link does not expire.	Der Link läuft nicht ab.
+Permission	Berechtigung
+Set	Gesetzt
+None	Keine
+Required	Erforderlich
+Never	Nie
+Not allowed	Nicht erlaubt
+Expires	Läuft ab
+Expiry date	Ablaufdatum
+YYYY-MM-DD	JJJJ-MM-TT
+1 to 256 characters	1 bis 256 Zeichen
+Remove password	Passwort entfernen
+Remove date	Datum entfernen
+This adds another link; the existing link keeps working.	Das ergibt einen weiteren Link; der vorhandene Link funktioniert weiter.
+Link	Link
+This address is not the one of your server. Check it before you pass it on.	Diese Adresse gehört nicht zu Ihrem Server. Prüfen Sie sie, bevor Sie sie weitergeben.
+This address does not use https. Anyone on the way can read what is sent.	Diese Adresse verwendet kein https. Jeder auf dem Weg kann mitlesen.
+The link is not readable and is not shown.	Der Link ist nicht lesbar und wird nicht angezeigt.
+%n characters	%n Zeichen||%n Zeichen
+Copy	Kopieren
+Copied. Other apps can read it until you copy something else.	Kopiert. Andere Apps können ihn lesen, bis Sie etwas anderes kopieren.
+This link belongs to someone else. You can see it but not change it.	Dieser Link gehört jemand anderem. Sie können ihn sehen, aber nicht ändern.
+The old password stops working.	Das alte Passwort funktioniert nicht mehr.
+Visitors will need this password.	Besucher brauchen dieses Passwort.
+The link will work without a password.	Der Link funktioniert ohne Passwort.
+The link will not work after %1.	Der Link funktioniert nach dem %1 nicht mehr.
+The link will not expire.	Der Link läuft nicht ab.
+Anyone with the link will be able to add files.	Jeder mit dem Link kann Dateien hinzufügen.
+Visitors will only be able to read.	Besucher können nur lesen.
+Change link	Link ändern
+Change	Ändern
+The link to "%1" stops working at once for everyone who has it. The folder itself is not deleted.	Der Link zu „%1“ funktioniert sofort für niemanden mehr. Der Ordner selbst wird nicht gelöscht.
+The link to "%1" stops working at once for everyone who has it. The file itself is not deleted.	Der Link zu „%1“ funktioniert sofort für niemanden mehr. Die Datei selbst wird nicht gelöscht.
+Remove link	Link entfernen
+Share links and their passwords are shown only on the screen you asked for. They are never stored, never written to the log and never opened by the app.	Freigabe-Links und ihre Passwörter werden nur auf dem Bildschirm angezeigt, den Sie aufgerufen haben. Sie werden nie gespeichert, nie ins Protokoll geschrieben und nie von der App geöffnet.

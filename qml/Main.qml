@@ -39,6 +39,14 @@ ApplicationWindow {
             replaceExit: Transition {}
         }
 
+        // clearSecrets() of the share bridge closed the sharing screens (the account changed, the application was left, ...): none stays on the stack
+        Connections {
+            target: share
+            function onClosed() {
+                while (nav.depth > 1 && nav.currentItem && nav.currentItem.objectName.indexOf("share") === 0) nav.pop()
+            }
+        }
+
         Connections {
             target: device
             function onBackRequested() {

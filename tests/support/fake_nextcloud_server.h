@@ -27,6 +27,8 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <cctype>
+#include <cstdlib>
 #include <set>
 #include <string>
 #include <vector>
@@ -35,6 +37,7 @@
 #include "pbc/dav_common.h"
 #include "pbc/http_transport.h"
 #include "pbc/remote_path.h"
+#include "pbc/share_date.h"
 
 namespace pbtest {
 
@@ -96,6 +99,16 @@ public:
     void omit_date_header(bool on) { omit_date_ = on; }
 
     // ---- the tree ----
+    // A server that outlives a client that was killed (kill tests): the whole tree and its counters can be taken out and put back into another instance, so
+    // that the ETags and file ids the client has recorded stay true.
+    const std::map<std::string, Node>& nodes() const { return tree_; }
+    uint64_t etag_counter() const { return etag_counter_; }
+    int64_t file_id_counter() const { return next_id_; }
+    void restore(const std::map<std::string, Node>& nodes, uint64_t etags, int64_t ids) {
+        tree_ = nodes;
+        etag_counter_ = etags;
+        next_id_ = ids;
+    }
     void add_folder(const std::string& path) { put(path, folder_node()); }
     void add_file(const std::string& path, const std::string& content, int64_t mtime = 1790000000) {
         Node n;
@@ -130,12 +143,58 @@ public:
     void set_encrypted(const std::string& path, bool on) { node(path).encrypted = on; }
     void set_mime(const std::string& path, const std::string& mime) { node(path).mime = mime; }
     void set_checksum(const std::string& path, const std::string& value) { node(path).checksum = value; }
+    // Folder synchronization (specs/003-folder-sync): the checksums a server lists in oc:checksums, as "SHA256:<hex>[ SHA1:<hex>]" in one element.
+    void set_checksums(const std::string& path, const std::string& sha256_hex, const std::string& sha1_hex = std::string()) {
+        node(path).checksum = "SHA256:" + sha256_hex + (sha1_hex.empty() ? std::string() : " SHA1:" + sha1_hex);
+    }
+    // true: every file without an explicit checksum is listed with the SHA-256 of its content (a server that computes it by itself).
+    void list_checksums(bool on) { list_checksums_ = on; }
+    // A generated tree: `folders` folders d000.. below `root`, each with `files_per_folder` files f000.bin.. of `bytes` bytes of their own content.
+    void add_tree(const std::string& root, int folders, int files_per_folder, int bytes = 1) {
+        add_folder(root);
+        char name[32];
+        for (int d = 0; d < folders; ++d) {
+            std::snprintf(name, sizeof name, "/d%03d", d);
+            const std::string folder = pbc::normalize_remote_path(root) + name;
+            add_folder(folder);
+            for (int f = 0; f < files_per_folder; ++f) {
+                std::snprintf(name, sizeof name, "/f%03d.bin", f);
+                std::string content(static_cast<size_t>(bytes), static_cast<char>('a' + (d + f) % 26));
+                Node n;
+                n.content = content;
+                n.mtime = 1790000000;
+                put(folder + name, n);
+            }
+        }
+    }
+    // How the Depth 1 listing of one folder fails: "partial" (some members carry a non-200 status), "truncated" (the XML stops halfway),
+    // "timeout" (no answer), "error" (a 500). "" clears. Listings of other folders and Depth 0 requests are not affected.
+    void set_listing_failure(const std::string& folder, const std::string& mode) {
+        const std::string p = pbc::normalize_remote_path(folder);
+        if (mode.empty()) listing_failures_.erase(p);
+        else listing_failures_[p] = mode;
+    }
+    // A change by someone else: new content, size, modification time and ETag (the ancestors' ETags change too).
+    void touch_file(const std::string& path, const std::string& content, int64_t mtime) { set_file(path, content, mtime); }
+    // An entry the user cannot use: "no_permission" (no read right), "encrypted" (end-to-end encrypted) or "unsupported" (an odd state).
+    void set_unavailable(const std::string& path, const std::string& kind) {
+        Node& n = node(path);
+        if (kind == "no_permission") n.permissions = "RDNVW";
+        else if (kind == "encrypted") n.encrypted = true;
+        else if (kind == "unsupported") n.listing_quirk = "no_etag_no_type";
+    }
+    // A member the Depth 1 listing of `folder` carries in addition to the tree: <d:response> with the given (already encoded) name as the last
+    // segment of its address. For names the tree cannot hold ("..", an encoded separator).
+    void add_raw_member(const std::string& folder, const std::string& encoded_name) { raw_members_[pbc::normalize_remote_path(folder)].push_back(encoded_name); }
     void set_quirk(const std::string& path, const std::string& quirk) { node(path).listing_quirk = quirk; }
     void set_weak_etag(const std::string& path, bool on) { node(path).weak_etag = on; }
     // A server that ignores Range and If-Range and always answers with the whole file.
     void set_ignore_range(bool on) { ignore_range_ = on; }
+    // A server (or a proxy) that ignores If-Match on a GET: the answer then carries whatever version the file has now.
+    void set_ignore_get_if_match(bool on) { ignore_get_if_match_ = on; }
     Node& node(const std::string& path) { return tree_.at(pbc::normalize_remote_path(path)); }
     bool has(const std::string& path) const { return tree_.count(pbc::normalize_remote_path(path)) == 1; }
+    std::vector<std::string> children(const std::string& path) const { return children_of(pbc::normalize_remote_path(path)); }   // sorted by path
     std::string etag_of(const std::string& path) const { return tree_.at(pbc::normalize_remote_path(path)).etag; }
 
     // ---- Login Flow v2 (section 9) ----
@@ -251,6 +310,12 @@ public:
     size_t count(const std::string& method) const {
         return static_cast<size_t>(std::count_if(log_.begin(), log_.end(), [&](const Logged& l) { return l.method == method; }));
     }
+    // The requests of any of these methods (a test proves "no write request at all").
+    size_t count_matching(const std::vector<std::string>& methods) const {
+        return static_cast<size_t>(std::count_if(log_.begin(), log_.end(), [&](const Logged& l) {
+            return std::find(methods.begin(), methods.end(), l.method) != methods.end();
+        }));
+    }
     struct Logged {
         std::string method, path, depth;
         // the conditions and headers of a write request (specs/002-manage-server-files): "" = not sent
@@ -267,6 +332,83 @@ public:
             if (l.method == "PROPFIND") d.push_back(l.depth);
         return d;
     }
+
+    // ---- share links (specs/004-share-links, contracts/share-requests.md) ----
+    // The shares side: list, inherited, one share, create, change, remove; the sharing rules of the server are switches that show in the
+    // capabilities AND are enforced with statuses that do not name the rule in text (the wording of meta.message is another switch).
+    struct Share {
+        int64_t id = 0;
+        int type = 3;                 // 0 user, 1 group, 3 public link, 4 mail, ...
+        std::string path;
+        std::string owner;            // "" = the signed-in user
+        int permissions = 1;
+        std::string expiration;       // "YYYY-MM-DD" or ""
+        std::string password;         // the clear text the fake keeps to check; "" = none
+        int password_style = 0;       // 0: password and share_with hold a hash, 1: only password, 2: only share_with
+        std::string label, with, with_display, token;
+        std::string url_override;     // "" = <base>/s/<token>
+    };
+    struct ShareLogged {
+        std::string method, route, url, query, content_type, body, ocs_header, accept, user_agent;
+    };
+    int64_t add_share(Share s) {
+        s.id = ++next_share_id_;
+        if (s.owner.empty()) s.owner = user_id_;
+        if (s.token.empty() && s.type == 3) s.token = "TOK" + std::to_string(s.id);
+        shares_.push_back(s);
+        return s.id;
+    }
+    void add_generated_shares(const std::string& path, int n) {
+        for (int i = 0; i < n; ++i) {
+            Share s;
+            s.path = path;
+            s.label = "Link " + std::to_string(i + 1);
+            add_share(s);
+        }
+    }
+    const Share* find_share(int64_t id) const {
+        for (const Share& s : shares_)
+            if (s.id == id) return &s;
+        return nullptr;
+    }
+    size_t share_count() const { return shares_.size(); }
+    // A change by someone else (tests of "changed meanwhile"): another password state, permission bits or expiry on a stored share.
+    void set_share_password(int64_t id, const std::string& password) { if (Share* s = mutable_share(id)) s->password = password; }
+    void set_share_permissions(int64_t id, int permissions) { if (Share* s = mutable_share(id)) s->permissions = permissions; }
+    void set_share_expiration(int64_t id, const std::string& day) { if (Share* s = mutable_share(id)) s->expiration = day; }
+    void remove_share(int64_t id) {
+        shares_.erase(std::remove_if(shares_.begin(), shares_.end(), [&](const Share& s) { return s.id == id; }), shares_.end());
+    }
+    void set_inherited_shares(const std::string& path, std::vector<Share> shares) {
+        for (Share& s : shares) {
+            s.id = ++next_share_id_;
+            if (s.owner.empty()) s.owner = user_id_;
+            if (s.token.empty() && s.type == 3) s.token = "TOK" + std::to_string(s.id);
+        }
+        inherited_[path] = std::move(shares);
+    }
+    void set_inherited_status(long status) { inherited_status_ = status; }   // 0 = offered; 404/405/501 = not offered
+    void set_sharing_enabled(bool on) { sharing_enabled_ = on; }
+    void set_public_links_enabled(bool on) { public_links_enabled_ = on; }
+    void set_password_enforced(bool on) { pw_enforced_ = on; pw_for_set_ = false; }
+    void set_password_enforced_for(bool read_only, bool read_write, bool upload_only) {
+        pw_for_set_ = true;
+        pw_for_ro_ = read_only;
+        pw_for_rw_ = read_write;
+        pw_for_uo_ = upload_only;
+    }
+    void set_expiry(bool enabled, bool enforced, int days) { exp_enabled_ = enabled; exp_enforced_ = enforced; exp_days_ = days; }
+    void set_public_upload(bool on) { public_upload_ = on; }
+    void set_sharing_rules_in_caps(bool on) { sharing_caps_ = on; }   // false: the capabilities say nothing about sharing
+    void set_unshareable(const std::string& path) { unshareable_.insert(path); }
+    void set_share_wording(int wording) { share_wording_ = wording; }   // meta.message in another wording/language; the statuses stay
+    void drop_before_processing(const std::string& method, const std::string& url_part = std::string()) {
+        drop_method_ = method;
+        drop_part_ = url_part;
+        drop_armed_ = true;
+    }
+    const std::vector<ShareLogged>& share_log() const { return share_log_; }
+    size_t link_hits() const { return link_hits_; }   // requests whose address is that of a share link: the app must make none
 
     pbc::Response perform(const pbc::Request& request) override { return inner_.perform(request); }
     FakeTransport& transport() { return inner_; }   // the recorded requests (credentials, headers)
@@ -363,8 +505,16 @@ private:
     static std::string quote_json(const std::string& s) {
         std::string out;
         for (char c : s) {
-            if (c == '"' || c == '\\') out.push_back('\\');
-            out.push_back(c);
+            if (c == '"' || c == '\\') {
+                out.push_back('\\');
+                out.push_back(c);
+            } else if (static_cast<unsigned char>(c) < 0x20) {   // valid JSON: a real server escapes control characters
+                char buf[8];
+                std::snprintf(buf, sizeof buf, "\\u%04x", static_cast<unsigned>(static_cast<unsigned char>(c)));
+                out += buf;
+            } else {
+                out.push_back(c);
+            }
         }
         return out;
     }
@@ -393,6 +543,7 @@ private:
         entry.method = r.method;
         entry.depth = pbc::header_value(r.headers, "Depth");
         const std::string base = base_url();
+        if (is_link_url(r.url)) ++link_hits_;
         if (offline_ || r.url.compare(0, base.size(), base) != 0 || (r.url.size() > base.size() && r.url[base.size()] != '/' && r.url[base.size()] != '?')) {
             entry.path = "(unreachable)";
             log_.push_back(entry);
@@ -431,6 +582,10 @@ private:
         }
         if (interceptor_)
             if (auto injected = interceptor_(r)) return *injected;
+        if (drop_armed_ && r.method == drop_method_ && (drop_part_.empty() || r.url.find(drop_part_) != std::string::npos)) {
+            drop_armed_ = false;
+            return unreachable();   // the connection never got the request: nothing was processed
+        }
         if (lose_armed_ && r.method == lose_method_ && (lose_part_.empty() || r.url.find(lose_part_) != std::string::npos)) {
             lose_armed_ = false;
             (void)dispatch(r, path);   // the server did the work ...
@@ -515,11 +670,238 @@ private:
             while (parts.size() < 3) parts.push_back("0");
             return reply(200, ok + "{\"version\":{\"major\":" + parts[0] + ",\"minor\":" + parts[1] + ",\"micro\":" + parts[2] +
                                   ",\"string\":\"" + parts[0] + "." + parts[1] + "." + parts[2] + "\",\"edition\":\"\"},\"capabilities\":{\"theming\":{\"name\":\"" +
-                                  quote_json(server_name_) + "\"}," + dav_and_files_caps() + "}}}}");
+                                  quote_json(server_name_) + "\"}," + dav_and_files_caps() + sharing_caps_json() + "}}}}");
         }
+        if (route.find("/apps/files_sharing/api/v1/shares") != std::string::npos) return shares(r, route);
         if (route.find("/cloud/user") != std::string::npos)
             return reply(200, ok + "{\"id\":\"" + quote_json(user_id_) + "\",\"display-name\":\"Demo User\"}}}");
         return reply(404, "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":404,\"message\":\"not found\"},\"data\":[]}}");
+    }
+
+    // ---- share links ----
+    Share* mutable_share(int64_t id) {
+        for (Share& s : shares_)
+            if (s.id == id) return &s;
+        return nullptr;
+    }
+    static std::string pct_decode(const std::string& v) {
+        std::string out;
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (v[i] == '%' && i + 2 < v.size() + 0 && std::isxdigit(static_cast<unsigned char>(v[i + 1])) && std::isxdigit(static_cast<unsigned char>(v[i + 2]))) {
+                out.push_back(static_cast<char>(std::stoi(v.substr(i + 1, 2), nullptr, 16)));
+                i += 2;
+            } else {
+                out.push_back(v[i]);
+            }
+        }
+        return out;
+    }
+    static std::map<std::string, std::string> parse_pairs(const std::string& text) {
+        std::map<std::string, std::string> out;
+        size_t pos = 0;
+        while (pos <= text.size()) {
+            size_t amp = text.find('&', pos);
+            if (amp == std::string::npos) amp = text.size();
+            const std::string pair = text.substr(pos, amp - pos);
+            if (!pair.empty()) {
+                const size_t eq = pair.find('=');
+                const std::string name = pct_decode(pair.substr(0, eq));
+                if (!out.count(name)) out[name] = eq == std::string::npos ? std::string() : pct_decode(pair.substr(eq + 1));
+            }
+            pos = amp + 1;
+        }
+        return out;
+    }
+    std::string share_link(const Share& s) const { return s.url_override.empty() ? base_url() + "/s/" + s.token : s.url_override; }
+    bool is_link_url(const std::string& url) const {
+        if (url.compare(0, base_url().size() + 3, base_url() + "/s/") == 0) return true;
+        for (const Share& s : shares_)
+            if (s.type == 3 && !s.url_override.empty() && s.url_override == url) return true;
+        return false;
+    }
+    std::string share_message(const char* key) const {
+        static const std::map<std::string, std::pair<std::string, std::string>> table = {
+            {"public", {"Public sharing is not allowed", "Oeffentliches Teilen ist nicht erlaubt"}},
+            {"password", {"A password is required for link shares", "Fuer Link-Freigaben ist ein Passwort erforderlich"}},
+            {"expiry", {"An expiration date is required", "Ein Ablaufdatum ist erforderlich"}},
+            {"upload", {"Public upload is not allowed", "Oeffentliches Hochladen ist nicht erlaubt"}},
+            {"item", {"You are not allowed to share this item", "Sie duerfen dieses Objekt nicht teilen"}},
+            {"path", {"Wrong path, file or folder does not exist", "Falscher Pfad"}},
+            {"off", {"Sharing is disabled", "Teilen ist deaktiviert"}},
+            {"owner", {"You are not the owner of this share", "Sie sind nicht der Eigentuemer"}},
+            {"type", {"Unsupported share type", "Nicht unterstuetzter Freigabetyp"}},
+            {"id", {"Wrong share ID, share does not exist", "Falsche Freigabe-ID"}},
+            {"auth", {"Current user is not logged in", "Nicht angemeldet"}},
+            {"bad", {"Invalid request", "Ungueltige Anfrage"}},
+        };
+        const auto it = table.find(key);
+        if (it == table.end()) return "error";
+        return share_wording_ == 0 ? it->second.first : it->second.second;
+    }
+    Response ocs_ok(bool v2, const std::string& data) {
+        return reply(200, std::string("{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":") + (v2 ? "200" : "100") + ",\"message\":\"OK\"},\"data\":" + data + "}}");
+    }
+    Response ocs_fail(bool v2, int code, const char* what) {
+        return reply(v2 ? code : 200, "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":" + std::to_string(code) + ",\"message\":\"" +
+                                          quote_json(share_message(what)) + "\"},\"data\":[]}}");
+    }
+    std::string share_json(const Share& s) const {
+        const bool folder = [&] {
+            const auto it = tree_.find(s.path);
+            return it == tree_.end() ? true : it->second.folder;
+        }();
+        auto str = [&](const std::string& v) { return "\"" + quote_json(v) + "\""; };
+        const std::string hash = "$2y$10$examplehashexamplehashexample";
+        std::string j = "{\"id\":" + str(std::to_string(s.id)) + ",\"share_type\":" + std::to_string(s.type) + ",\"uid_owner\":" + str(s.owner) +
+                        ",\"displayname_owner\":" + str(s.owner) + ",\"permissions\":" + std::to_string(s.permissions) + ",\"item_type\":" +
+                        str(folder ? "folder" : "file") + ",\"path\":" + str(s.path) + ",\"stime\":1790000000,\"label\":" + str(s.label);
+        if (s.type == 3) {
+            j += ",\"token\":" + str(s.token) + ",\"url\":" + str(share_link(s));
+            const bool has = !s.password.empty();
+            j += std::string(",\"password\":") + (has && s.password_style != 2 ? str(hash) : "null");
+            j += std::string(",\"share_with\":") + (has && s.password_style != 1 ? str(hash) : "null");
+        } else {
+            j += ",\"share_with\":" + str(s.with) + ",\"share_with_displayname\":" + str(s.with_display.empty() ? s.with : s.with_display) + ",\"token\":null";
+        }
+        j += std::string(",\"expiration\":") + (s.expiration.empty() ? "null" : str(s.expiration + " 00:00:00")) + "}";
+        return j;
+    }
+    bool password_needed(int perms) const {
+        if (pw_for_set_) {
+            if (perms == 4) return pw_for_uo_;
+            if (perms & 4) return pw_for_rw_;
+            return pw_for_ro_;
+        }
+        return pw_enforced_;
+    }
+    // 0 = fine, else the HTTP/OCS status and *what; used by create and change
+    int check_link_fields(const std::map<std::string, std::string>& f, bool creating, const Share* existing, const char** what) const {
+        const int64_t today = server_time_ / 86400;
+        int perms = existing ? existing->permissions : 1;
+        if (f.count("permissions")) {
+            char* end = nullptr;
+            perms = static_cast<int>(std::strtol(f.at("permissions").c_str(), &end, 10));
+            if (end == f.at("permissions").c_str() || perms < 1 || perms > 31) { *what = "bad"; return 400; }
+        }
+        const std::string path = existing ? existing->path : (f.count("path") ? f.at("path") : std::string());
+        const auto node = tree_.find(path);
+        const bool folder = node != tree_.end() && node->second.folder;
+        if ((perms & 4) && !folder) { *what = "bad"; return 400; }
+        if ((perms & 4) && !public_upload_) { *what = "upload"; return 403; }
+        std::string password = existing ? existing->password : std::string();
+        if (f.count("password")) password = f.at("password");
+        if (password_needed(perms) && password.empty()) { *what = "password"; return 400; }
+        std::string expiry = existing ? existing->expiration : std::string();
+        if (f.count("expireDate")) expiry = f.at("expireDate");
+        if (exp_enforced_ && expiry.empty()) { *what = "expiry"; return 400; }
+        if (!expiry.empty()) {
+            const auto day = pbc::parse_iso_day(expiry);
+            if (!day || *day < today) { *what = "expiry"; return 400; }
+            if (exp_enforced_ && *day > today + exp_days_) { *what = "expiry"; return 400; }
+        }
+        (void)creating;
+        return 0;
+    }
+
+    Response shares(const pbc::Request& r, const std::string& route) {
+        const bool v2 = route.compare(0, 7, "/ocs/v2") == 0;
+        const size_t api = route.find("/api/v1");
+        const std::string sub = api == std::string::npos ? route : route.substr(api + 7);   // "/shares", "/shares/inherited", "/shares/12"
+        const size_t q = r.url.find('?');
+        const std::string query = q == std::string::npos ? std::string() : r.url.substr(q + 1);
+        ShareLogged entry;
+        entry.method = r.method;
+        entry.route = sub;
+        entry.url = r.url;
+        entry.query = query;
+        entry.content_type = pbc::header_value(r.headers, "Content-Type");
+        entry.body = r.body;
+        entry.ocs_header = pbc::header_value(r.headers, "OCS-APIRequest");
+        entry.accept = pbc::header_value(r.headers, "Accept");
+        entry.user_agent = pbc::header_value(r.headers, "User-Agent");
+        share_log_.push_back(entry);
+        if (entry.ocs_header != "true") return ocs_fail(v2, 401, "auth");
+        if (!sharing_enabled_) return ocs_fail(v2, 404, "off");
+        const auto params = parse_pairs(query);
+        const std::string user = user_id_;
+        if (sub == "/shares/inherited" && r.method == "GET") {
+            if (inherited_status_ != 0) return ocs_fail(v2, static_cast<int>(inherited_status_), "off");
+            const std::string path = params.count("path") ? params.at("path") : std::string();
+            std::string data = "[";
+            const auto it = inherited_.find(path);
+            if (it != inherited_.end())
+                for (size_t i = 0; i < it->second.size(); ++i) data += (i ? "," : "") + share_json(it->second[i]);
+            return ocs_ok(v2, data + "]");
+        }
+        if (sub == "/shares" && r.method == "GET") {
+            if (!params.count("path")) return ocs_fail(v2, 400, "bad");
+            const std::string path = params.at("path");
+            if (!tree_.count(path)) return ocs_fail(v2, 404, "path");
+            const bool reshares = params.count("reshares") && params.at("reshares") == "true";
+            std::string data = "[";
+            bool first = true;
+            for (const Share& s : shares_) {
+                if (s.path != path || (!reshares && s.owner != user)) continue;
+                data += (first ? "" : ",") + share_json(s);
+                first = false;
+            }
+            return ocs_ok(v2, data + "]");
+        }
+        if (sub == "/shares" && r.method == "POST") {
+            const auto f = parse_pairs(r.body);
+            if (!f.count("shareType") || f.at("shareType") != "3") return ocs_fail(v2, 400, "type");
+            if (!public_links_enabled_) return ocs_fail(v2, 403, "public");
+            const std::string path = f.count("path") ? f.at("path") : std::string();
+            if (!tree_.count(path)) return ocs_fail(v2, 404, "path");
+            if (unshareable_.count(path)) return ocs_fail(v2, 403, "item");
+            const char* what = "bad";
+            if (const int code = check_link_fields(f, true, nullptr, &what)) return ocs_fail(v2, code, what);
+            Share s;
+            s.type = 3;
+            s.path = path;
+            s.permissions = f.count("permissions") ? std::atoi(f.at("permissions").c_str()) : 1;
+            s.password = f.count("password") ? f.at("password") : std::string();
+            s.expiration = f.count("expireDate") ? f.at("expireDate") : std::string();
+            const int64_t id = add_share(s);
+            return ocs_ok(v2, share_json(*find_share(id)));
+        }
+        const std::string prefix = "/shares/";
+        if (sub.compare(0, prefix.size(), prefix) == 0) {
+            const std::string idtext = sub.substr(prefix.size());
+            const int64_t id = idtext.empty() || idtext.find_first_not_of("0123456789") != std::string::npos ? 0 : std::atoll(idtext.c_str());
+            Share* sh = nullptr;
+            for (Share& s : shares_)
+                if (s.id == id) sh = &s;
+            if (!sh) return ocs_fail(v2, 404, "id");
+            if (r.method == "GET") return ocs_ok(v2, "[" + share_json(*sh) + "]");
+            if (sh->owner != user) return ocs_fail(v2, 403, "owner");
+            if (r.method == "DELETE") {
+                remove_share(id);
+                return ocs_ok(v2, "[]");
+            }
+            if (r.method == "PUT") {
+                if (sh->type != 3) return ocs_fail(v2, 400, "type");
+                const auto f = parse_pairs(r.body);
+                const char* what = "bad";
+                if (const int code = check_link_fields(f, false, sh, &what)) return ocs_fail(v2, code, what);
+                if (f.count("password")) sh->password = f.at("password");
+                if (f.count("expireDate")) sh->expiration = f.at("expireDate");
+                if (f.count("permissions")) sh->permissions = std::atoi(f.at("permissions").c_str());
+                return ocs_ok(v2, share_json(*sh));
+            }
+        }
+        return ocs_fail(v2, 400, "bad");
+    }
+
+    std::string sharing_caps_json() const {
+        if (!sharing_caps_) return std::string();
+        auto b = [](bool v) { return v ? "true" : "false"; };
+        std::string pw = std::string("\"password\":{\"enforced\":") + b(pw_enforced_);
+        if (pw_for_set_) pw += std::string(",\"enforced_for\":{\"read_only\":") + b(pw_for_ro_) + ",\"read_write\":" + b(pw_for_rw_) + ",\"upload_only\":" + b(pw_for_uo_) + "}";
+        pw += "}";
+        return std::string(",\"files_sharing\":{\"api_enabled\":") + b(sharing_enabled_) + ",\"public\":{\"enabled\":" + b(public_links_enabled_) + "," + pw +
+               ",\"expire_date\":{\"enabled\":" + b(exp_enabled_) + ",\"days\":" + std::to_string(exp_days_) + ",\"enforced\":" + b(exp_enforced_) +
+               "},\"upload\":" + b(public_upload_) + ",\"upload_files_drop\":true},\"resharing\":true}";
     }
 
     std::string props_xml(const std::string& p, const Node& n, bool with_quota) {
@@ -533,6 +915,7 @@ private:
             x += "<d:getcontenttype>" + pbc::dav::escape(n.mime) + "</d:getcontenttype>";
             x += "<d:getcontentlength>" + std::to_string(n.size()) + "</d:getcontentlength>";
             if (!n.checksum.empty()) x += "<oc:checksums><oc:checksum>" + n.checksum + "</oc:checksum></oc:checksums>";
+            else if (list_checksums_) x += "<oc:checksums><oc:checksum>SHA256:" + sha256_hex_of(n.bytes(0, n.size())) + "</oc:checksum></oc:checksums>";
         }
         x += "<oc:fileid>" + std::to_string(n.fileid) + "</oc:fileid>";
         x += "<oc:permissions>" + n.permissions + "</oc:permissions>";
@@ -634,12 +1017,43 @@ private:
             return reply(403, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"><d:propfind-finite-depth/></d:error>", "application/xml");
         auto it = tree_.find(p);
         if (it == tree_.end()) return reply(404, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");
+        std::string failure;
+        if (depth == "1") {
+            auto f = listing_failures_.find(p);
+            if (f != listing_failures_.end()) failure = f->second;
+        }
+        if (failure == "timeout") {
+            Response t;
+            t.error = pbc::ErrorClass::Network;
+            t.error_key = "timeout";
+            t.error_detail = "the fake server did not answer";
+            return t;
+        }
+        if (failure == "error") return reply(500, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");
         const bool quota = r.body.find("quota-available-bytes") != std::string::npos && p == "/";
         std::string xml = "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:oc=\"http://owncloud.org/ns\" xmlns:nc=\"http://nextcloud.org/ns\">";
         xml += response_xml(p, it->second, quota);
-        if (depth == "1" && it->second.folder)
-            for (const std::string& c : children_of(p)) xml += response_xml(c, tree_.at(c), false);
+        if (depth == "1" && it->second.folder) {
+            const std::vector<std::string> kids = children_of(p);
+            for (size_t i = 0; i < kids.size(); ++i) {
+                if (failure == "partial" && i % 2 == 1) {   // every second member could not be read: a 403 propstat, the others are fine
+                    Node broken = tree_.at(kids[i]);
+                    broken.listing_quirk = "no_propstat_ok";
+                    xml += response_xml(kids[i], broken, false);
+                } else {
+                    xml += response_xml(kids[i], tree_.at(kids[i]), false);
+                }
+            }
+            auto raw = raw_members_.find(p);
+            if (raw != raw_members_.end())
+                for (const std::string& name : raw->second) {
+                    const std::string href = "/remote.php/dav/files" + pbc::encode_path("/" + user_id_) + (p == "/" ? "" : pbc::encode_path(p)) + "/" + name;
+                    xml += "<d:response><d:href>" + href + "</d:href><d:propstat><d:prop><d:getetag>\"hostile\"</d:getetag><d:resourcetype/></d:prop>"
+                           "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+                }
+        }
         xml += "</d:multistatus>";
+        if (failure == "truncated") xml.resize(xml.size() * 6 / 10);   // the answer stops in the middle of an element
         return reply(207, xml, "application/xml; charset=utf-8");
     }
 
@@ -1117,6 +1531,11 @@ private:
         if (it == tree_.end()) return reply(404, "", "application/xml");
         if (it->second.folder) return reply(405, "", "application/xml");
         const Node& n = it->second;
+        // RFC 9110: a GET that names the version it wants (If-Match) is refused with 412 when the file is not that version any more
+        {
+            const std::string want = pbc::header_value(req.headers, "If-Match");
+            if (!ignore_get_if_match_ && !want.empty() && !if_match_ok(want, &n)) return reply(412, sabre_body("PreconditionFailed"), "application/xml; charset=utf-8");
+        }
         // RFC 7233: a ranged request is answered with 206 when the validator in If-Range is the current strong ETag
         const std::string range = pbc::header_value(req.headers, "Range");
         if (!ignore_range_ && range.compare(0, 6, "bytes=") == 0) {
@@ -1149,6 +1568,22 @@ private:
         return r;
     }
 
+    static std::string sha256_hex_of(const std::string& data) {
+        unsigned char md[EVP_MAX_MD_SIZE];
+        unsigned int len = 0;
+        EVP_Digest(data.data(), data.size(), md, &len, EVP_sha256(), nullptr);
+        static const char* hex = "0123456789abcdef";
+        std::string out;
+        for (unsigned int i = 0; i < len; ++i) {
+            out.push_back(hex[md[i] >> 4]);
+            out.push_back(hex[md[i] & 15]);
+        }
+        return out;
+    }
+
+    bool list_checksums_ = false, ignore_get_if_match_ = false;
+    std::map<std::string, std::string> listing_failures_;
+    std::map<std::string, std::vector<std::string>> raw_members_;
     std::string host_;
     std::string login_name_ = "demo", user_id_ = "demo", app_password_ = "app-pass-0001";
     std::string version_ = "31.0.4.1";
@@ -1188,6 +1623,19 @@ private:
     std::string before_method_, before_part_;
     std::function<void()> before_fn_;
     int before_skip_ = 0;
+    // share links
+    std::vector<Share> shares_;
+    std::map<std::string, std::vector<Share>> inherited_;
+    std::vector<ShareLogged> share_log_;
+    int64_t next_share_id_ = 1000;
+    long inherited_status_ = 0;
+    bool sharing_enabled_ = true, public_links_enabled_ = true, pw_enforced_ = false, pw_for_set_ = false, pw_for_ro_ = false, pw_for_rw_ = false,
+         pw_for_uo_ = false, exp_enabled_ = false, exp_enforced_ = false, public_upload_ = true, sharing_caps_ = true;
+    int exp_days_ = 0, share_wording_ = 0;
+    std::set<std::string> unshareable_;
+    std::string drop_method_, drop_part_;
+    bool drop_armed_ = false;
+    size_t link_hits_ = 0;
     FakeTransport inner_;
 };
 

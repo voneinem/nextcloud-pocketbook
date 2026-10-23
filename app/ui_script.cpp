@@ -59,7 +59,7 @@ void start(QQuickWindow* window, const QString& path) {
             return;
         }
         QTextStream in(&f);
-        int failures = 0, lineno = 0;
+        int failures = 0, lineno = 0, taps = 0;
         while (!in.atEnd()) {
             const QString line = in.readLine().trimmed();
             ++lineno;
@@ -84,6 +84,7 @@ void start(QQuickWindow* window, const QString& path) {
                 QQuickItem* item = items.at(n);
                 const QPointF center = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
                 QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, center.toPoint());
+                ++taps;
                 pump(150);
             } else if (cmd == "type") {
                 for (const QChar c : rest) QTest::keyClick(window, c.toLatin1());
@@ -119,6 +120,10 @@ void start(QQuickWindow* window, const QString& path) {
                 if (!found) fail(QStringLiteral("not there after 20 s"));
             } else if (cmd == "expect_absent") {
                 if (!find_all(window->contentItem(), parts.value(1)).isEmpty()) fail(QStringLiteral("item is visible"));
+            } else if (cmd == "taps_reset") {
+                taps = 0;
+            } else if (cmd == "expect_taps_max") {   // the taps since taps_reset must not be more than this (the step budgets of the success criteria)
+                if (taps > parts.value(1).toInt()) fail(QStringLiteral("%1 taps since taps_reset").arg(taps));
             } else if (cmd == "quit") {
                 break;
             } else {

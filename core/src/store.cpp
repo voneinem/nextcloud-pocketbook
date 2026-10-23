@@ -106,6 +106,15 @@ Result<std::unique_ptr<Store>> Store::open(const std::string& dir, Clock& clock,
                             },
                             nullptr, nullptr);
 
+    // the case-insensitive identity of a reader name (utf8.h: case_fold), used by the unique index of the sync records
+    sqlite3_create_function(db, "pbc_casefold", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC, nullptr,
+                            [](sqlite3_context* ctx, int, sqlite3_value** argv) {
+                                const unsigned char* t = sqlite3_value_text(argv[0]);
+                                const std::string key = pbc::case_fold(t ? reinterpret_cast<const char*>(t) : "");
+                                sqlite3_result_text(ctx, key.c_str(), static_cast<int>(key.size()), SQLITE_TRANSIENT);
+                            },
+                            nullptr, nullptr);
+
     std::string value, err;
     if (!query_text(db, "PRAGMA journal_mode=TRUNCATE", &value, &err) ||
         !exec(db, "PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA secure_delete=ON;", &err) ||

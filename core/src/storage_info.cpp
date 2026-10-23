@@ -39,6 +39,12 @@ int64_t PosixStorageInfo::max_file_bytes(const std::string& path) const {
     return std::numeric_limits<int64_t>::max();
 }
 
+std::optional<int64_t> PosixStorageInfo::total_bytes(const std::string& path) const {
+    struct statvfs v;
+    if (::statvfs(existing_ancestor(path).c_str(), &v) != 0) return std::nullopt;
+    return static_cast<int64_t>(v.f_blocks) * static_cast<int64_t>(v.f_frsize);
+}
+
 bool PosixStorageInfo::writable(const std::string& path) const {
     const std::string dir = existing_ancestor(path);
     struct statvfs v;

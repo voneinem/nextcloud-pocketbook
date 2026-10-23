@@ -1,0 +1,166 @@
+# Share links (specs/004-share-links): see the shares of an item, create, show, change and remove a public link, and the messages when the server limits
+# sharing. Run after 17-sync-interrupted.walk with the same server (the fake holds a link, a user share, a group share, a share of another kind and the link of
+# another user on /Books).
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# the app opens Files where it was left; go up to the root (a tap on Up at the root does nothing)
+tap folderUp
+wait 400
+tap folderUp
+wait 400
+waitfor folderRow
+shot @OUT@/179-root.png
+# US2: select Books (the second row of the root) and open Share
+tap folderSelect
+wait 300
+tap folderRow 1
+wait 300
+tap folderShare
+waitfor shareRow
+wait 400
+shot @OUT@/180-share-list.png
+expect shareItemName Books
+expect shareRowTitle Public link
+expect shareRowTitle User: Bob Example
+expect shareRowTitle Group: Team Example
+expect shareRowTitle Other kind of share
+expect shareRowDetail Not yours
+expect_absent shareLinkText
+# a user share opens a read-only summary and nothing that changes it
+tap shareRow 1
+waitfor dialogText Bob Example
+shot @OUT@/181-share-user-summary.png
+expect dialogText Read only
+tap footerButton 0
+wait 300
+# US1: create a link with a password, an expiry date and the upload permission; the confirmation says what the link allows and defaults to Cancel
+tap shareCreate
+waitfor shareFormCreate
+shot @OUT@/182-share-form.png
+expect shareFormAllows read this folder
+expect shareFormNotice another link
+tap shareFormPermissionRow 1
+wait 300
+expect shareFormAllows add files
+tap shareFormPassword
+wait 400
+type Zx9-secret-pw
+shot @OUT@/183-share-password-entry.png
+key Return
+wait 400
+expect shareFormPassword Set
+tap shareFormExpiry
+wait 400
+type 2026-12-31
+key Return
+wait 400
+expect shareFormExpiry 2026
+tap shareFormCreate
+waitfor dialogText add files
+expect dialogText password
+shot @OUT@/184-share-confirm.png
+# the first button is Cancel: nothing is created
+tap footerButton 0
+wait 400
+expect_absent dialogText
+tap shareFormCreate
+waitfor dialogText add files
+tap footerButton 1
+waitfor shareRow
+wait 800
+shot @OUT@/185-share-created.png
+expect shareRowDetail Read and upload
+expect shareRowDetail Password
+# SC-001: a read-only link with the defaults takes at most 8 taps from the folder listing (the screen is left and the item selected again)
+tap shareBack
+wait 400
+tap folderSelectDone
+wait 300
+taps_reset
+tap folderSelect
+wait 300
+tap folderRow 1
+wait 300
+tap folderShare
+waitfor shareRow
+tap shareCreate
+waitfor shareFormCreate
+tap shareFormCreate
+waitfor dialogText read this folder
+tap footerButton 1
+wait 1200
+expect_taps_max 8
+shot @OUT@/186-share-created-defaults.png
+# US3: the link of the first row is shown in full and cannot be tapped open; Back drops it
+tap shareRow 0
+waitfor shareLinkText
+shot @OUT@/187-share-link.png
+expect shareLinkText https://
+expect shareLinkLength characters
+tap shareLinkText
+wait 300
+expect shareLinkText https://
+tap shareLinkCopy
+wait 300
+expect shareLinkCopied Copied
+shot @OUT@/188-share-link-copied.png
+# US4: set a password, set an expiry date and switch the folder link to read and upload; each change is confirmed and states its effect
+tap shareLinkPassword
+wait 400
+type new-pw-123
+key Return
+waitfor dialogText password
+shot @OUT@/189-share-change-password-confirm.png
+tap footerButton 1
+waitfor shareLinkText
+wait 1200
+expect shareLinkPassword Set
+tap shareLinkExpiry
+wait 400
+type 2026-12-30
+key Return
+waitfor dialogText 2026
+tap footerButton 1
+wait 1200
+expect shareLinkExpiry 2026
+tap shareLinkPermission
+waitfor choiceRow
+shot @OUT@/190-share-change-permission.png
+tap choiceRow 1
+waitfor dialogText add files
+tap footerButton 1
+wait 1200
+expect shareLinkPermission Read and upload
+shot @OUT@/191-share-link-changed.png
+# US5: remove the link: the confirmation names the item, says the file is not deleted and defaults to Cancel; at most 4 taps from the selected item
+tap shareLinkRemove
+waitfor dialogText stops working at once
+expect dialogText Books
+expect dialogText is not deleted
+shot @OUT@/192-share-remove-confirm.png
+tap footerButton 0
+wait 400
+expect shareLinkText https://
+tap shareLinkRemove
+waitfor dialogText stops working at once
+tap footerButton 1
+waitfor shareRow
+wait 1000
+shot @OUT@/193-share-removed.png
+expect_absent shareLinkText
+# US3, Back: the link of another user (the fourth row: user, group, other kind, then Carol's link) is shown, and dropped when the screen is left
+tap shareRow 3
+waitfor shareLinkText
+expect shareLinkNotYours someone else
+shot @OUT@/194-share-link-of-another-user.png
+tap shareLinkBack
+wait 400
+expect_absent shareLinkText
+waitfor shareRow
+# Back out of every screen: the link, the rows and the rules are dropped
+tap shareBack
+wait 400
+tap folderSelectDone
+wait 300

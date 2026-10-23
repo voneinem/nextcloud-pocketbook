@@ -1,0 +1,36 @@
+{
+ "ocs": {
+  "meta": {
+   "status": "ok",
+   "statuscode": 100,
+   "message": "OK"
+  },
+  "data": [
+   {
+    "id": "51",
+    "share_type": 3,
+    "uid_owner": "alice",
+    "displayname_owner": "Owner Name",
+    "permissions": 1,
+    "item_type": "file",
+    "path": "/Docs/Shared",
+    "token": "TOKEN0051",
+    "url": "https://cloud.example.org/s/TOKEN0051",
+    "label": "Bad\u0007Label\u202eevil",
+    "password": null,
+    "share_with": null,
+    "expiration": null,
+    "stime": 1700000000,
+    "mail_send": 0,
+    "hide_download": 0
+   },
+   {
+    "id": "52",
+    "share_type": 1,
+    "permissions": 1,
+    "share_with_displayname": "Gr\u0000oup\n\u202eX",
+    "uid_owner": "alice"
+   }
+  ]
+ }
+}

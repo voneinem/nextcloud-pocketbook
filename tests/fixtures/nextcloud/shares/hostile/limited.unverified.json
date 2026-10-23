@@ -1,0 +1,1 @@
+{"ocs": {"meta": {"status": "ok", "statuscode": 100, "message": "OK"}, "data": [{"id": "81", "uid_owner": "alice"}, {"id": "82", "share_type": 3, "uid_owner": "alice"}, {"id": "83", "permissions": 1}]}}

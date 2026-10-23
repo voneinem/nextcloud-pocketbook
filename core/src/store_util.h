@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "pbc/sync_types.h"
 #include "pbc/types.h"
 #include "store_sql.h"
 
@@ -22,6 +23,12 @@ inline std::string cap(const std::string& s, size_t max) {
 }
 
 Error storage_error(sqlite3* db, const char* fallback_key);   // store_util.cpp
+
+// FR-050 (store_sync.cpp): marks the pairs of another account account_changed, clears the mark of this account's pairs. The caller holds the mutex.
+bool sync_mark_account_rows(sqlite3* db, const std::string& server, const std::string& user_id);
+// The record of a pair written or removed inside a transaction the caller holds (store_sync.cpp); the queue's confirmation uses them.
+Error sync_record_write(sqlite3* db, const SyncRecord& record);
+bool sync_record_erase(sqlite3* db, int64_t pair_id, const std::string& rel);
 
 struct Transaction {
     sqlite3* db;

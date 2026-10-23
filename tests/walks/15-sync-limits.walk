@@ -1,0 +1,119 @@
+# Folder synchronization, limits (specs/003-folder-sync US9). Run after 14-sync-upload-only.walk with the same server and folders: a pair for the one big file of the
+# server (Big, 120 MB) is given a limit of 1 MB; its plan is over the limit and cannot be approved; raising the limit asks first and names the new numbers.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncPairRow
+tap syncAdd
+waitfor pairServerFolder
+tap pairServerFolder
+waitfor chooserRow
+tap chooserRow 0
+waitfor chooserPath Big
+tap chooserChoose
+waitfor pairServerFolder Big
+tap pairReaderFolder
+waitfor pickerPath
+tap pickerNewFolder
+type Large
+tap footerButton 1
+wait 500
+expect pickerRow Large
+tap pickerRow 1
+wait 500
+tap pickerChooseFolder
+waitfor pairReaderFolder Large
+# the limits are on the page; the data limit goes down to the smallest value
+expect pairMaxFiles Most files
+tap pairMaxSize
+waitfor pairSizeEntry
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+type 1 MB
+tap footerButton 1
+wait 400
+expect pairMaxSize 1 MB
+shot @OUT@/122-pair-limits.png
+tap pairSave
+waitfor syncPairRow
+wait 500
+expect syncPairUsage of
+shot @OUT@/123-three-pairs.png
+
+# the plan is over the limit: it says which one and by how much, and there is no way to approve it
+tap syncPairRow 2
+wait 400
+tap choiceRow 0
+waitfor planTotals download
+expect planNotApprovable Over the size limit by
+shot @OUT@/124-plan-over-limit.png
+tap planCancel
+waitfor syncPairRow
+
+# raising the limit names the new numbers first; declining leaves the pair as it was
+tap syncPairRow 2
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+tap pairMaxSize
+waitfor pairSizeEntry
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+type 500 MB
+tap footerButton 1
+wait 400
+tap pairSave
+waitfor pairLimitConfirm
+shot @OUT@/125-raise-limit-confirm.png
+expect dialogText 500 MB
+tap footerButton 0
+wait 400
+tap pairCancel
+waitfor syncPairRow
+tap syncPairRow 2
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+expect pairMaxSize 1 MB
+tap pairMaxSize
+waitfor pairSizeEntry
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+type 500 MB
+tap footerButton 1
+wait 400
+tap pairSave
+waitfor pairLimitConfirm
+tap footerButton 1
+waitfor syncPairRow
+shot @OUT@/126-limit-raised.png
+
+# the same plan is now within the limits and can be approved (it is not: the next walk starts it and stops the app in the middle)
+tap syncPairRow 2
+wait 400
+tap choiceRow 0
+waitfor planTotals download
+expect_absent planNotApprovable
+shot @OUT@/127-plan-within-limit.png
+tap planCancel
+waitfor syncPairRow
+tap syncBack
+wait 300

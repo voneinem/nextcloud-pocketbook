@@ -1,10 +1,10 @@
 # Qt layer between the QML UI and pbc_core. ARM: SDK Qt with manual moc. HOST: host Qt6 (Core only)
 # when installed; otherwise the bridge, the app and the bridge tests are simply not built.
 
-set(PBC_BRIDGE_SOURCES src/about_bridge.cpp src/worker.cpp src/settings_bridge.cpp src/table_translator.cpp src/format_util.cpp src/connection_bridge.cpp src/qr_image_provider.cpp src/browse_bridge.cpp src/transfer_bridge.cpp src/space_bridge.cpp src/picker_bridge.cpp src/queue_bridge.cpp src/folder_chooser_bridge.cpp)
-set(PBC_BRIDGE_HEADERS include/about_bridge.h include/worker.h include/settings_bridge.h include/table_translator.h include/format_util.h include/connection_bridge.h include/qr_image_provider.h include/browse_bridge.h include/transfer_bridge.h include/space_bridge.h include/picker_bridge.h include/queue_bridge.h include/folder_chooser_bridge.h)
+set(PBC_BRIDGE_SOURCES src/about_bridge.cpp src/worker.cpp src/settings_bridge.cpp src/table_translator.cpp src/format_util.cpp src/connection_bridge.cpp src/qr_image_provider.cpp src/browse_bridge.cpp src/transfer_bridge.cpp src/space_bridge.cpp src/picker_bridge.cpp src/queue_bridge.cpp src/folder_chooser_bridge.cpp src/sync_bridge.cpp src/share_bridge.cpp)
+set(PBC_BRIDGE_HEADERS include/about_bridge.h include/worker.h include/settings_bridge.h include/table_translator.h include/format_util.h include/connection_bridge.h include/qr_image_provider.h include/browse_bridge.h include/transfer_bridge.h include/space_bridge.h include/picker_bridge.h include/queue_bridge.h include/folder_chooser_bridge.h include/sync_bridge.h include/share_bridge.h)
 # headers with Q_OBJECT (the device build runs moc by hand on these)
-set(PBC_BRIDGE_MOC_HEADERS include/about_bridge.h include/settings_bridge.h include/connection_bridge.h include/browse_bridge.h include/transfer_bridge.h include/space_bridge.h include/picker_bridge.h include/queue_bridge.h include/folder_chooser_bridge.h)
+set(PBC_BRIDGE_MOC_HEADERS include/about_bridge.h include/settings_bridge.h include/connection_bridge.h include/browse_bridge.h include/transfer_bridge.h include/space_bridge.h include/picker_bridge.h include/queue_bridge.h include/folder_chooser_bridge.h include/sync_bridge.h include/share_bridge.h)
 
 if(TARGET_TYPE STREQUAL "ARM")
     pbc_moc(PBC_BRIDGE_MOC ${PBC_BRIDGE_MOC_HEADERS})

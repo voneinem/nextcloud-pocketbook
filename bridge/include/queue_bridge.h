@@ -19,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "pbc/auto_sync.h"
 #include "pbc/http_transport.h"
@@ -63,6 +64,9 @@ public:
         int auto_sync_quiet_ms = 10000;   // the quiet period after the user's own action (tests use milliseconds)
         int progress_interval_ms = 2000;  // the coarse progress of a run: at most this often, or when it moves by progress_step_percent
         int progress_step_percent = 5;
+        // Folder synchronization (specs/003-folder-sync): told the server folder of every action of the user that arms Auto Sync, so that a pair that holds
+        // it can compare. Called only where this bridge already notes an action of its own, never for anything else.
+        std::function<void(const std::string& remote_path)> on_user_action;
     };
 
     explicit QueueBridge(Config config, QObject* parent = nullptr);
@@ -145,7 +149,7 @@ private:
     void reload();
     void start_run(bool ensure_network, int64_t only);
     void finish_run(const pbc::SendReport& report);
-    void note_action();            // the user's own action: arms Auto Sync
+    void note_action(const std::vector<std::string>& remote_folders = {});   // the user's own action: arms Auto Sync (and tells the pairs that hold these folders)
     void evaluate_auto_sync();     // asks the scheduler what to do now
     void on_timer();
     qint64 now_ms() const { return mono_.elapsed(); }

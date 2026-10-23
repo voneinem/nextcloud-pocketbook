@@ -100,6 +100,9 @@ signals:
     void changed();
     void testFinished(bool ok, const QString& key);
     void loginChecked(const QString& status);   // approved | pending | expired | failed
+    // The one account check at start has ended (only ever emitted by checkAtStart, which runs only with Wi-Fi already on): `ok` when the server accepted the
+    // login. Folder synchronization's start-up comparison hangs on this (specs/003-folder-sync R-13).
+    void startCheckFinished(bool ok);
 
 private:
     struct Outcome;

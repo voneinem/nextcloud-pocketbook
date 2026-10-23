@@ -10,12 +10,14 @@ namespace pbtest {
 
 struct FakeStorage : pbc::StorageInfo {
     std::optional<int64_t> free = 10ll << 30;           // 10 GiB
+    std::optional<int64_t> total = 64ll << 30;          // the volume
     int64_t limit = pbc::kFatMaxFileBytes;
     bool read_only = false;
 
     std::optional<int64_t> free_bytes(const std::string&) const override { return free; }
     int64_t max_file_bytes(const std::string&) const override { return limit; }
     bool writable(const std::string&) const override { return !read_only; }
+    std::optional<int64_t> total_bytes(const std::string&) const override { return total; }
 };
 
 }  // namespace pbtest

@@ -1,0 +1,13 @@
+# Folder synchronization, a run that is stopped (specs/003-folder-sync US8). Run after 15-sync-limits.walk with the same server and folders: the plan of the Big pair is
+# approved and the app is closed while the 120 MB file is on its way. The next walk shows what the pair says after the restart.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncPairRow
+tap syncPairRow 2
+wait 400
+tap choiceRow 0
+waitfor planTotals download
+tap planApprove
+wait 50
+quit

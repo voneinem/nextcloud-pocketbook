@@ -90,7 +90,14 @@ struct Downloader::Job {
     std::string checksum;
     std::optional<int64_t> remote_mtime;
     ConflictPolicy policy = ConflictPolicy::Ask;
+    std::string root;                    // the folder `rel` is relative to: the download root, or the reader folder of a pair
+    int64_t pair_id = 0;                 // > 0: recorded in sync_files
+    std::string rel_server;              // pair: the path below the pair's server folder
+    bool strict = false;                 // the version in planned_etag is required
+    std::string planned_etag;
+    std::string checksum_sha256;         // the SHA-256 of the finished file, when the verification computed one
     bool track = true;                   // recorded in local_files at the end
+    std::string copy_of;                 // pair, KeepBoth: the original this copy was made for
     std::string recorded_etag;           // the ETag of the response that delivered the bytes, as sent
     std::optional<int64_t> recorded_size;
     // account
@@ -142,6 +149,18 @@ DownloadOutcome Downloader::run(const DownloadRequest& req, Cancel& cancel, cons
     job.policy = req.policy;
     job.etag = strong(req.etag) ? req.etag : "";
     job.expected = req.size;
+    job.pair_id = req.pair_id;
+    job.root = req.pair_id > 0 ? req.target_root : root_;
+    job.strict = req.pair_id > 0 && req.strict_version && strong(req.etag);
+    if (job.strict) job.planned_etag = req.etag;
+    if (job.pair_id > 0) {
+        struct stat rs;
+        if (job.root.empty() || job.root[0] != '/' || ::lstat(job.root.c_str(), &rs) != 0 || !S_ISDIR(rs.st_mode)) return end(JobState::Failed, "path_unsafe");
+        const std::string strip = normalize_remote_path(req.strip_prefix);
+        const std::string prefix = strip == "/" ? std::string("/") : strip + "/";
+        if (job.remote.size() <= prefix.size() || job.remote.compare(0, prefix.size(), prefix) != 0) return end(JobState::Failed, "protocol_error");
+        job.rel_server = job.remote.substr(prefix.size());
+    }
 
     const auto account = store_->account();
     AuthGuard guard(*store_);
@@ -155,9 +174,39 @@ DownloadOutcome Downloader::run(const DownloadRequest& req, Cancel& cancel, cons
     secure_wipe(creds.value.password);
 
     // where the file goes
-    const auto existing = store_->local_file(job.remote);
+    const bool pair = job.pair_id > 0;
+    std::optional<SyncRecord> srec;
+    if (pair) srec = store_->sync_record(job.pair_id, job.rel_server);
+    const auto existing = pair ? std::optional<LocalFile>() : store_->local_file(job.remote);
     std::string rel;
-    if (req.policy == ConflictPolicy::KeepBoth && existing) {
+    if (pair) {
+        // the recorded name, else a safe name below the pair's folder that is free in the records and on the card
+        if (srec) {
+            rel = srec->local_rel;
+        } else {
+            std::vector<std::pair<std::string, std::string>> taken_pairs;
+            for (const SyncRecord& r : store_->sync_records(job.pair_id)) taken_pairs.push_back({"/" + r.rel, r.local_rel});
+            const auto chosen = choose_local_path(job.root, "/" + job.rel_server, build_taken(taken_pairs));
+            if (!chosen.ok()) return end(JobState::Failed, chosen.error.key.c_str());
+            rel = chosen.value;
+        }
+        if (req.policy == ConflictPolicy::KeepBoth) {   // the copy beside the original, under the exact name the plan chose
+            const std::string name = req.conflict_name;
+            if (name.empty() || name[0] == '.' || sanitize_component(name) != name) return end(JobState::Failed, "name_forbidden");
+            const std::string dir = dirname_of(rel);
+            const std::string folder = dir.empty() ? job.root : job.root + "/" + dir;
+            if (DIR* d = ::opendir(folder.c_str())) {
+                bool taken = false;
+                while (dirent* e = ::readdir(d))
+                    if (case_fold(e->d_name) == case_fold(name)) taken = true;
+                ::closedir(d);
+                if (taken) return end(JobState::Failed, "name_exists");
+            }
+            rel = dir.empty() ? name : dir + "/" + name;
+            job.copy_of = req.copy_of;
+            if (job.copy_of.empty()) return end(JobState::Failed, "protocol_error");
+        }
+    } else if (req.policy == ConflictPolicy::KeepBoth && existing) {
         const std::string dir = dirname_of(existing->local_path);
         std::string base = basename_of(existing->local_path);
         const size_t dot = base.rfind('.');
@@ -186,18 +235,23 @@ DownloadOutcome Downloader::run(const DownloadRequest& req, Cancel& cancel, cons
         rel = chosen.value;
     }
     job.rel = rel;
-    job.target = root_ + "/" + rel;
+    job.target = job.root + "/" + rel;
 
     // a copy that the user changed is never overwritten without asking
     if (req.policy == ConflictPolicy::Ask && existing) {
         const FileStat now = stat_file(job.target);
         if (now.exists && local_copy_changed(*existing, now)) return end(JobState::Blocked, "local_changed");
     }
+    if (req.policy == ConflictPolicy::Ask && pair) {   // a file of the pair folder that is not exactly the recorded copy is never overwritten
+        const FileStat now = stat_file(job.target);
+        if (now.exists && (!srec || !now.regular || now.size != srec->local_size.value_or(-1) || now.mtime != srec->local_mtime.value_or(-1)))
+            return end(JobState::Blocked, "local_changed");
+    }
 
     // the checks before the first byte
     const Preflight pf = preflight_download(*storage_, dirname_of(job.target), req.size, INT64_MAX);
     if (pf.verdict == Preflight::Verdict::Refused) return end(JobState::Failed, pf.error_key.c_str());
-    const Error dirs = ensure_directories(root_, dirname_of(rel));
+    const Error dirs = ensure_directories(job.root, dirname_of(rel));
     if (!dirs.ok()) return end(JobState::Failed, dirs.key.c_str());
 
     // the journal row, before the first request
@@ -207,10 +261,24 @@ DownloadOutcome Downloader::run(const DownloadRequest& req, Cancel& cancel, cons
     row.expected_etag = job.etag;
     row.expected_size = req.size;
     row.state = "running";
+    if (pair) {
+        row.pair_id = job.pair_id;
+        row.target_root = job.root;
+        row.checksum = req.checksum;
+        row.strict = job.strict;
+    }
+    if (pair) {   // a cut-short earlier try of this very file (paused by a death or a lost connection) is replaced by this one: never two partial files for one record
+        for (const DownloadJournalRow& old : store_->journal()) {
+            if (old.pair_id != job.pair_id || old.remote_path != job.remote) continue;
+            const std::string dir = dirname_of(old.target_path);
+            const std::string base = old.target_root.empty() ? job.root : old.target_root;
+            abandon(*store_, old.id, (dir.empty() ? base : base + "/" + dir) + "/.pbc-" + std::to_string(old.id) + ".part");
+        }
+    }
     const auto began = store_->journal_begin(row);
     if (!began.ok()) return end(JobState::Failed, "write_failed");
     job.id = began.value;
-    job.temp = (dirname_of(job.target).empty() ? root_ : dirname_of(job.target)) + "/.pbc-" + std::to_string(job.id) + ".part";
+    job.temp = (dirname_of(job.target).empty() ? job.root : dirname_of(job.target)) + "/.pbc-" + std::to_string(job.id) + ".part";
     log::event("download.start", {log::count("job", static_cast<long>(job.id))});
     if (options_.hook) options_.hook("journal");
     return transfer(job, cancel, on_progress);
@@ -226,12 +294,25 @@ DownloadOutcome Downloader::resume(int64_t job_id, Cancel& cancel, const std::fu
     job.id = row->id;
     job.remote = row->remote_path;
     job.rel = row->target_path;
-    job.target = root_ + "/" + row->target_path;
-    job.temp = (dirname_of(job.target).empty() ? root_ : dirname_of(job.target)) + "/.pbc-" + std::to_string(job.id) + ".part";
+    job.pair_id = row->pair_id;
+    job.root = row->pair_id > 0 && !row->target_root.empty() ? row->target_root : root_;
+    job.target = job.root + "/" + row->target_path;
+    job.temp = (dirname_of(job.target).empty() ? job.root : dirname_of(job.target)) + "/.pbc-" + std::to_string(job.id) + ".part";
     job.etag = strong(row->expected_etag) ? row->expected_etag : "";
     job.expected = row->expected_size;
     job.policy = ConflictPolicy::Ask;
-    if (const auto entry = store_->entry(job.remote)) {
+    if (job.pair_id > 0) {   // a pair's download: the pair is looked up again; without it the partial file is worthless
+        const auto sp = store_->sync_pair(job.pair_id);
+        const std::string prefix = sp ? (sp->remote_folder == "/" ? std::string("/") : sp->remote_folder + "/") : std::string();
+        if (!sp || job.remote.size() <= prefix.size() || job.remote.compare(0, prefix.size(), prefix) != 0) {
+            abandon(*store_, job.id, job.temp);
+            return end(JobState::Failed, "protocol_error");
+        }
+        job.rel_server = job.remote.substr(prefix.size());
+        job.checksum = row->checksum;
+        job.strict = row->strict && !job.etag.empty();
+        if (job.strict) job.planned_etag = job.etag;
+    } else if (const auto entry = store_->entry(job.remote)) {
         job.checksum = entry->checksum;
         job.remote_mtime = entry->mtime;
     }
@@ -301,6 +382,7 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
                 req.headers.push_back({"Range", "bytes=" + std::to_string(offset) + "-"});
                 req.headers.push_back({"If-Range", job.etag});
             }
+            if (job.strict) req.headers.push_back({"If-Match", job.planned_etag});   // only the planned version is wanted (research R-7)
             req.save_body_to = job.temp;
             req.save_append = true;
             req.resume_from = offset;
@@ -379,6 +461,7 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
                 }
                 return fail("protocol_error");
             }
+            if (job.strict && resp.status == 412) return fail("changed_during_sync");
             if (resp.status != 200 && resp.status != 206) {
                 bool handled = true;
                 const Error e = session.status_error(resp, &handled);
@@ -391,6 +474,7 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
 
             // 200 or 206: the bytes are in the file
             const std::string etag_header = header_value(resp.headers, "ETag");
+            if (job.strict && etag_header != job.planned_etag) return fail("changed_during_sync");   // a server that ignores If-Match is caught here
             job.recorded_etag = etag_header;
             int64_t total = -1;
             if (resp.status == 206) {
@@ -422,6 +506,7 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
         const auto digest = hash_file(job.temp, sum->algo, cancel);
         if (!digest.ok()) return digest.error.key == "cancelled" ? cancelled() : fail(digest.error.key);
         if (digest.value != sum->hex) return fail("checksum_mismatch");
+        if (sum->algo == HashAlgo::Sha256) job.checksum_sha256 = digest.value;   // verified against the server: the record keeps it
     }
     // the file is on disk before it gets its name
     {
@@ -433,9 +518,16 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
     }
     // the copy must not have been changed meanwhile (also for a resume after a pause)
     if (job.policy == ConflictPolicy::Ask) {
-        const auto existing = store_->local_file(job.remote);
         const FileStat now = stat_file(job.target);
-        if (now.exists && (!existing || local_copy_changed(*existing, now))) {
+        bool changed;
+        if (job.pair_id > 0) {   // a pair's file: exactly the recorded copy, or nothing at all
+            const auto srec = store_->sync_record(job.pair_id, job.rel_server);
+            changed = now.exists && (!srec || !now.regular || now.size != srec->local_size.value_or(-1) || now.mtime != srec->local_mtime.value_or(-1));
+        } else {
+            const auto existing = store_->local_file(job.remote);
+            changed = now.exists && (!existing || local_copy_changed(*existing, now));
+        }
+        if (changed) {
             abandon(*store_, job.id, job.temp);   // the server still has the bytes; the user's file is untouched
             return finish(end(JobState::Blocked, "local_changed"));
         }
@@ -444,7 +536,36 @@ DownloadOutcome Downloader::transfer(Job& job, Cancel& cancel, const std::functi
     if (options_.hook) options_.hook("rename");
 
     const FileStat placed = stat_file(job.target);
-    if (job.track) {
+    if (job.pair_id > 0 && job.track) {   // a pair's file: the record of the pair, advanced together with the end of the journal row
+        SyncRecord rec;
+        rec.pair_id = job.pair_id;
+        rec.rel = job.rel_server;
+        rec.local_rel = job.rel;
+        rec.kind = Kind::File;
+        rec.origin = "download";
+        rec.server_etag = job.recorded_etag;
+        rec.server_size = job.recorded_size;
+        if (const auto sum = strongest(parse_checksums(job.checksum))) rec.server_checksum = std::string(sum->algo == HashAlgo::Sha256 ? "SHA256:" : sum->algo == HashAlgo::Sha1 ? "SHA1:" : "MD5:") + sum->hex;
+        if (!job.copy_of.empty()) {   // the server's version added beside the reader's: it lives on the reader only and is never sent back
+            const size_t slash = job.rel_server.rfind('/');   // the copy's name in the folder of the original, a name the server does not have
+            rec.rel = (slash == std::string::npos ? std::string() : job.rel_server.substr(0, slash + 1)) + basename_of(job.rel);
+            rec.origin = "conflict_copy";
+            rec.one_sided = "reader";
+            rec.copy_of = job.copy_of;
+            rec.server_etag.clear();
+            rec.server_size.reset();
+            rec.server_checksum.clear();
+        }
+        rec.local_size = placed.size;
+        rec.local_mtime = placed.mtime;
+        rec.local_sha256 = job.checksum_sha256;
+        rec.synced_at = clock_->now();
+        const Error e = store_->sync_commit_download(job.pair_id, rec, job.id);
+        if (!e.ok()) {
+            log::event("download.fail", {log::text("cause", e.key)});
+            return finish(end(JobState::Failed, e.key.c_str(), job.id));   // the file is in place; the journal row stays for the next start
+        }
+    } else if (job.track) {
         LocalFile lf;
         lf.remote_path = job.remote;
         lf.local_path = job.rel;
@@ -476,11 +597,43 @@ void Downloader::recover() {
     for (const DownloadJournalRow& row : store_->journal()) {
         known.push_back(row.id);
         const std::string dir = dirname_of(row.target_path);
-        const std::string folder = dir.empty() ? root_ : root_ + "/" + dir;
+        const std::string base = row.pair_id > 0 && !row.target_root.empty() ? row.target_root : root_;
+        const std::string folder = dir.empty() ? base : base + "/" + dir;
         const std::string temp = folder + "/.pbc-" + std::to_string(row.id) + ".part";
-        const std::string target = root_ + "/" + row.target_path;
+        const std::string target = base + "/" + row.target_path;
         if (stat_file(temp).exists) {
             if (row.state != "paused") store_->journal_update(row.id, std::max<int64_t>(0, file_size(temp)), "paused");
+            continue;
+        }
+        if (row.pair_id > 0) {
+            // The file was renamed into place and the process died before the record: the file is the finished download when it has the size that was
+            // planned and is not the recorded copy it was to replace. Recording it here keeps the next comparison from seeing a stranger on the card.
+            const FileStat placed = stat_file(target);
+            const auto sp = store_->sync_pair(row.pair_id);
+            const std::string prefix = sp ? (sp->remote_folder == "/" ? std::string("/") : sp->remote_folder + "/") : std::string();
+            if (sp && placed.exists && placed.regular && row.expected_size && placed.size == *row.expected_size && strong(row.expected_etag) &&
+                row.remote_path.size() > prefix.size() && row.remote_path.compare(0, prefix.size(), prefix) == 0) {
+                const std::string rel_server = row.remote_path.substr(prefix.size());
+                const auto old = store_->sync_record(row.pair_id, rel_server);
+                const bool is_old_copy = old && old->local_size.value_or(-1) == placed.size && old->local_mtime.value_or(-1) == placed.mtime;
+                if (!is_old_copy) {
+                    SyncRecord rec;
+                    rec.pair_id = row.pair_id;
+                    rec.rel = rel_server;
+                    rec.local_rel = row.target_path;
+                    rec.kind = Kind::File;
+                    rec.origin = "download";
+                    rec.server_etag = row.expected_etag;
+                    rec.server_size = row.expected_size;
+                    if (const auto sum = strongest(parse_checksums(row.checksum)))
+                        rec.server_checksum = std::string(sum->algo == HashAlgo::Sha256 ? "SHA256:" : sum->algo == HashAlgo::Sha1 ? "SHA1:" : "MD5:") + sum->hex;
+                    rec.local_size = placed.size;
+                    rec.local_mtime = placed.mtime;
+                    rec.synced_at = clock_->now();
+                    if (store_->sync_commit_download(row.pair_id, rec, row.id).ok()) continue;
+                }
+            }
+            store_->journal_end(row.id);
             continue;
         }
         // no partial file: the job never wrote one, or the rename happened and the commit did not
@@ -527,6 +680,14 @@ void Downloader::recover() {
         }
     };
     Walk::run(root_, "", known, 0);
+    // the folders of the pairs hold temporary files too (a pair's download that was cut short)
+    std::vector<std::string> roots;
+    for (const SyncPair& p : store_->sync_pairs()) roots.push_back(p.local_folder);
+    for (const DownloadJournalRow& row : store_->journal())
+        if (row.pair_id > 0 && !row.target_root.empty()) roots.push_back(row.target_root);
+    std::sort(roots.begin(), roots.end());
+    roots.erase(std::unique(roots.begin(), roots.end()), roots.end());
+    for (const std::string& r : roots) Walk::run(r, "", known, 0);
 }
 
 }  // namespace pbc

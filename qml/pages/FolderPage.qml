@@ -240,6 +240,14 @@ Item {
                 onClicked: { var r = page.selectedRow(); if (r) renameEntry.open(r.name) }
             },
             ToolButton {
+                objectName: "folderShare"
+                text: qsTr("Share")
+                icon: "share"
+                visible: browse.selecting
+                enabled: browse.selectedCount === 1
+                onClicked: { var r = page.selectedRow(); if (r) page.openShare(r.remotePath) }
+            },
+            ToolButton {
                 objectName: "folderMove"
                 text: qsTr("Move")
                 icon: "cut"
@@ -439,6 +447,17 @@ Item {
         if (queuedCount > 0) queuedNotice.open()
     }
 
+    // Share (specs/004-share-links): reads the rules and the shares of the selected item and shows them; an unavailable item and a missing connection are
+    // shown by the share page itself, anything else that stops the read is told here
+    function openShare(path) {
+        var r = share.open(path)
+        if (r.errorKey === "busy" || r.errorKey === "share_item_gone") {
+            shareFail.text = Problems.title(r.errorKey) + " " + Problems.action(r.errorKey)
+            shareFail.open()
+            return
+        }
+        page.StackView.view.push(Qt.resolvedUrl("SharePage.qml"))
+    }
     function selectedRow() {
         for (var i = 0; i < browse.rows.length; ++i) if (browse.rows[i].selected) return browse.rows[i]
         return null
@@ -582,5 +601,12 @@ Item {
             var p = value.split(":")
             browse.setSort(p[0], p[1] === "asc")
         }
+    }
+
+    ConfirmDialog {
+        id: shareFail
+        objectName: "shareFailDialog"
+        title: qsTr("Share")
+        showCancel: false
     }
 }

@@ -40,7 +40,14 @@
         <file>pages/SpacePage.qml</file>
         <file>pages/FilePickerPage.qml</file>
         <file>pages/QueuePage.qml</file>
+        <file>pages/SharePage.qml</file>
+        <file>pages/ShareFormPage.qml</file>
+        <file>pages/ShareLinkPage.qml</file>
         <file>pages/FolderChooserPage.qml</file>
+        <file>pages/SyncPage.qml</file>
+        <file>pages/PairPage.qml</file>
+        <file>pages/PlanPage.qml</file>
+        <file>pages/ResultPage.qml</file>
         <file>Problems.qml</file>
         <file>EntryWords.qml</file>
         <file>FlatList.qml</file>
@@ -51,6 +58,7 @@
         <file>pages/ThirdPartyPage.qml</file>
         <file>icons/calendar.svg</file>
         <file>icons/send.svg</file>
+        <file>icons/share.svg</file>
         <file>icons/reply-all.svg</file>
         <file>icons/chevron-down.svg</file>
         <file>icons/chevron-left.svg</file>
@@ -102,5 +110,9 @@
         <file>icons/eye-filled.svg</file>
         <file>icons/eye.svg</file>
         <file>icons/folder.svg</file>
+        <file>icons/arrow-down.svg</file>
+        <file>icons/arrow-up.svg</file>
+        <file>icons/arrows-both.svg</file>
+        <file>icons/warning.svg</file>
     </qresource>
 </RCC>

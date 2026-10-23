@@ -1,0 +1,149 @@
+# Folder synchronization (specs/003-folder-sync). US1: pair a server folder with a reader folder, change it, remove it; saving a pair
+# changes nothing on either side. Run it after 10-no-trash.walk with the same server and folders (quickstart.md, steps 1).
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncEmpty No pairs yet
+shot @OUT@/90-sync-empty.png
+
+# a new pair: the server folder Books, a new reader folder Mirror, the default direction (download only)
+tap syncAdd
+waitfor pairServerFolder
+shot @OUT@/91-pair-new.png
+tap pairServerFolder
+waitfor chooserRow
+tap chooserRow 1
+waitfor chooserPath Books
+tap chooserChoose
+waitfor pairServerFolder Books
+tap pairReaderFolder
+waitfor pickerPath
+tap pickerNewFolder
+type Mirror
+shot @OUT@/92-new-folder.png
+tap footerButton 1
+wait 500
+expect pickerRow Mirror
+shot @OUT@/93-reader-folders.png
+tap pickerRow 1
+wait 500
+tap pickerChooseFolder
+waitfor pairReaderFolder Mirror
+expect pairDirection Download only (selected)
+shot @OUT@/94-pair-filled.png
+tap pairSave
+waitfor syncPairRow
+expect syncPairTitle Books
+expect syncPairTitle Mirror
+expect syncPairState Never synced
+shot @OUT@/95-sync-one-pair.png
+
+# change it: Sync at start on; the pair says "Never synced" still and nothing was requested (the row's menu: Sync, Settings)
+tap syncPairRow
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+tap pairStartup
+tap pairSave
+waitfor syncPairRow
+expect syncPairState Never synced
+
+# the three directions are all offered
+tap syncPairRow
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+expect pairDirection Upload only
+expect pairDirection Two-way
+shot @OUT@/96-pair-directions.png
+
+# US2: review before anything changes, then the result. Tap Sync in the pair's menu: the plan comes up and nothing is on the reader yet.
+tap pairCancel
+waitfor syncPairRow
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planTotals download
+shot @OUT@/98-plan.png
+expect planNothingChanged Nothing has been changed yet
+expect planTab Transfers
+expect planRow
+# take the first entry out of the plan; it is marked, and Approve is still there
+tap planRow 0
+wait 400
+expect planRowCaption Taken out of the plan
+shot @OUT@/99-plan-entry-removed.png
+# the offline preview does not exist while online; Cancel leaves the plan and nothing changed: compare again and approve this time
+tap planCancel
+waitfor syncPairRow
+expect syncPairState Never synced
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planApprove
+tap planApprove
+waitfor resultCounts downloaded
+shot @OUT@/100-result.png
+expect resultCounts failed
+expect resultTime It took
+tap resultDone
+waitfor syncPairRow
+expect syncPairState In sync
+# the last result stays on the Sync screen
+tap syncPairRow
+wait 400
+tap choiceRow 2
+waitfor resultCounts downloaded
+tap resultDone
+waitfor syncPairRow
+# a second sync of a pair that is in sync: nothing to do
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planTotals Nothing to do
+shot @OUT@/101-plan-in-sync.png
+tap planCancel
+waitfor syncPairRow
+
+# remove it: the files on both sides stay
+tap syncPairRow
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+tap pairRemove
+waitfor dialogText stay where they are
+tap footerButton 1
+waitfor syncEmpty No pairs yet
+shot @OUT@/97-sync-removed.png
+
+# SC-001: adding a download-only pair takes at most 6 steps from the Sync screen. A step is a screen of its own (Add pair, the server folder, the reader folder, Save);
+# choosing in a folder screen is two taps (the folder, then Choose), so the shortest way, to a reader folder that exists already, is 8 taps and never more.
+taps_reset
+tap syncAdd
+waitfor pairServerFolder
+tap pairServerFolder
+waitfor chooserRow
+tap chooserRow 1
+waitfor chooserPath Books
+tap chooserChoose
+waitfor pairServerFolder Books
+tap pairReaderFolder
+waitfor pickerPath
+tap pickerRow 1
+wait 500
+tap pickerChooseFolder
+waitfor pairReaderFolder Mirror
+tap pairSave
+waitfor syncPairRow
+expect syncPairState Never synced
+expect_taps_max 8
+tap syncPairRow
+wait 400
+tap choiceRow 1
+waitfor pairServerFolder
+tap pairRemove
+waitfor dialogText stay where they are
+tap footerButton 1
+waitfor syncEmpty No pairs yet
+tap syncBack
+wait 300

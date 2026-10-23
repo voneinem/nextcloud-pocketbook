@@ -13,6 +13,9 @@
 #   U4 No `source:` set to a literal http(s)/ftp address (no remote content is ever loaded, FR-009).
 #   U5 No `import QtWebView` / `import QtWebEngine` (texts are shown as plain text).
 #   U6 No `Qt.openUrlExternally` (links are shown as text and never opened).
+#   U7 (feature 004) qml/pages/ShareLinkPage.qml: the link is shown as Text.PlainText wrapped with Text.WrapAnywhere and has no MouseArea,
+#      onLinkActivated, TapHandler, PointerHandler, HoverHandler or Qt.openUrl (nothing in the display can be tapped or opened).
+#   U8 (feature 004) a qml/pages/Share*.qml that has a password entry (objectName containing "sharePassword") sets `secret: true` on it.
 set -u
 
 SELF="$(basename "${BASH_SOURCE[0]}")"
@@ -34,6 +37,22 @@ scan() {
             if [ -n "$hits" ]; then echo "U5 $f: web view import"; echo "$hits" | sed 's/^/    /'; bad=1; fi
             hits="$(grep -nE 'Qt\.openUrlExternally' "$f" || true)"
             if [ -n "$hits" ]; then echo "U6 $f: Qt.openUrlExternally"; echo "$hits" | sed 's/^/    /'; bad=1; fi
+            case "$f" in
+                */pages/ShareLinkPage.qml)
+                    hits="$(grep -nE 'MouseArea|onLinkActivated|TapHandler|PointerHandler|HoverHandler|Qt\.openUrl' "$f" || true)"
+                    if [ -n "$hits" ]; then echo "U7 $f: the link display must not be tappable"; echo "$hits" | sed 's/^/    /'; bad=1; fi
+                    for need in 'Text\.PlainText' 'Text\.WrapAnywhere'; do
+                        grep -qE "$need" "$f" || { echo "U7 $f: the link display needs ${need//\\/}"; bad=1; }
+                    done
+                    ;;
+            esac
+            case "$f" in
+                */pages/Share*.qml)
+                    if grep -q 'sharePassword' "$f" && ! grep -qE 'secret:[[:space:]]*true' "$f"; then
+                        echo "U8 $f: a password entry must set secret: true (no Copy, no suggestions)"; bad=1
+                    fi
+                    ;;
+            esac
             ;;
         esac
     done < <(find "$root/qml" -type f \( -name '*.qml' -o -name qmldir -o -name qml.qrc \) -print0)
@@ -64,6 +83,28 @@ Button { text: \"x\" }" \
     mk good2
     printf 'import QtQuick\nItem { Image { source: "qrc:/icons/a.png" } Text { text: "see https://example.org" } }\n' > "$tmp/good2/qml/C.qml"
     scan "$tmp/good2" >/dev/null || { echo "self-test: a local image source or URL text was reported" >&2; rc=1; }
+    # U7/U8 (feature 004, share links): the link display is plain, wrapped and cannot be tapped; a password entry is a secret field
+    good_link='import QtQuick\nItem { Text { objectName: "shareLinkText"; textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; text: share.detail.linkText } }'
+    mk u7ok; mkdir -p "$tmp/u7ok/qml/pages"; printf "$good_link\n" > "$tmp/u7ok/qml/pages/ShareLinkPage.qml"
+    scan "$tmp/u7ok" >/dev/null || { echo "self-test: a plain, wrapped link display was reported" >&2; rc=1; }
+    for bad_ in 'MouseArea { anchors.fill: parent }' 'Text { onLinkActivated: function(l) { x(l) } }' 'TapHandler { onTapped: x() }' 'PointerHandler { }' 'Item { Component.onCompleted: Qt.openUrl(a) }'; do
+        mk u7bad; mkdir -p "$tmp/u7bad/qml/pages"
+        printf "$good_link\nItem { $bad_ }\n" > "$tmp/u7bad/qml/pages/ShareLinkPage.qml"
+        if scan "$tmp/u7bad" >/dev/null; then echo "self-test: U7 was not detected for: $bad_" >&2; rc=1; fi
+        rm -rf "$tmp/u7bad"
+    done
+    for missing in 'Text.PlainText' 'Text.WrapAnywhere'; do
+        mk u7miss; mkdir -p "$tmp/u7miss/qml/pages"
+        printf "$good_link\n" | sed "s/$missing/Text.Wrap/" > "$tmp/u7miss/qml/pages/ShareLinkPage.qml"
+        if scan "$tmp/u7miss" >/dev/null; then echo "self-test: U7 was not detected when $missing is missing" >&2; rc=1; fi
+        rm -rf "$tmp/u7miss"
+    done
+    mk u8ok; mkdir -p "$tmp/u8ok/qml/pages"
+    printf 'import QtQuick\nItem { TextEntryDialog { objectName: "sharePasswordDialog"; secret: true } }\n' > "$tmp/u8ok/qml/pages/ShareFormPage.qml"
+    scan "$tmp/u8ok" >/dev/null || { echo "self-test: a secret password dialog was reported" >&2; rc=1; }
+    mk u8bad; mkdir -p "$tmp/u8bad/qml/pages"
+    printf 'import QtQuick\nItem { TextEntryDialog { objectName: "sharePasswordDialog" } }\n' > "$tmp/u8bad/qml/pages/ShareFormPage.qml"
+    if scan "$tmp/u8bad" >/dev/null; then echo "self-test: U8 was not detected (password dialog without secret: true)" >&2; rc=1; fi
     # the qmldir and the resource list are scanned too
     mk bad2
     printf 'InkButton 1.0 InkButton.qml\n' > "$tmp/bad2/qml/qmldir"

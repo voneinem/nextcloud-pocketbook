@@ -69,7 +69,7 @@ Item {
     function caption(row) {
         var why = reasonText(row)
         var state = stateWord(row) + (why.length > 0 ? ": " + why : "")
-        return [kindWord(row.kind), row.sizeText, state, row.sourceChanged ? qsTr("File changed since queued") : ""].filter(function (t) { return t.length > 0 }).join("  ·  ")
+        return [kindWord(row.kind), row.sizeText, state, row.sourceChanged ? qsTr("File changed since queued") : "", row.syncedBy && row.syncedBy.length > 0 ? qsTr("Sync: %1").arg(row.syncedBy) : ""].filter(function (t) { return t.length > 0 }).join("  ·  ")
     }
     function noticeText() {
         switch (queue.waitingNotice) {

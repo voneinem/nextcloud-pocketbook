@@ -63,11 +63,11 @@ const std::string kItem =
 
 }  // namespace
 
-PB_TEST(a_fresh_database_is_schema_4_with_the_queue_tables) {
+PB_TEST(a_fresh_database_has_the_queue_tables) {
     pbtest::TmpDir d;
     auto s = open_current(d);
-    PB_CHECK_EQ(pbc::Store::kSchemaVersion, 4);
-    PB_CHECK_EQ(s->schema_version(), 4);
+    PB_CHECK(pbc::Store::kSchemaVersion >= 4);
+    PB_CHECK(s->schema_version() >= 4);
     for (const char* t : {"settings", "sync_state", "account", "folders", "entries", "local_files", "offline_marks", "favorites", "downloads", "queue_items",
                           "server_caps"})
         PB_CHECK(table_exists(*s, t));
@@ -89,7 +89,7 @@ PB_TEST(a_schema_3_database_upgrades_after_a_backup_and_keeps_all_of_its_data) {
         PB_CHECK(s->set_setting("ui_language", "de").ok());
     }
     auto s = open_current(d);
-    PB_CHECK_EQ(s->schema_version(), 4);
+    PB_CHECK(s->schema_version() >= 4);
     PB_CHECK(table_exists(*s, "queue_items"));
     PB_CHECK(table_exists(*s, "server_caps"));
     PB_CHECK_EQ(s->debug_query("SELECT count(*) FROM account"), std::string("1"));
@@ -126,11 +126,11 @@ PB_TEST(a_failing_upgrade_is_rolled_back_and_keeps_the_backup) {
     sqlite3_close(db);
 }
 
-PB_TEST(a_schema_5_database_is_refused_and_left_byte_identical) {
+PB_TEST(a_schema_6_database_is_refused_and_left_byte_identical) {
     pbtest::TmpDir d;
     {
         auto s = open_current(d);
-        PB_CHECK(s->debug_exec("PRAGMA user_version = 5").empty());
+        PB_CHECK(s->debug_exec("PRAGMA user_version = 6").empty());
     }
     const std::string path = d.file("data/pbcloud.db");
     const std::string before = read_file(path);

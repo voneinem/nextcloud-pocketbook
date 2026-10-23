@@ -1,0 +1,26 @@
+# Folder synchronization after a stopped run (specs/003-folder-sync US8). Run after 16-sync-stopped.walk with the same server and folders: the pair says how far the run
+# got, nothing was started again by itself, and the next sync finishes what was left and ends as an uninterrupted one.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncPairRow
+wait 500
+# quickstart step 5, the start-up half: the Books pair has Sync at start on, so the app compared it when it started (a plan is ready, nothing was changed by it)
+# and it did not run any plan by itself; the other pairs have the switch off and were left alone
+expect syncPairState Plan ready
+expect syncPairState In sync
+expect syncPairState 0 of 1 done
+shot @OUT@/128-interrupted.png
+tap syncPairRow 2
+wait 400
+tap choiceRow 0
+waitfor planApprove
+tap planApprove
+waitfor resultCounts downloaded
+shot @OUT@/129-result-after-interruption.png
+expect resultCounts failed
+tap resultDone
+waitfor syncPairRow
+expect syncPairState In sync
+tap syncBack
+wait 300

@@ -61,6 +61,8 @@ Item {
             Line { text: qsTr("License: %1").arg(page.orUnavailable(about.licenseName)) }
             Line { text: qsTr("This is an unofficial app. It is not made by or connected with Nextcloud GmbH."); font.pixelSize: Style.labelSize }
             Line { text: qsTr("The app writes to your server only when you ask it to, and never by itself."); font.pixelSize: Style.labelSize }
+            Line { text: qsTr("Folders are compared only at start, when you tap Sync, or shortly after your own change; never in the background."); font.pixelSize: Style.labelSize }
+            Line { text: qsTr("Share links and their passwords are shown only on the screen you asked for. They are never stored, never written to the log and never opened by the app."); font.pixelSize: Style.labelSize }
 
             Line { text: qsTr("Time zone data: release %1").arg(about.tzRelease.length > 0 ? about.tzRelease : qsTr("unknown")); font.pixelSize: Style.labelSize }
             Line {

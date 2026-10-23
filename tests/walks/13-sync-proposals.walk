@@ -1,0 +1,40 @@
+# Folder synchronization, deletions are proposals (specs/003-folder-sync US7). Run after 12-sync-both-ways.walk with the same server and folders: the two-way pair
+# Books <-> Mirror exists and has synced every name. The server loses Notes.txt: the sync only proposes; the user chooses; nothing is deleted without a confirmation.
+# server remove /Books/Notes.txt
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncPairRow
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planTotals skipped
+# the Proposals tab lists the one file that is gone from the server; nothing has been chosen
+tap planTab 2
+wait 400
+expect planRowCaption Deleted on the server
+expect planRowCaption No choice yet
+shot @OUT@/115-plan-proposals.png
+# choose "Delete on the reader": the row says so; Apply choices asks for a confirmation that names the file
+tap planRow 0
+wait 400
+shot @OUT@/116-proposal-choices.png
+tap choiceRow 2
+wait 400
+expect planRowCaption Delete on the reader
+tap planApply
+waitfor planConfirmDelete
+expect dialogText cannot be recovered with this app
+shot @OUT@/117-confirm-delete.png
+# decline first: nothing is applied and the choice stays
+tap footerButton 0
+wait 400
+expect planRowCaption Delete on the reader
+# then apply for real
+tap planApply
+waitfor planConfirmDelete
+tap footerButton 1
+waitfor resultCounts deleted
+shot @OUT@/118-result-deleted.png
+tap resultDone
+waitfor syncPairRow

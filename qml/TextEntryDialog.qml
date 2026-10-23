@@ -9,13 +9,17 @@ DialogFrame {
     id: root
     property string placeholder
     property string errorText
+    property bool secret: false   // the text is a secret (a password shown in plain letters): never copyable, no suggestions, emptied when the dialog closes
     property string acceptText: qsTr("OK")
     property string cancelText: qsTr("Cancel")
+    property string clearText: ""   // a third, middle button (for example "Remove date"): emits cleared() and closes
     signal accepted(string text)
+    signal cleared()
     signal rejected()
 
     boxY: 120
-    footer: [{ text: cancelText, role: "dismiss" }, { text: acceptText, role: "accept" }]
+    footer: clearText.length > 0 ? [{ text: cancelText, role: "dismiss" }, { text: clearText, role: "clear" }, { text: acceptText, role: "accept" }]
+                                 : [{ text: cancelText, role: "dismiss" }, { text: acceptText, role: "accept" }]
 
     function open(initial) {
         input.text = initial === undefined ? "" : initial
@@ -26,17 +30,20 @@ DialogFrame {
     }
     function close() {
         Qt.inputMethod.hide()
+        if (secret) input.text = ""
         visible = false
     }
     onCloseRequested: { close(); rejected() }
     onFooterClicked: function(role) {
         if (role === "accept") accepted(input.text)
+        else if (role === "clear") { close(); cleared() }
         else { close(); rejected() }
     }
 
     InkField {
         id: input
         width: parent.width
+        secretField: root.secret
         placeholderText: root.placeholder
         errorText: root.errorText
         onAccepted: root.accepted(text)   // Return = OK

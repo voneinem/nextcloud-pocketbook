@@ -71,7 +71,17 @@ QVariantMap TransferBridge::details(const QString& remotePath) const {
     QVariantMap m;
     m["remotePath"] = q(p);
     const auto entry = c_.store->entry(p);
-    const auto local = c_.store->local_file(p);
+    auto local = c_.store->local_file(p);
+    std::string root = c_.download_root;
+    qlonglong synced_by = 0;
+    if (!local) {   // a file a folder pair keeps up to date (feature 003): shown like a downloaded copy, managed by the pair
+        if (const auto sc = c_.store->synced_copy(p)) {
+            local = pbc::as_local_file(p, *sc);
+            root = sc->root;
+            synced_by = static_cast<qlonglong>(sc->pair_id);
+        }
+    }
+    m["syncedBy"] = synced_by;
     m["name"] = display_safe(entry ? entry->name : p.substr(p.rfind('/') + 1));
     m["kind"] = entry && entry->kind == pbc::Kind::Folder ? QStringLiteral("folder") : QStringLiteral("file");
     m["sizeText"] = entry && entry->size ? human_size(*entry->size) : (local ? human_size(local->size) : QString());
@@ -81,7 +91,7 @@ QVariantMap TransferBridge::details(const QString& remotePath) const {
     m["reason"] = entry ? q(entry->reason) : QString();
     bool on_reader = false, can_open = false;
     if (local) {
-        const auto abs = pbc::resolve_local_file(c_.download_root, local->local_path);
+        const auto abs = pbc::resolve_local_file(root, local->local_path);
         can_open = abs.ok();
         on_reader = abs.ok();
     }
@@ -91,13 +101,13 @@ QVariantMap TransferBridge::details(const QString& remotePath) const {
     m["serverNewer"] = local && entry && !entry->etag.empty() && entry->etag != local->remote_etag && entry->etag != local->seen_etag;
     m["serverMissing"] = local && local->server_missing;
     {   // the state word of the list, and whether the file is kept offline
-        const pbc::FileStat st = local ? pbc::stat_file(c_.download_root + "/" + local->local_path) : pbc::FileStat();
+        const pbc::FileStat st = local ? pbc::stat_file(root + "/" + local->local_path) : pbc::FileStat();
         m["state"] = q(pbc::state_key(pbc::compute_state(entry ? &*entry : nullptr, local ? &*local : nullptr, st)));
         m["kept"] = c_.store->in_scope(p);
         m["keptDirect"] = c_.store->is_marked(p);
     }
     if (local) {   // the copy as it is on the card now (it may have been changed there)
-        const pbc::FileStat now = pbc::stat_file(c_.download_root + "/" + local->local_path);
+        const pbc::FileStat now = pbc::stat_file(root + "/" + local->local_path);
         m["localSizeText"] = now.exists ? human_size(now.size) : QString();
         m["localDateText"] = now.exists && c_.format_date_time ? c_.format_date_time(now.mtime) : QString();
         m["localChanged"] = now.exists && pbc::local_copy_changed(*local, now);
@@ -218,9 +228,17 @@ void TransferBridge::resolveConflict(const QString& remotePath, const QString& c
 }
 
 void TransferBridge::open(const QString& remotePath) {
-    const auto local = c_.store->local_file(pbc::normalize_remote_path(remotePath.toStdString()));
-    if (!local) return;
-    const auto abs = pbc::resolve_local_file(c_.download_root, local->local_path);
+    const std::string p = pbc::normalize_remote_path(remotePath.toStdString());
+    std::string root = c_.download_root, rel;
+    if (const auto local = c_.store->local_file(p)) {
+        rel = local->local_path;
+    } else if (const auto sc = c_.store->synced_copy(p)) {   // the copy of a folder pair
+        root = sc->root;
+        rel = sc->local_rel;
+    } else {
+        return;
+    }
+    const auto abs = pbc::resolve_local_file(root, rel);
     if (!abs.ok() || !c_.open_file) return;
     c_.open_file(q(abs.value));
 }

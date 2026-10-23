@@ -48,6 +48,13 @@ Item {
                 onClicked: page.push("QueuePage.qml")
             },
             ToolButton {
+                objectName: "homeSync"
+                text: sync.readyCount > 0 ? qsTr("Sync (%1)").arg(sync.readyCount) : qsTr("Sync")
+                icon: "arrows-both"
+                enabled: connection.hasAccount
+                onClicked: page.push("SyncPage.qml")
+            },
+            ToolButton {
                 objectName: "homeStorage"
                 text: qsTr("Storage")
                 icon: "save"
@@ -124,6 +131,16 @@ Item {
             font.pixelSize: Style.labelSize
             color: Style.ink
             text: qsTr("Queue: %n not synced", "", queue.openCount)
+        }
+        Text {
+            objectName: "homeSyncLine"
+            x: 30
+            width: parent.width - 60
+            wrapMode: Text.Wrap
+            visible: sync.readyCount > 0
+            font.pixelSize: Style.labelSize
+            color: Style.ink
+            text: qsTr("Sync: %n plan(s) ready", "", sync.readyCount)
         }
         Text {
             objectName: "homeAction"

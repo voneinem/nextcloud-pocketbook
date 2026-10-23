@@ -21,6 +21,16 @@ PB_TEST(every_key_of_the_contract_is_listed_exactly_once) {
         "name_exists", "target_gone", "source_gone", "partial_failure", "server_refused", "queue_full", "refresh_first", "change_pending",
         "source_unreadable", "source_changed", "source_not_allowed", "trash_unavailable", "outcome_unknown", "other_account",
         "no_connection",
+        // folder synchronization (specs/003-folder-sync/data-model.md "Reason and key vocabulary")
+        "pair_limit", "pair_overlap", "pair_folder_forbidden", "pair_limit_invalid", "sync_busy", "plan_stale", "plan_not_approvable",
+        "plan_too_large", "over_limit", "records_full", "changed_during_sync", "confirmation_needed",
+        "in_sync", "identical", "hidden_name", "direction", "kept_both", "unavailable", "by_user", "server_version_unknown", "quota_exceeded", "no_space", "over_reserve",
+        "name_collision", "server_folder_missing", "reader_folder_missing", "account_changed", "managed_by_sync",
+        // share links (specs/004-share-links/contracts/core-interfaces.md "Error keys")
+        "share_not_offered", "share_public_disabled", "share_password_required", "share_expiry_required", "share_expiry_too_far",
+        "share_upload_not_allowed", "share_item_not_shareable", "share_item_gone", "share_not_changeable", "share_gone",
+        "share_changed_meanwhile", "share_unknown_outcome", "share_list_too_big", "share_refused",
+        "expiry_invalid", "expiry_in_past", "password_invalid", "permission_invalid",
     };
     const auto& all = pbc::all_error_keys();
     std::set<std::string> seen(all.begin(), all.end());
@@ -55,6 +65,39 @@ PB_TEST(the_write_side_keys_have_the_classes_of_the_contract) {
     PB_CHECK(pbc::class_of("other_account") == pbc::ErrorClass::Auth);
     // an unknown key still falls back to a protocol error
     PB_CHECK(pbc::error_from_key("name_exist").key == "protocol_error");
+}
+
+PB_TEST(the_sync_keys_have_the_classes_of_the_data_model) {
+    for (const char* k : {"pair_limit", "pair_overlap", "pair_folder_forbidden", "pair_limit_invalid", "sync_busy", "plan_stale", "plan_not_approvable",
+                          "plan_too_large", "over_limit", "confirmation_needed", "in_sync", "identical", "hidden_name", "direction", "kept_both", "by_user", "server_version_unknown", "managed_by_sync"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Unsupported);
+    for (const char* k : {"records_full", "changed_during_sync", "no_space", "over_reserve", "name_collision", "reader_folder_missing"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Storage);
+    for (const char* k : {"unavailable", "quota_exceeded", "server_folder_missing"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Server);
+    PB_CHECK(pbc::class_of("account_changed") == pbc::ErrorClass::Auth);
+    // keys that already existed keep their class and meaning
+    for (const char* k : {"name_forbidden", "name_exists"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Server);
+    for (const char* k : {"path_unsafe", "path_too_long", "source_unreadable", "too_large_for_storage", "storage_full", "storage_readonly", "queue_full", "local_changed"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Storage);
+    for (const char* k : {"trash_unavailable", "refresh_first"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Unsupported);
+    PB_CHECK(pbc::is_known_error_key("change_pending"));
+}
+
+PB_TEST(the_share_keys_have_the_classes_of_the_contract) {
+    for (const char* k : {"share_not_offered", "share_public_disabled", "share_password_required", "share_expiry_required", "share_expiry_too_far",
+                          "share_upload_not_allowed", "share_item_not_shareable", "share_item_gone", "share_not_changeable", "share_gone",
+                          "share_changed_meanwhile", "share_list_too_big", "share_refused"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Server);
+    PB_CHECK(pbc::class_of("share_unknown_outcome") == pbc::ErrorClass::Network);
+    // client-side input errors never come from the network; they are Protocol by the contract
+    for (const char* k : {"expiry_invalid", "expiry_in_past", "password_invalid", "permission_invalid"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Protocol && pbc::is_known_error_key(k));
+    // keys the share code reuses keep their class
+    PB_CHECK(pbc::class_of("auth_failed") == pbc::ErrorClass::Auth);
+    PB_CHECK(pbc::class_of("no_network") == pbc::ErrorClass::Network);
+    PB_CHECK(pbc::class_of("rate_limited") == pbc::ErrorClass::Server);
+    PB_CHECK(pbc::class_of("maintenance") == pbc::ErrorClass::Server);
+    PB_CHECK(pbc::class_of("protocol_error") == pbc::ErrorClass::Protocol);
 }
 
 PB_TEST(an_unknown_key_is_a_protocol_error) {

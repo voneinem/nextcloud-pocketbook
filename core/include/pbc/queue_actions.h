@@ -73,6 +73,21 @@ struct DeletePreview {
     std::vector<std::string> names;    // the names of the first entries, for the dialog
 };
 
+// specs/003-folder-sync R-8: one upload of an approved plan. The runner has checked the source against the plan; the names are the plan's.
+struct SyncUploadSpec {
+    std::string rel;                           // the name below the pair's server folder (the record the confirmation advances)
+    std::string local_abs;                     // the reader file; opened read-only by the sender
+    std::string dst_parent, dst_name;          // where it goes on the server
+    std::optional<std::string> replace_etag;   // a changed file: replace it, conditional on this strong version
+    std::string role = "file";                 // or "conflict_copy"
+};
+// The group that was written: `items` runs parallel to the specs (0 = the spec was refused), `refused` names why with the spec's rel in `path`.
+struct SyncGroup {
+    int64_t group_id = 0;
+    std::vector<int64_t> items;
+    std::vector<PickRefusal> refused;
+};
+
 class QueueActions {
 public:
     QueueActions(Store& store, SourceRules rules) : store_(&store), rules_(std::move(rules)) {}
@@ -116,6 +131,21 @@ public:
     AddResult rename_entry(const std::string& remote_path, const std::string& new_name);
 
     Error remove_item(int64_t id);
+
+    // The uploads of a pair's approved plan as ONE group in ONE transaction: a new folder for every folder below `remote_folder` that the stored listing
+    // does not show on the server (every folder before what it holds), then the uploads, each waiting for its folder. Nothing is sent, no source is touched.
+    // A source that fails inspect_source is refused alone; the call as a whole is refused with queue_full when the items do not fit, auth_failed without an
+    // account and not_found without the pair.
+    // `existing_folders` are folders (absolute server paths) the caller has just seen on the server; they get no folder item even if the stored listings
+    // do not show them.
+    Result<SyncGroup> add_sync_uploads(int64_t pair_id, const std::string& remote_folder, const std::vector<SyncUploadSpec>& specs,
+                                       const std::set<std::string>& existing_folders = {});
+
+    // One server deletion that the user confirmed in a proposal of a pair's plan (specs/003-folder-sync R-10): a delete item of the queue, conditional on the
+    // strong version the pair's record knows, with sync_role "delete" so that its confirmation drops the record (and, for a folder, the records below it).
+    // Errors: trash_unavailable (a delete would be permanent: refused), refresh_first (no strong version), change_pending (an open item names the entry),
+    // not_found (no such pair), queue_full, auth_failed.
+    Result<int64_t> add_sync_delete(int64_t pair_id, const std::string& remote_path, const std::string& etag, Kind entry_kind = Kind::File);
 
 private:
     // The question for a taken name, or nullopt when the name is free (the cached listing and the open items are looked at, not the server).

@@ -8,11 +8,18 @@
 # and prints the address, the user name and the app password to type into Settings. Type commands for the server in this terminal:
 #   approve        the browser login that is waiting was approved
 #   touch <path>   change a file on the server (then tap Update in the app)
+#   remove <path>  remove a file or folder on the server (folder sync proposes a deletion, never does it)
 #   drop           the next download loses its connection half way
 #   offline|online switch the server off and on
 #   lose-next-answer [METHOD [part]]  the next write is done on the server but its answer is lost (an upload with an unknown outcome)
 #   drop-after <bytes>  the next upload body longer than that is cut; quota <bytes>; lock <path>; no-trash; ignore-conditions
+#   share-rules <what> <value>   the server's sharing rules: sharing|public|password|upload on|off, or expiry <days>|off (specs/004-share-links)
+#   share-list [path]   the shares on a path (ids and kinds, no addresses); unshare <id>   remove a share behind the app's back
 #   quit           close the demo
+# Share links (specs/004-share-links quickstart step 3): Files > Select > an entry > Share. /Books has a link, a user, a group, another kind of share and
+# the link of another user. After a few actions search the data folder for the password you typed or a link: nothing is stored there.
+# Folder sync (specs/003-folder-sync quickstart step 3): Sync > Add pair; the server has Books/ and Documents/, the reader's Downloads/ and Notes/ are
+# folders to pair (Downloads is a good Outbox). tests/walks/11 ... 14 script the same steps with pictures.
 # Everything is removed when the demo ends. The server is a fake of the tests: nothing here proves anything about a real Nextcloud.
 set -euo pipefail
 
@@ -58,8 +65,9 @@ echo "Fake Nextcloud:  ${url#https://}"
 echo "User name:       $user"
 echo "App password:    $password"
 echo "Downloads go to: $tmp/downloads"
+echo "Data folder:     $tmp/data (the app writes no password, link or token here; search it after trying share links)"
 echo "Uploads come from: $tmp/picker (Downloads, Notes, PBCloud)"
-echo "Commands: approve | touch <path> | drop | offline | online | lose-next-answer [METHOD [part]] | drop-after <bytes> | quota <bytes> | lock <path> | no-trash | ignore-conditions | quit"
+echo "Commands: approve | touch <path> | drop | offline | online | lose-next-answer [METHOD [part]] | drop-after <bytes> | quota <bytes> | lock <path> | no-trash | ignore-conditions | share-rules <what> <value> | share-list [path] | unshare <id> | quit"
 
 PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" PBC_PICKER_ROOT="$picker" "$APP" &
 app_pid=$!

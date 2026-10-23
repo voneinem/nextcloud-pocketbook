@@ -88,7 +88,7 @@ public:
            const SenderOptions& options, Cancel& cancel)
         : store_(store), http_(http), clock_(clock), random_(random), rules_(rules), download_root_(download_root), options_(options), cancel_(cancel) {}
 
-    SendReport run(int64_t only) {
+    SendReport run(int64_t only, int64_t only_group) {
         const std::string link_key = open_link(store_, http_, clock_, link_);
         if (!link_key.empty()) {
             report_.stopped_by_key = link_key;
@@ -114,7 +114,7 @@ public:
                     if (dep && dep->state != ItemState::Done) break;
                 }
             } else {
-                next = store_.queue_next(link_.account.base_url, link_.account.user_id);
+                next = store_.queue_next(link_.account.base_url, link_.account.user_id, only_group);
             }
             if (!next) break;
             ++handled_;
@@ -653,9 +653,9 @@ QueueSender::QueueSender(Store& store, HttpTransport& http, const Clock& clock, 
                          SenderOptions options)
     : store_(store), http_(http), clock_(clock), random_(random), rules_(std::move(rules)), download_root_(std::move(download_root)), options_(std::move(options)) {}
 
-SendReport QueueSender::run(Cancel& cancel, int64_t only) {
+SendReport QueueSender::run(Cancel& cancel, int64_t only, int64_t only_group) {
     Runner runner(store_, http_, clock_, random_, rules_, download_root_, options_, cancel);
-    return runner.run(only);
+    return runner.run(only, only_group);
 }
 
 Found QueueSender::check_unknown(int64_t id) {

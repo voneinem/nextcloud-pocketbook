@@ -102,12 +102,22 @@ QVariantMap BrowseBridge::row_map(const pbc::RemoteEntry& e, const std::string& 
     m["source"] = q(source);
     m["favorite"] = e.favorite;
     QString state;   // folders have none; one stat per visible file at most
+    qlonglong synced_by = 0;
     if (e.kind == pbc::Kind::File) {
-        const auto local = c_.store->local_file(e.path);
-        const pbc::FileStat st = local && !c_.download_root.empty() ? pbc::stat_file(c_.download_root + "/" + local->local_path) : pbc::FileStat();
+        auto local = c_.store->local_file(e.path);
+        std::string root = c_.download_root;
+        if (!local) {   // a file a folder pair keeps up to date counts as downloaded (feature 003): the 001 copy is consulted first
+            if (const auto sc = c_.store->synced_copy(e.path)) {
+                local = pbc::as_local_file(e.path, *sc);
+                root = sc->root;
+                synced_by = static_cast<qlonglong>(sc->pair_id);
+            }
+        }
+        const pbc::FileStat st = local && !root.empty() ? pbc::stat_file(root + "/" + local->local_path) : pbc::FileStat();
         state = QString::fromLatin1(pbc::state_key(pbc::compute_state(&e, local ? &*local : nullptr, st)));
     }
     m["state"] = state;
+    m["syncedBy"] = synced_by;
     m["kept"] = c_.store->in_scope(e.path);
     m["keptDirect"] = c_.store->is_marked(e.path);
     return m;
@@ -128,6 +138,7 @@ QVariantMap BrowseBridge::overlay_row_map(const pbc::OverlayRow& r) const {
         m["source"] = QString();
         m["favorite"] = false;
         m["state"] = QString();
+        m["syncedBy"] = 0LL;
         m["kept"] = false;
         m["keptDirect"] = false;
     } else {

@@ -33,6 +33,14 @@ struct DownloadRequest {
     std::string checksum;                    // the oc:checksums text of the listing ("" = none)
     std::optional<int64_t> remote_mtime;
     ConflictPolicy policy = ConflictPolicy::Ask;
+    // The downloads of a folder pair (specs/003-folder-sync, research R-7). Without `pair_id` none of this has any effect.
+    int64_t pair_id = 0;                     // > 0: the result is recorded in sync_files (Store::sync_commit_download), not in local_files
+    std::string target_root;                 // absolute: the pair's reader folder; the file goes below it instead of below the download root
+    std::string strip_prefix;                // the pair's server folder: the remote path below it is the path below target_root
+    bool strict_version = false;             // the answer must be the version in `etag` (strong): If-Match; a 412 or another ETag ends the job
+                                             // Failed with changed_during_sync and nothing is written
+    std::string conflict_name;               // with KeepBoth: the exact name of the copy beside the original (already a valid, free name; checked again)
+    std::string copy_of;                     // with KeepBoth under a pair: the rel of the original; the copy is recorded as a conflict copy that lives on the reader only
 };
 
 struct JobProgress {

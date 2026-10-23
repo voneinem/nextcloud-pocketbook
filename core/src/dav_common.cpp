@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include "pbc/clock_check.h"
+#include "pbc/secure_wipe.h"
 
 namespace pbc {
 
@@ -98,7 +99,8 @@ std::string DavSession::url_for(const std::string& href) const {
     return origin_ + "/" + href;
 }
 
-Response DavSession::send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap) {
+Response DavSession::send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap,
+                          long total_timeout_s, bool secret_body) {
     Request r;
     r.method = method;
     r.url = url;
@@ -107,7 +109,9 @@ Response DavSession::send(const std::string& method, const std::string& url, con
     r.username = user_;
     r.password = password_;
     r.max_response_bytes = cap;
+    if (total_timeout_s > 0) r.total_timeout_s = total_timeout_s;
     Response answer = http_.perform(r);
+    if (secret_body) secure_wipe(r.body);
     if (answer.status != 0) {
         const std::string date = header_value(answer.headers, "Date");
         if (!date.empty())
