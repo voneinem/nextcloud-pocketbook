@@ -145,7 +145,9 @@ PB_TEST(the_numbers_for_the_space_screen) {
     PB_CHECK(svc.load("/", pbc::Fetch::Always).error.ok());
     const int64_t with_listing = e.store->database_bytes();
     PB_CHECK(e.store->clear_cache().ok());
-    PB_CHECK(e.store->database_bytes() <= with_listing);
+    // the listing's pages are given back; a VACUUM also lays out the schema itself compactly, which for a small listing and the larger schema 5
+    // (more tables and indexes) can cost one page more than the file as it was created
+    PB_CHECK(e.store->database_bytes() <= with_listing + 4096);
 }
 
 PB_TEST_MAIN()

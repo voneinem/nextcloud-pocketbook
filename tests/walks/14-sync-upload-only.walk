@@ -1,0 +1,40 @@
+# Folder synchronization, upload only (specs/003-folder-sync US4). Run after 13-sync-proposals.walk with the same server and folders: the reader's Downloads folder is the
+# Outbox of a pair with the server folder Documents; its files go to the server through the queue, and the files on the reader stay where they are.
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncPairRow
+tap syncAdd
+waitfor pairServerFolder
+tap pairServerFolder
+waitfor chooserRow
+tap chooserRow 2
+waitfor chooserPath Documents
+tap chooserChoose
+waitfor pairServerFolder Documents
+tap pairReaderFolder
+waitfor pickerPath
+tap pickerRow 0
+wait 500
+tap pickerChooseFolder
+waitfor pairReaderFolder Downloads
+tap pairDirection 1
+wait 300
+expect pairDirection Upload only (selected)
+tap pairSave
+waitfor dialogText can be sent to
+tap footerButton 1
+waitfor syncPairRow
+shot @OUT@/119-two-pairs.png
+# the second pair's menu: Sync (the first pair is row 0 of the list, this one is the next)
+tap syncPairRow 1
+wait 400
+tap choiceRow 0
+waitfor planTotals upload
+shot @OUT@/120-plan-uploads.png
+expect planRowCaption Upload
+tap planApprove
+waitfor resultCounts uploaded
+shot @OUT@/121-result-uploaded.png
+tap resultDone
+waitfor syncPairRow

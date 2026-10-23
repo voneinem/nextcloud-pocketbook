@@ -29,7 +29,9 @@ bool is_sensitive_name(const std::string& name) {
     for (const char* d : kFragments)
         if (n.find(d) != std::string::npos) return true;
     static const char* const kWords[] = {"host",      "folder",   "subject",  "from",    "to",
-                                         "recipient", "summary",  "attendee", "location"};
+                                         "recipient", "summary",  "attendee", "location",
+                                         // folder synchronization: relative names, folders and servers of a pair
+                                         "rel",       "server",   "remote",   "local",   "path", "file", "address"};
     std::string word;
     auto is_word = [&]() {
         for (const char* w : kWords)

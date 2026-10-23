@@ -40,7 +40,6 @@ on purpose. Nothing here is a defect of the baseline: it builds, and all tests p
 | `tests/support/kill_harness.h`, `tests/support/mutate.h` | The interruption and mutation helpers; `mutate.h` is used, `kill_harness.h` has no user yet. |
 | `scripts/check-fake-markers.sh`, `PBC_FAKE_SERVER_TEST` in `tests/support/test_support.h` | The rule for tests that use a fake server. There is no fake server yet; the first Nextcloud fake must carry the marker. |
 | `tests/templates/` | The performance tests of the notes baseline. They include headers that do not exist here and are not built; they only show the shape of a budget test. |
-| `tests/qml/test_qml_pages.cpp`, `tests/qml/stubs.qml` | The QML page test of the notes baseline (also from an older bridge set); not built. `app_self_test` covers the pages today. |
 | `docs/reference/` | Copied unchanged from office-pocketbook: the analyses talk about mail and calendar. `office-pocketbook-constitution.md` is the constitution this project started from. The project's own `.specify/memory/constitution.md` is still the empty Spec Kit template; the scripts under `scripts/` enforce the rules of the copied one (the principles they name are those of that document). |
 
 ## Removed by the Nextcloud files feature (specs/001-nextcloud-files-client, research R-18)

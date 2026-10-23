@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Tue, 20 Oct 2026 08:00:00 GMT</d:getlastmodified>
+      <d:getetag>"root-1"</d:getetag>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>100</oc:fileid>
+      <oc:permissions>RGDNVCK</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/Novels/</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Tue, 20 Oct 2026 08:00:00 GMT</d:getlastmodified>
+      <d:getetag>"novels-1"</d:getetag>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>101</oc:fileid>
+      <oc:permissions>RGDNVCK</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/a.epub</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Sun, 18 Oct 2026 07:15:30 GMT</d:getlastmodified>
+      <d:getcontentlength>1000</d:getcontentlength>
+      <d:resourcetype/>
+      <d:getetag>"a-1"</d:getetag>
+      <oc:fileid>102</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+      <oc:checksums><oc:checksum>SHA256:abababababababababababababababababababababababababababababababab SHA1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd</oc:checksum></oc:checksums>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/b.epub</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Sun, 18 Oct 2026 07:15:30 GMT</d:getlastmodified>
+      <d:getcontentlength>2000</d:getcontentlength>
+      <d:resourcetype/>
+      <d:getetag>"b-1"</d:getetag>
+      <oc:fileid>103</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+      <oc:checksums><oc:checksum>MD5:efefefefefefefefefefefefefefefef</oc:checksum></oc:checksums>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/files/demo/Books/c.epub</d:href>
+    <d:propstat><d:prop>
+      <d:getlastmodified>Sun, 18 Oct 2026 07:15:30 GMT</d:getlastmodified>
+      <d:getcontentlength>3000</d:getcontentlength>
+      <d:resourcetype/>
+      <d:getetag>"c-1"</d:getetag>
+      <oc:fileid>104</oc:fileid>
+      <oc:permissions>RGDNVW</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

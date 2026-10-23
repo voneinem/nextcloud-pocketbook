@@ -149,7 +149,8 @@ namespace {
 
 const char* kColumns =
     "id, group_id, kind, entry_kind, state, step, server, user_id, src_local, src_size, src_mtime, src_remote, src_etag, src_fileid, dst_parent,"
-    " dst_name, \"replace\", dst_etag, depends_on, upload_id, chunk_size, checksum, result_etag, result_fileid, reason, created_at, updated_at";
+    " dst_name, \"replace\", dst_etag, depends_on, upload_id, chunk_size, checksum, result_etag, result_fileid, reason, created_at, updated_at,"
+    " pair_id, sync_rel, sync_role";
 
 QueueItem item_from(const Stmt& st) {
     QueueItem q;
@@ -180,6 +181,9 @@ QueueItem item_from(const Stmt& st) {
     q.reason = st.text(24);
     q.created_at = st.int64(25);
     q.updated_at = st.int64(26);
+    q.pair_id = opt_col(st, 27);
+    q.sync_rel = st.text(28);
+    q.sync_role = st.text(29);
     return q;
 }
 
@@ -225,6 +229,9 @@ void bind_item(Stmt& st, const QueueItem& q, int64_t now, const std::optional<in
     st.bind_text(i++, q.reason);
     st.bind_int64(i++, now);
     st.bind_int64(i++, now);
+    bind_opt(st, i++, q.pair_id);
+    st.bind_text(i++, q.sync_rel);
+    st.bind_text(i++, q.sync_role);
 }
 
 int row_count(sqlite3* db) {
@@ -302,7 +309,7 @@ Result<int64_t> Store::queue_add(const QueueItem& item) {
     }
     Stmt st(db_, (std::string("INSERT INTO queue_items(group_id, kind, entry_kind, state, step, server, user_id, src_local, src_size, src_mtime, src_remote,"
                               " src_etag, src_fileid, dst_parent, dst_name, \"replace\", dst_etag, depends_on, upload_id, chunk_size, checksum,"
-                              " result_etag, result_fileid, reason, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")).c_str());
+                              " result_etag, result_fileid, reason, created_at, updated_at, pair_id, sync_rel, sync_role) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")).c_str());
     if (!st.ok()) {
         out.error = storage_error(db_, "write_failed");
         return out;
@@ -353,7 +360,7 @@ Result<std::vector<int64_t>> Store::queue_add_group(const std::vector<QueueItem>
         if (depends_on_index[i] >= 0) q.depends_on = ids[static_cast<size_t>(depends_on_index[i])];
         Stmt st(db_, "INSERT INTO queue_items(group_id, kind, entry_kind, state, step, server, user_id, src_local, src_size, src_mtime, src_remote,"
                      " src_etag, src_fileid, dst_parent, dst_name, \"replace\", dst_etag, depends_on, upload_id, chunk_size, checksum,"
-                     " result_etag, result_fileid, reason, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                     " result_etag, result_fileid, reason, created_at, updated_at, pair_id, sync_rel, sync_role) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         if (!st.ok()) {
             out.error = storage_error(db_, "write_failed");
             return out;
@@ -415,15 +422,17 @@ int Store::queue_count_sendable(const std::string& server, const std::string& us
     return st.step() == SQLITE_ROW ? static_cast<int>(st.int64(0)) : 0;
 }
 
-std::optional<QueueItem> Store::queue_next(const std::string& server, const std::string& user_id) const {
+std::optional<QueueItem> Store::queue_next(const std::string& server, const std::string& user_id, int64_t only_group) const {
     std::lock_guard<std::mutex> lock(mu_);
     Stmt st(db_, (std::string("SELECT q.id, q.group_id, q.kind, q.entry_kind, q.state, q.step, q.server, q.user_id, q.src_local, q.src_size, q.src_mtime,"
                               " q.src_remote, q.src_etag, q.src_fileid, q.dst_parent, q.dst_name, q.\"replace\", q.dst_etag, q.depends_on, q.upload_id,"
-                              " q.chunk_size, q.checksum, q.result_etag, q.result_fileid, q.reason, q.created_at, q.updated_at") + kSendable +
-                  " ORDER BY q.id LIMIT 1").c_str());
+                              " q.chunk_size, q.checksum, q.result_etag, q.result_fileid, q.reason, q.created_at, q.updated_at, q.pair_id, q.sync_rel, q.sync_role") + kSendable +
+                  " AND (? = 0 OR q.group_id = ?) ORDER BY q.id LIMIT 1").c_str());
     if (!st.ok()) return std::nullopt;
     st.bind_text(1, server);
     st.bind_text(2, user_id);
+    st.bind_int64(3, only_group);
+    st.bind_int64(4, only_group);
     if (st.step() != SQLITE_ROW) return std::nullopt;
     return item_from(st);
 }
@@ -674,8 +683,11 @@ Error Store::queue_confirm(int64_t id, const std::string& etag, std::optional<in
     std::string parent, name, src_local, src_remote;
     std::optional<int64_t> size, mtime;
     bool replace = false;
+    std::optional<int64_t> pair_id;
+    std::string sync_rel, sync_role, checksum;
     {
-        Stmt st(db_, "SELECT kind, entry_kind, dst_parent, dst_name, src_size, src_mtime, src_local, \"replace\", src_remote FROM queue_items WHERE id = ?");
+        Stmt st(db_, "SELECT kind, entry_kind, dst_parent, dst_name, src_size, src_mtime, src_local, \"replace\", src_remote, pair_id, sync_rel, sync_role, checksum"
+                     " FROM queue_items WHERE id = ?");
         if (!st.ok()) return storage_error(db_, "write_failed");
         st.bind_int64(1, id);
         if (st.step() != SQLITE_ROW) return refused("protocol_error", "the item does not exist");
@@ -688,6 +700,10 @@ Error Store::queue_confirm(int64_t id, const std::string& etag, std::optional<in
         src_local = st.text(6);
         replace = st.int64(7) != 0;
         src_remote = st.text(8);
+        pair_id = opt_col(st, 9);
+        sync_rel = st.text(10);
+        sync_role = st.text(11);
+        checksum = st.text(12);
     }
     {
         Stmt st(db_, "UPDATE queue_items SET state = 'done', step = '', reason = '', result_etag = ?, result_fileid = ?, updated_at = ? WHERE id = ?");
@@ -786,6 +802,62 @@ Error Store::queue_confirm(int64_t id, const std::string& etag, std::optional<in
     } else {
         if (!forget_versions_up(db_, parent)) return storage_error(db_, "write_failed");
         if ((kind == ItemKind::Rename || kind == ItemKind::Move) && !forget_versions_up(db_, parent_path(src_remote))) return storage_error(db_, "write_failed");
+    }
+    if (pair_id && !sync_rel.empty() && (sync_role == "file" || sync_role == "conflict_copy" || sync_role == "delete")) {
+        // A pair's plan created this item (specs/003-folder-sync R-8): its record is advanced in this very transaction, so that the item is done exactly when
+        // the record says the file is synced. A pair that was removed meanwhile leaves an ordinary item and no record.
+        bool pair_there = false;
+        std::string pair_folder;
+        {
+            Stmt st(db_, "SELECT local_folder FROM sync_pairs WHERE id = ?");
+            if (!st.ok()) return storage_error(db_, "write_failed");
+            st.bind_int64(1, *pair_id);
+            if (st.step() == SQLITE_ROW) {
+                pair_there = true;
+                pair_folder = st.text(0);
+            }
+        }
+        if (pair_there && sync_role == "delete") {
+            if (!store_util::sync_record_erase(db_, *pair_id, sync_rel)) return storage_error(db_, "write_failed");
+            if (entry_kind == Kind::Folder) {   // a folder: the records of everything below it go too
+                Stmt below(db_, "DELETE FROM sync_files WHERE pair_id = ?1 AND rel >= ?2 || '/' AND rel < ?2 || '0'");
+                if (!below.ok()) return storage_error(db_, "write_failed");
+                below.bind_int64(1, *pair_id);
+                below.bind_text(2, sync_rel);
+                if (below.step() != SQLITE_DONE) return storage_error(db_, "write_failed");
+            }
+        } else if (pair_there && kind == ItemKind::Upload && !src_local.empty() && src_local.compare(0, pair_folder.size() + 1, pair_folder + "/") == 0) {
+            SyncRecord rec;
+            rec.pair_id = *pair_id;
+            rec.rel = sync_rel;
+            rec.local_rel = src_local.substr(pair_folder.size() + 1);
+            rec.kind = Kind::File;
+            rec.origin = sync_role == "conflict_copy" ? "conflict_copy" : "upload";
+            rec.server_etag = strong_etag(etag) ? etag : std::string();
+            rec.server_size = size;
+            rec.local_size = size;
+            rec.local_mtime = mtime;
+            rec.local_sha256 = checksum;
+            rec.synced_at = clock_->now();
+            if (sync_role == "conflict_copy") {
+                // The reader's version went to the server under a new name: that copy lives on the server only. The source is the original, whose own record
+                // stays as it is; the copy's record is named like the copy and knows which original it was made for.
+                Stmt orig(db_, "SELECT rel FROM sync_files WHERE pair_id = ? AND local_rel = ?");
+                rec.copy_of = rec.local_rel;   // a first-sync clash has no record yet: the names are the same on both sides
+                if (orig.ok()) {
+                    orig.bind_int64(1, *pair_id);
+                    orig.bind_text(2, rec.local_rel);
+                    if (orig.step() == SQLITE_ROW) rec.copy_of = orig.text(0);
+                }
+                rec.local_rel = rec.rel;
+                rec.local_size.reset();
+                rec.local_mtime.reset();
+                rec.local_sha256.clear();
+                rec.one_sided = "server";
+            }
+            // a record that cannot be written (the table is full, a name differs only by case) does not undo an upload that arrived: the next comparison finds the file on both sides
+            if (const Error e = store_util::sync_record_write(db_, rec); !e.ok() && e.key == "write_failed") return e;
+        }
     }
     if (kind == ItemKind::Upload && replace) {
         // The link (research R-10, FR-029): an upload that replaced the entry's file from the entry's own downloaded copy, with the copy unchanged since

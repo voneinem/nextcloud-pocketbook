@@ -20,3 +20,19 @@ upload folder, `capabilities/` for the capability lists, `errors/` for refusals 
 apply: reserved example names, the `.unverified` suffix before the extension until a live run produced the exchange, no
 `Authorization` value. Hostile and partial variants (markup and control characters in an exception class, a truncated
 multistatus) are kept here too.
+
+## Folder synchronization (feature 003)
+
+`sync/` holds the answers the folder scans read: `listings/` (complete multistatus listings with `oc:checksums`), `partial/` (a
+multistatus in which some members failed, or that was cut short), `hostile/` (names that must never reach a path outside the
+pair's reader folder) and `unavailable/` (entries without permission or encrypted). The same rules apply: reserved example
+names, no `Authorization` value, and the `.unverified` suffix before the extension until a live run produced the exchange
+(constitution Principle IX).
+
+## Share links (feature 004)
+
+`shares/` holds the answers the sharing screens read: `capabilities/` (the `files_sharing` object of the capabilities answer in several
+shapes), `lists/` (share lists of a path), `details/` (single shares with and without a link, a hash in `share_with`, other share types) and
+`hostile/` (huge, truncated, mistyped and control-character variants). The same rules apply: reserved example names and hosts, no
+`Authorization` value, no real tokens, and the `.unverified` suffix before the extension until a live run produced the exchange
+(constitution Principle IX).

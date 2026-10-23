@@ -208,6 +208,17 @@ Item {
                                      : qsTr("Changes stay in the queue until you tap Send on the Queue screen.")
             }
 
+            Text {
+                objectName: "settingsAutoSyncPairs"
+                x: 30
+                width: parent.width - 60
+                topPadding: 6
+                wrapMode: Text.Wrap
+                font.pixelSize: Style.captionSize
+                color: Style.ink
+                text: qsTr("Also applies to pair syncs (they only compare).")
+            }
+
             Head { text: qsTr("Security") }
             Text {
                 objectName: "settingsCustomCa"

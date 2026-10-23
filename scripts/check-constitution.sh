@@ -22,7 +22,7 @@
 #        app/ only in core/src/curl_session.cpp (tests/ may use them for the fake servers).
 #   R8 No log::text / log::count key that is, starts with or ends with the word host, folder, subject, from,
 #        to, recipient, title, summary, attendee, location, contact, phone, email, book, org, note, path, name, file, filename, url, address,
-#        server, remote, local, etag, password, secret or account in core/, bridge/ and app/ (no mail or calendar content, no server names
+#        server, remote, local, rel, etag, password, secret or account in core/, bridge/ and app/ (no mail or calendar content, no server names
 #        and no names or paths of the user's files in logs; counts such as files, folders or entries are fine).
 #   R9 The identifier pbnotes (the application this one was started from) appears in no tracked file except
 #        under docs/reference/, in NOTICE and under licenses/ (the planning documents in specs/ and .specify/
@@ -40,14 +40,28 @@
 #        the QML name no method at all - except the device probe (app/probe/pbc_probe.cpp), a developer's console tool that sends one PUT of its
 #        own temporary file, only when PBC_PROBE_PUT_URL names a test address by hand (DT-W1); it names no other write method.
 #   N3 No QTimer, QBasicTimer or sleep in core/ and bridge/ except core/src/downloader.cpp and its header (no background activity; the
-#        download wait) and bridge/src/queue_bridge.cpp with its header, which may hold the one single-shot QTimer of Auto Sync (never sleep).
+#        download wait), bridge/src/queue_bridge.cpp with its header, which may hold the one single-shot QTimer of Auto Sync (never sleep), and
+#        bridge/src/sync_bridge.cpp with its header, which may hold exactly one QTimer (the single-shot timer of the per-pair Auto Sync of feature
+#        003; never a QBasicTimer, never sleep, never a second timer). core/src/sync_*.cpp stay forbidden.
 #   N4 No log field named href, term, user, login, token, query, search, link, etag, checksum or upload_id in core/, bridge/ and app/ (server data and user
 #        input stay out of the log).
 #   N6 The files an upload reads are only ever read: no O_WRONLY, O_RDWR, O_CREAT, O_TRUNC, O_APPEND, write-mode fopen, ofstream, std::ios::out,
 #        QIODevice write modes or QFile::remove/rename/copy in core/src/queue_sender.cpp, core/src/upload_source.cpp and
 #        bridge/src/picker_bridge.cpp.
-#   N5 No unlink/remove/rename in core/src outside local_files.cpp, downloader.cpp, credentials_file.cpp, ca_selector.cpp,
-#        curl_transport.cpp and store*.cpp (all file mutation goes through the audited modules).
+#   N5 No unlink/remove/rename/rmdir/truncate in core/src outside local_files.cpp, downloader.cpp, credentials_file.cpp, ca_selector.cpp,
+#        curl_transport.cpp and store*.cpp (all file mutation goes through the audited modules; the folder synchronization of feature 003
+#        - sync_*.cpp - removes and renames nothing itself: it asks local_files.cpp, the Downloader or the queue).
+#   N7 Paths are never joined by hand in core/src/sync_runner.cpp, sync_scan.cpp and sync_planner.cpp (feature 003): no `x + "/" + y`
+#        outside a function named join_path_checked, which refuses ".." and separators in a component. Every reader path of a sync is built
+#        by that function or by choose_local_path, every server path by remote_path.h.
+#   N2 (feature 004) core/src/share_api.cpp is a fourth audited module: it may name PUT and DELETE (the share requests); it names no other
+#        write verb. Every other share_* module and the share bridge name none.
+#   N8 The share modules (core/src/share_*.cpp, core/include/pbc/share_*.h, secret_text.*, bridge/src/share_bridge.cpp and its header) cannot log
+#        secrets (feature 004): no log::text, log::path or log::Field, no qDebug/qWarning/qInfo/qCritical, std::cerr/cout/clog or printf family,
+#        every log::event code starts with "share.", and SecretText::reveal() is called only in share_api.cpp (the form encoder).
+#   N9 Nothing opens a link (feature 004): no QProcess, system()/popen(), xdg-open, openUrlExternally/Qt.openUrl, QUrl::fromUserInput or
+#        QDesktopServices in core/, bridge/, app/ and qml/*.qml - except the one hand-over of a downloaded local file to the viewer in
+#        app/device_bridge.cpp (QDesktopServices::openUrl(QUrl::fromLocalFile(...))).
 #   R10 libcurl tracing is never switched on (it would write LOGIN / AUTH PLAIN passwords to the log):
 #        CURLOPT_VERBOSE, CURLOPT_DEBUGFUNCTION, CURLOPT_DEBUGDATA, CURLOPT_STDERR, curl -v / --verbose /
 #        --trace* in core/, bridge/, app/ and scripts/.
@@ -153,7 +167,7 @@ scan() {
                     report R7 "$f" "$p" '(imap|smtp)://' && bad=1
                 fi
                 # R8: log keys that would carry mail or calendar content or server names
-                report R8 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(host|folder|subject|from|to|recipient|title|summary|attendee|location|contact|phone|email|book|org|note|path|name|file|filename|url|address|server|remote|local|etag|password|secret|account)(_[A-Za-z0-9_.]+)?"' && bad=1
+                report R8 "$f" "$p" 'log::(text|count)[[:space:]]*\([[:space:]]*"([A-Za-z0-9.]+_)?(host|folder|subject|from|to|recipient|title|summary|attendee|location|contact|phone|email|book|org|note|path|name|file|filename|url|address|server|remote|local|rel|etag|password|secret|account)(_[A-Za-z0-9_.]+)?"' && bad=1
                 ;;
         esac
         case "$f" in
@@ -177,6 +191,10 @@ scan() {
             core/src/dav_write.cpp|core/src/queue_sender.cpp|core/src/upload_session.cpp)
                 report N2 "$f" "$p" '"(PROPPATCH|LOCK|UNLOCK)"' && bad=1
                 ;;
+            core/src/share_api.cpp)
+                # feature 004: the share requests (POST, PUT, DELETE on the sharing resources) live here and nowhere else; no WebDAV write verb
+                report N2 "$f" "$p" '"(MKCOL|MOVE|COPY|PROPPATCH|LOCK|UNLOCK)"' && bad=1
+                ;;
             core/src/curl_transport.cpp|core/src/http_transport.cpp|core/src/dav_common.cpp) ;;
             app/probe/pbc_probe.cpp)
                 report N2 "$f" "$p" '"(MKCOL|MOVE|COPY|DELETE|PROPPATCH|LOCK|UNLOCK)"' && bad=1
@@ -190,6 +208,13 @@ scan() {
             core/src/downloader.cpp|core/include/pbc/downloader.h) ;;
             bridge/src/queue_bridge.cpp|bridge/include/queue_bridge.h)
                 report N3 "$f" "$p" '\bQBasicTimer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
+                ;;
+            bridge/src/sync_bridge.cpp|bridge/include/sync_bridge.h)
+                report N3 "$f" "$p" '\bQBasicTimer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
+                # exactly one timer: more than one instance (new QTimer, or a QTimer value) is a second timer
+                if [ "$(grep -oE 'new[[:space:]]+QTimer|QTimer[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(;|\{|\(|=)' "$p" 2>/dev/null | wc -l)" -gt 1 ]; then
+                    echo "N3 $f: more than one QTimer"; bad=1
+                fi
                 ;;
             core/*|bridge/*)
                 report N3 "$f" "$p" '\bQ(Basic)?Timer\b|sleep_for|\busleep[[:space:]]*\(|\bnanosleep[[:space:]]*\(|(^|[^A-Za-z0-9_])sleep[[:space:]]*\(' && bad=1
@@ -205,7 +230,7 @@ scan() {
         case "$f" in
             core/src/local_files.cpp|core/src/downloader.cpp|core/src/credentials_file.cpp|core/src/ca_selector.cpp|core/src/curl_transport.cpp|core/src/store*.cpp) ;;
             core/src/*.cpp)
-                report N5 "$f" "$p" '(^|[^A-Za-z0-9_.>])(::|std::)?(unlink|remove|rename)[[:space:]]*\(|filesystem::(remove|remove_all|rename)' && bad=1
+                report N5 "$f" "$p" '(^|[^A-Za-z0-9_.>])(::|std::)?(unlink|remove|rename|rmdir|truncate|ftruncate)[[:space:]]*\(|filesystem::(remove|remove_all|rename|resize_file)' && bad=1
                 ;;
         esac
         # N6: the files an upload reads are only ever read
@@ -214,7 +239,65 @@ scan() {
                 report N6 "$f" "$p" 'O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND|fopen[[:space:]]*\([^)]*"[wa]b?\+?"|"r\+b?"|std::ios::out|ofstream|QIODevice::(WriteOnly|ReadWrite|Append|Truncate|NewOnly)|QFile::(remove|rename|copy)' && bad=1
                 ;;
         esac
+        # N7: no hand-made path joins in the sync modules (feature 003): only inside join_path_checked
+        case "$f" in
+            core/src/sync_runner.cpp|core/src/sync_scan.cpp|core/src/sync_planner.cpp)
+                out="$(awk '
+                    # a line that defines join_path_checked starts the exempt region; it ends with the closing brace of its body
+                    { line = $0
+                      if (!infn && line ~ /join_path_checked[[:space:]]*\(/ && line !~ /;[[:space:]]*$/) { infn = 1; depth = 0; seen = 0 }
+                      if (infn) {
+                          n = gsub(/\{/, "{", line); m = gsub(/\}/, "}", line)
+                          depth += n - m; if (n > 0) seen = 1
+                          if (seen && depth <= 0) infn = 0
+                          next
+                      }
+                      if ($0 ~ /\+[[:space:]]*"\/"|"\/"[[:space:]]*\+|\+[[:space:]]*\x27\/\x27/) print NR ":" $0
+                    }' "$p")" && [ -n "$out" ] && {
+                    printf '%s\n' "$out" | sed "s#^#N7 $f:#"; bad=1; }
+                ;;
+        esac
+        # N8: the share modules cannot log (feature 004: links and passwords are secrets, constitution IV): no log::text/log::path/log::Field, no Qt or C
+        # logging, only share.* event codes, and SecretText::reveal() only in share_api.cpp (the form encoder)
+        case "$f" in
+            core/src/share_*.cpp|core/include/pbc/share_*.h|core/src/secret_text.cpp|core/include/pbc/secret_text.h|bridge/src/share_bridge.cpp|bridge/include/share_bridge.h)
+                report N8 "$f" "$p" 'log::(text|path|Field)|(^|[^A-Za-z0-9_])(qDebug|qWarning|qInfo|qCritical)[[:space:]]*\(|std::(cerr|cout|clog)|(^|[^A-Za-z0-9_])(printf|fprintf|puts|fputs|perror)[[:space:]]*\(' && bad=1
+                out="$(grep -nE 'log::event[[:space:]]*\([[:space:]]*"' "$p" 2>/dev/null | grep -vE 'log::event[[:space:]]*\([[:space:]]*"share\.')" && {
+                    printf '%s\n' "$out" | sed "s#^#N8 $f:#"; bad=1; }
+                case "$f" in
+                    core/src/share_api.cpp|core/src/secret_text.cpp|core/include/pbc/secret_text.h) ;;
+                    *) report N8 "$f" "$p" '\.reveal[[:space:]]*\(' && bad=1 ;;
+                esac
+                ;;
+        esac
+        # N9: nothing opens a link (feature 004): no browser, no process, no shell, no URL opener in the code or the QML; the one hand-over of a
+        # downloaded local file to the reader's viewer (app/device_bridge.cpp) may use QDesktopServices::openUrl(QUrl::fromLocalFile(...)) only
+        case "$f" in
+            core/*|bridge/*|app/*|qml/*.qml)
+                report N9 "$f" "$p" 'QProcess|(^|[^A-Za-z0-9_:.>])(system|popen)[[:space:]]*\(|std::(system|popen)[[:space:]]*\(|xdg-open|openUrlExternally|Qt\.openUrl|QUrl::fromUserInput' && bad=1
+                case "$f" in
+                    app/device_bridge.cpp)
+                        out="$(grep -nE 'QDesktopServices' "$p" 2>/dev/null | grep -vE '#include <QDesktopServices>|QDesktopServices::openUrl\(QUrl::fromLocalFile\(')" && {
+                            printf '%s\n' "$out" | sed "s#^#N9 $f:#"; bad=1; }
+                        ;;
+                    *) report N9 "$f" "$p" 'QDesktopServices' && bad=1 ;;
+                esac
+                ;;
+        esac
     done < <(list_files "$root")
+    # T1: no test that CMake does not build or run (a stale test must not be claimed as passing): C++ tests only in the directories CMake globs or lists,
+    # every bridge test named in tests/CMakeLists.txt, every walk named in app/CMakeLists.txt
+    while IFS= read -r -d '' f; do
+        f="${f#"$root"/}"
+        case "$f" in
+            tests/unit/*|tests/integration/*|tests/templates/*) ;;
+            tests/bridge/*) grep -q "$(basename "$f" .cpp)" "$root/tests/CMakeLists.txt" 2>/dev/null || { echo "T1 $f: a bridge test that tests/CMakeLists.txt does not build"; bad=1; } ;;
+            *) echo "T1 $f: a test file outside the directories that CMake builds"; bad=1 ;;
+        esac
+    done < <(find "$root/tests" -name 'test_*.cpp' -print0 2>/dev/null)
+    while IFS= read -r -d '' f; do
+        grep -q "$(basename "$f")" "$root/app/CMakeLists.txt" 2>/dev/null || { echo "T1 ${f#"$root"/}: a walk that app/CMakeLists.txt does not run"; bad=1; }
+    done < <(find "$root/tests/walks" -name '*.walk' -print0 2>/dev/null)
     return $bad
 }
 
@@ -287,7 +370,7 @@ if [ "${1:-}" = "--self-test" ]; then
     for w in contact phone email book org note; do   # spec 002 FR-027: no contact data in logs
         violate core/src/a.cpp "log::text(\"$w\", v);" "R8: log key $w"
     done
-    for w in path name file filename url address server remote local etag password secret account; do   # spec 001: no file names, paths or server data in logs
+    for w in path name file filename url address server remote local rel etag password secret account; do   # spec 001: no file names, paths or server data in logs
         violate core/src/a.cpp "log::text(\"$w\", v);" "R8: log key $w"
     done
     violate core/src/a.cpp 'log::text("remote_path", v);' "R8: log key remote_path"
@@ -430,6 +513,116 @@ if [ "${1:-}" = "--self-test" ]; then
     rm -f "$tmp/core/src/upload_source.cpp" "$tmp/core/src/queue_sender.cpp" "$tmp/bridge/src/picker_bridge.cpp"
     printf 'FILE* f = fopen(p, "w");\n' > "$tmp/core/src/downloader.cpp"
     expect pass "N6: it concerns only the upload source modules"; rm "$tmp/core/src/downloader.cpp"
+    # N4/R8 in the sync modules (feature 003): no names, paths, server addresses, versions or checksums in the log
+    for m in sync_runner sync_scan sync_planner; do
+        for key in etag checksum href link; do
+            violate core/src/$m.cpp "log::text(\"$key\", v);" "N4: log key $key in $m.cpp"
+        done
+        for key in rel local_rel name path server remote_folder; do
+            violate core/src/$m.cpp "log::text(\"$key\", v);" "R8: log key $key in $m.cpp"
+        done
+        printf 'log::event("sync.compare.end", {log::count("pair", 1), log::count("plan", 2), log::count("seq", 3), log::text("reason", r), log::count("files", 4)});\n' > "$tmp/core/src/$m.cpp"
+        expect pass "N4: pair, plan, seq, reason and counts are allowed in $m.cpp"
+        rm -f "$tmp/core/src/$m.cpp"
+    done
+    # feature 003 (folder synchronization): N3 allow-list, N5 for the sync modules and the new calls, N2 and the new N7
+    violate bridge/src/plan_helper.cpp 'QTimer t;' "N3: QTimer in a bridge file other than the sync and queue bridges"
+    violate bridge/src/sync_bridge.cpp 'QBasicTimer t;' "N3: QBasicTimer in the sync bridge (only one QTimer is allowed there)"
+    violate bridge/src/sync_bridge.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the sync bridge"
+    violate bridge/src/sync_bridge.cpp 'timer_ = new QTimer(this); other_ = new QTimer(this);' "N3: a second timer in the sync bridge"
+    violate bridge/src/sync_bridge.cpp 'QTimer a; QTimer b;' "N3: two QTimer values in the sync bridge"
+    violate core/src/sync_runner.cpp 'std::this_thread::sleep_for(std::chrono::seconds(1));' "N3: sleep_for in the sync runner"
+    violate core/src/sync_scan.cpp 'sleep(1);' "N3: sleep in the sync scan"
+    violate core/src/sync_scheduler.cpp 'QTimer t;' "N3: QTimer in the sync scheduler"
+    printf 'timer_ = new QTimer(this); timer_->setSingleShot(true); int sleeping = 1;\n' > "$tmp/bridge/src/sync_bridge.cpp"
+    printf 'QTimer* timer_ = nullptr;\n' > "$tmp/bridge/include/sync_bridge.h"
+    expect pass "N3: the sync bridge may hold its one single-shot QTimer"
+    rm -f "$tmp/bridge/src/sync_bridge.cpp" "$tmp/bridge/include/sync_bridge.h"
+    for m in sync_runner sync_scan sync_planner; do
+        for call in '::unlink(p.c_str());' 'std::remove(p.c_str());' 'std::rename(a, b);' '::rmdir(d);' '::truncate(p, 0);'; do
+            violate core/src/$m.cpp "$call" "N5: $call in $m.cpp"
+        done
+    done
+    violate core/src/a.cpp '::rmdir(d.c_str());' "N5: rmdir outside the audited modules"
+    violate core/src/a.cpp '::truncate(p, 0);' "N5: truncate outside the audited modules"
+    violate core/src/a.cpp 'std::filesystem::resize_file(p, 0);' "N5: filesystem::resize_file outside the audited modules"
+    for m in local_files downloader credentials_file ca_selector curl_transport store_files store_sync; do
+        printf 'std::remove(p.c_str()); ::rename(a, b); ::unlink(c); ::rmdir(d); ::truncate(p, 0);\n' > "$tmp/core/src/$m.cpp"
+    done
+    expect pass "N5: the audited modules (also local_files.cpp for the sync) may remove, rename, rmdir and truncate"
+    for m in local_files downloader credentials_file ca_selector curl_transport store_files store_sync; do rm -f "$tmp/core/src/$m.cpp"; done
+    for m in sync_runner sync_scan sync_planner; do
+        for m2 in PUT MKCOL MOVE COPY DELETE; do
+            violate core/src/$m.cpp "req.method = \"$m2\";" "N2: write verb $m2 in $m.cpp"
+        done
+    done
+    for m in sync_runner sync_scan sync_planner; do
+        violate core/src/$m.cpp 'std::string p = root + "/" + name;' "N7: root + / + name in $m.cpp"
+        violate core/src/$m.cpp 'auto q = folder + "/" + rel;' "N7: folder + / + rel in $m.cpp"
+        violate core/src/$m.cpp 'auto q = dir + "/" + name;' "N7: dir + / + name in $m.cpp"
+        violate core/src/$m.cpp 'auto q = "/" + name;' "N7: / + name in $m.cpp"
+    done
+    printf 'std::string join_path_checked(const std::string& root, const std::string& rel) {\n    if (rel.empty()) return root;\n    return root + "/" + rel;\n}\nauto p = join_path_checked(dir, name);\nauto q = remote_join(folder, name);\nstd::string s = "a/b";\n' > "$tmp/core/src/sync_scan.cpp"
+    expect pass "N7: the join inside join_path_checked and calls to it are the allowed form"
+    printf 'std::string join_path_checked(const std::string& root, const std::string& rel);\nauto p = join_path_checked(dir, name);\n' > "$tmp/core/src/sync_runner.cpp"
+    printf 'std::string join_path_checked(const std::string& root,\n                              const std::string& rel) {\n    return root + "/" + rel;\n}\nauto x = root + "/" + name;\n' > "$tmp/core/src/sync_planner.cpp"
+    expect fail "N7: a raw join after the end of join_path_checked is found"
+    rm -f "$tmp/core/src/sync_scan.cpp" "$tmp/core/src/sync_runner.cpp" "$tmp/core/src/sync_planner.cpp"
+    printf 'std::string path = root + "/" + name;\n' > "$tmp/core/src/store_sync.cpp"
+    printf 'std::string path = root + "/" + name;\n' > "$tmp/core/src/local_files.cpp"
+    expect pass "N7: it concerns only the planner, the scan and the runner of the sync"
+    rm -f "$tmp/core/src/store_sync.cpp" "$tmp/core/src/local_files.cpp"
+    # feature 004 (share links): N2 allow-list entry for share_api.cpp, N8 (the share modules cannot log secrets), N9 (nothing opens a link)
+    mkdir -p "$tmp/core/include/pbc" "$tmp/bridge/src" "$tmp/bridge/include" "$tmp/qml" "$tmp/app"
+    for m in share_parse share_diagnose share_rules share_date secret_text; do
+        for verb in PUT DELETE; do
+            violate core/src/$m.cpp "r.method = \"$verb\";" "N2: $verb in $m.cpp (only share_api.cpp may name it for shares)"
+        done
+    done
+    violate bridge/src/share_bridge.cpp 'r.method = "DELETE";' "N2: DELETE in the share bridge"
+    for verb in PROPPATCH LOCK UNLOCK MKCOL MOVE COPY; do
+        violate core/src/share_api.cpp "r.method = \"$verb\";" "N2: $verb in share_api.cpp (it may name PUT and DELETE only)"
+    done
+    printf 'r.method = "POST"; r.method = "PUT"; r.method = "DELETE"; r.method = "GET";\n' > "$tmp/core/src/share_api.cpp"
+    expect pass "N2: share_api.cpp may name POST, PUT, DELETE and GET"; rm "$tmp/core/src/share_api.cpp"
+    for f in core/src/share_parse.cpp core/src/share_diagnose.cpp core/src/share_api.cpp core/src/share_rules.cpp core/src/share_date.cpp core/src/secret_text.cpp \
+             core/include/pbc/share_types.h core/include/pbc/secret_text.h bridge/src/share_bridge.cpp bridge/include/share_bridge.h; do
+        for lit in 'log::text("result", r);' 'log::path(p);' 'log::Field f{"a", "b"};' 'qDebug() << x;' 'qWarning() << x;' 'qInfo() << x;' 'std::cerr << x;' \
+                   'printf("%d", n);' 'fprintf(stderr, "x");' 'puts("x");' 'log::event("upload.done", {log::count("n", 1)});'; do
+            violate $f "$lit" "N8: $lit in $f"
+        done
+    done
+    printf 'log::event("share.open", {log::status(200), log::count("rows", 3)});\nint prints = 0; int logs = 1; // no log::text here would be wrong\n' > "$tmp/core/src/share_parse.cpp"
+    expect fail "N8: a comment that names log::text is still found (the rule is a plain scan; reword the comment)"
+    printf 'log::event("share.open", {log::status(200), log::count("rows", 3)});\nint prints = 0; int logs = 1;\n' > "$tmp/core/src/share_parse.cpp"
+    expect pass "N8: a share.* event with status and count fields is allowed"; rm "$tmp/core/src/share_parse.cpp"
+    printf 'log::text("result", r); log::path(p); log::event("upload.done", {log::count("n", 1)});\n' > "$tmp/core/src/queue_sender.cpp"
+    expect pass "N8: it concerns only the share modules"; rm "$tmp/core/src/queue_sender.cpp"
+    violate core/src/share_parse.cpp 'auto s = pw.reveal();' "N8: reveal() outside share_api.cpp"
+    violate bridge/src/share_bridge.cpp 'auto s = request.password.reveal();' "N8: reveal() in the share bridge"
+    printf 'const std::string& reveal() const { return value_; }\n' > "$tmp/core/include/pbc/secret_text.h"
+    printf 'auto body = form_encode({{"password", request.password.reveal()}});\n' > "$tmp/core/src/share_api.cpp"
+    expect pass "N8: reveal() is declared in secret_text.h and used by share_api.cpp"; rm "$tmp/core/include/pbc/secret_text.h" "$tmp/core/src/share_api.cpp"
+    for lit in 'QDesktopServices::openUrl(QUrl(link));' 'QProcess p;' 'system("xdg-open x");' 'popen("x", "r");' 'std::system(c);' 'QUrl u = QUrl::fromUserInput(s);' 'run("xdg-open", l);'; do
+        violate core/src/a.cpp "$lit" "N9: $lit in core"
+        violate bridge/src/a.cpp "$lit" "N9: $lit in the bridge"
+        violate app/a.cpp "$lit" "N9: $lit in the app"
+    done
+    violate qml/A.qml 'onClicked: Qt.openUrlExternally(link)' "N9: Qt.openUrlExternally in QML"
+    violate qml/A.qml 'onClicked: Qt.openUrl(link)' "N9: Qt.openUrl in QML"
+    violate app/device_bridge.cpp 'QDesktopServices::openUrl(QUrl(x));' "N9: the viewer hand-over may open a local file only"
+    printf '#include <QDesktopServices>\nreturn QDesktopServices::openUrl(QUrl::fromLocalFile(path));\nauto n = QLocale::system().name();\n' > "$tmp/app/device_bridge.cpp"
+    expect pass "N9: app/device_bridge.cpp may hand a local file to the viewer; QLocale::system() is not a shell call"; rm "$tmp/app/device_bridge.cpp"
+    printf 'std::filesystem::path p; int systems = 0; bool ecosystem() { return true; } // opens nothing\n' > "$tmp/core/src/ok9.cpp"
+    expect pass "N9: words that merely contain system are fine"; rm "$tmp/core/src/ok9.cpp"
+    mkdir -p "$tmp/tests/qml" "$tmp/tests/bridge" "$tmp/tests/walks" "$tmp/tests/unit"
+    printf 'add_executable(test_ok bridge/test_ok.cpp)\n' > "$tmp/tests/CMakeLists.txt"; printf 'tests/walks/01-a.walk\n' > "$tmp/app/CMakeLists.txt"
+    printf 'int main() {}\n' > "$tmp/tests/bridge/test_ok.cpp"; printf 'size 1 1\n' > "$tmp/tests/walks/01-a.walk"; printf 'int main() {}\n' > "$tmp/tests/unit/test_u.cpp"
+    expect pass "T1: tests that CMake builds and runs pass"
+    violate tests/qml/test_x.cpp 'int main() {}' "T1: a test file in a directory CMake does not build"
+    violate tests/bridge/test_stale.cpp 'int main() {}' "T1: a bridge test missing from tests/CMakeLists.txt"
+    violate tests/walks/02-b.walk 'size 1 1' "T1: a walk missing from app/CMakeLists.txt"
+    rm -rf "$tmp/tests" "$tmp/app/CMakeLists.txt"
     violate docs/a.md 'see /home/someone/project/file' "R5: Linux home path"
     violate docs/a.md 'see /Users/someone/project/file' "R5: macOS home path"
     violate docs/a.md 'see C:\Users\x\file' "R5: drive-letter path"

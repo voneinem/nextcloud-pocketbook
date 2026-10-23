@@ -6,6 +6,15 @@ file(GLOB PBC_QML_FILES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/qml/qmldir ${CMAKE_SOURCE_DIR}/qml/icons/*.svg)
 set(PBC_APP_SOURCES main.cpp device_bridge.cpp)
 
+# Copy of a share link to the system clipboard on the reader (specs/004-share-links R-11): OFF. DT-L2 (2026-10-23) showed that text copied in this app cannot be
+# pasted into another app (PB Office): the reader has no system clipboard. Switch it ON only for a platform that has one. The host build always has the Copy tool (the tests and the demo exercise it).
+option(PBC_DEVICE_CLIPBOARD "Offer Copy for share links on the reader (no system clipboard there: DT-L2 failed)" OFF)
+if(PBC_DEVICE_CLIPBOARD)
+    set(PBC_DEVICE_CLIPBOARD_VALUE 1)
+else()
+    set(PBC_DEVICE_CLIPBOARD_VALUE 0)
+endif()
+
 # The device probe has no Qt dependency and builds on every target.
 add_subdirectory(probe)
 
@@ -16,7 +25,7 @@ if(TARGET_TYPE STREQUAL "ARM")
     add_executable(pbcloud_app ${PBC_APP_SOURCES} ${PBC_MOC_SOURCES} ${PBC_QML_RCC})
     target_include_directories(pbcloud_app SYSTEM PRIVATE ${PBC_QT_INCLUDES})
     target_include_directories(pbcloud_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_definitions(pbcloud_app PRIVATE PLATFORM_POCKETBOOK PBC_VERSION="${PBC_VERSION}")
+    target_compile_definitions(pbcloud_app PRIVATE PLATFORM_POCKETBOOK PBC_VERSION="${PBC_VERSION}" PBC_DEVICE_CLIPBOARD=${PBC_DEVICE_CLIPBOARD_VALUE})
     # libinkview lives outside the default sysroot library directories.
     target_link_directories(pbcloud_app PRIVATE ${SYSROOT}/usr/local/lib)
     target_link_libraries(pbcloud_app PRIVATE pbc_bridge ${PBC_QT_LIBS} pthread inkview)
@@ -60,7 +69,16 @@ else()
                 ${CMAKE_SOURCE_DIR}/tests/walks/07-move-and-copy.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/08-delete.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/09-refusals.walk
-                ${CMAKE_SOURCE_DIR}/tests/walks/10-no-trash.walk)
+                ${CMAKE_SOURCE_DIR}/tests/walks/10-no-trash.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/11-folder-sync.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/12-sync-both-ways.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/13-sync-proposals.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/14-sync-upload-only.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/15-sync-limits.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/16-sync-stopped.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/17-sync-interrupted.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/18-share-links.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/19-share-limits.walk)
             set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 900)
             if(PBC_SANITIZE)
                 set_property(TEST ui_walk APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")

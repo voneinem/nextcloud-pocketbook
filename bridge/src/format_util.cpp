@@ -1,5 +1,7 @@
 #include "format_util.h"
 
+#include <QCoreApplication>
+
 QString human_size(qint64 bytes) {
     if (bytes < 0) return QString();
     if (bytes < 1024) return QStringLiteral("%1 B").arg(bytes);
@@ -30,3 +32,5 @@ QString display_safe(const std::string& name, int max_chars) {
     }
     return out;
 }
+
+QString bridge_tr(const char* english_source) { return QCoreApplication::translate("bridge", english_source); }

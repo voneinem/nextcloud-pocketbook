@@ -72,6 +72,40 @@ Added by `specs/002-manage-server-files/`. Same legend and rules as above. The e
 | LV-W11 | The status code of every refusal: quota, size, type, locked, forbidden name, missing parent, permission, also after a write behind a reverse proxy (500/502/504) | the mapping of the contract holds; note the exception classes seen | U | U |
 | LV-W12 | `207` member failures on a folder `DELETE`, `MOVE` and `COPY` | the members that failed are listed; nothing else is changed | U | U |
 
+## Folder synchronization (feature 003)
+
+Added by `specs/003-folder-sync/`. Same legend and rules as above. The expected behaviour is in
+`specs/003-folder-sync/research.md` (R-3, R-4, R-10, R-14) and its contracts.
+
+| ID | Item | Expected | Nextcloud | OpenCloud |
+|----|------|----------|-----------|-----------|
+| LV-S1 | `oc:checksums` in listings | present for files, with the algorithm per file (`SHA256:`, `SHA1:`, `MD5:`); note which server settings change it | U | U |
+| LV-S2 | ETag stability of a file across a rename and across a desktop-client sync | the file ETag does not change by a rename or by a sync that did not change content; note what does change it | U | U |
+| LV-S3 | `Depth: 1` walk of a tree of 1,000 files | time and number of requests; no truncated answers; note paging | U | U |
+| LV-S4 | A listing that fails halfway (multistatus with member errors, a cut connection) | the scan is marked incomplete and no deletion is proposed from it | U | U |
+| LV-S5 | Conditional replace of a synced file (`If-Match` with the recorded ETag) | a stale ETag gives 412 and the 002 conflict handling keeps both versions | U | U |
+| LV-S6 | Server deletion from a proposal | the file lands in the trash; `If-Match` is enforced | U | U |
+| LV-S7 | Unavailable entries inside a paired folder (no permission, encrypted) | they are listed as unavailable or not at all; the scan completes and nothing is proposed for them | U | U |
+| LV-S8 | External changes between the compare and the run | the changed entry ends `changed_during_sync` and is not transferred | U | U |
+
+## Share links (feature 004)
+
+Added by `specs/004-share-links/`. Same legend and rules as above. The expected behaviour is in
+`specs/004-share-links/research.md` (R-1 to R-9, R-20) and its contracts.
+
+| ID | Item | Expected | Nextcloud | OpenCloud |
+|----|------|----------|-----------|-----------|
+| LV-L1 | Shape of the `files_sharing` capabilities across server versions | the keys of `contracts/share-requests.md` L1 exist (`public.enabled`, `password.enforced`, `expire_date.*`, `upload`); note differences per version | U | U |
+| LV-L2 | Permission values of public links | a read-only link is `1`; a folder link with upload is `15`; a file link is `1` (or `3` when editable); note the values the server returns | U | U |
+| LV-L3 | Where the password state of a link appears in the answer | `password` and/or `share_with` is non-empty for a link with a password; the value is a hash, not the password | U | U |
+| LV-L4 | `GET .../shares/inherited` | lists the shares that reach the item from a parent folder, or answers 404/405/501 where not offered | U | U |
+| LV-L5 | `reshares=true` on `GET .../shares?path=` | includes shares made by other users that the account can see | U | U |
+| LV-L6 | The HTTP status and OCS `statuscode` of each enforcement (public links off, password enforced, expiry enforced, expiry too far, upload not allowed, item not shareable) | each is a 400/403/404 class answer that the re-read of the capabilities explains (research R-4); note the values | U | U |
+| LV-L7 | Clearing a password (`password=`) and an expiry (`expireDate=`) with empty form values | the field is cleared; note refusals when the server forces them | U | U |
+| LV-L8 | `DELETE` of an unknown share id | 404; nothing else changes | U | U |
+| LV-L9 | The host of a link behind a reverse proxy or with a configured public address | note whether it differs from the connected host (the app flags a different address) | U | U |
+| LV-L10 | Form-encoded `POST` and `PUT` bodies on `/ocs/v2.php` and `/ocs/v1.php` | both are accepted; the HTTP status mirrors the OCS status on v2 | U | U |
+
 ## Recording
 
 For every `V` or `F` add the date and one line (no addresses, no host names that identify the owner). Put

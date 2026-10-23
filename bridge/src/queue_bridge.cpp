@@ -22,6 +22,21 @@ std::string base_name(const std::string& path) { return path.substr(path.rfind('
 
 QString kind_text(pbc::ItemKind k) { return QString::fromLatin1(pbc::item_kind_text(k)); }
 
+// the server folders an item is about: where it goes, and where its source lies
+std::vector<std::string> folders_of(const std::optional<pbc::QueueItem>& item) {
+    std::vector<std::string> out;
+    if (!item) return out;
+    if (!item->dst_parent.empty()) out.push_back(item->dst_parent);
+    if (!item->src_remote.empty()) out.push_back(pbc::parent_of(item->src_remote));
+    return out;
+}
+
+std::vector<std::string> parents_of(const QStringList& remote_paths) {
+    std::vector<std::string> out;
+    for (const QString& p : remote_paths) out.push_back(pbc::parent_of(p.toStdString()));
+    return out;
+}
+
 // Why a run stopped, as the page words it (FR-013): the connection is gone, the server asks for a pause, or the account needs a new sign-in.
 QString notice_for(const std::string& key) {
     if (key == "no_connection" || key == "connection_lost" || key == "no_network" || key == "server_unreachable" || key == "timeout") return QStringLiteral("offline");
@@ -99,6 +114,12 @@ QVariantMap QueueBridge::row_map(const pbc::QueueItem& item, const std::optional
         source_changed = now.ok() && (now.value.size != *item.src_size || now.value.mtime != *item.src_mtime);
     }
     m["sourceChanged"] = source_changed;
+    // an item that a pair's sync created: the server folder of the pair, so that the Queue says where it came from
+    m["syncedBy"] = QString();
+    if (item.pair_id) {
+        if (const auto pair = c_.store->sync_pair(*item.pair_id)) m["syncedBy"] = display_safe(base_name(pair->remote_folder.empty() ? std::string("/") : pair->remote_folder), 60);
+        else m["syncedBy"] = QStringLiteral("-");
+    }
     m["canRetry"] = item.state == pbc::ItemState::Failed;
     m["canResolve"] = item.state == pbc::ItemState::Conflict || item.state == pbc::ItemState::Unknown ||
                       (item.state == pbc::ItemState::Failed && (item.reason == "name_forbidden" || item.reason == "name_exists" || item.reason == "target_gone"));
@@ -169,7 +190,7 @@ QVariantMap QueueBridge::addUploads(const QString& targetFolder, const QStringLi
     const pbc::AddResult r = actions_.add_uploads(targetFolder.toStdString(), picked);
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action({targetFolder.toStdString()});
     return result_map(r);
 }
 
@@ -225,7 +246,7 @@ QVariantMap QueueBridge::confirmFolderPick(const QString& token, const QString& 
     const pbc::AddResult r = actions_.confirm_folder_pick(pick, how);
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action({pick.target});
     return result_map(r);
 }
 
@@ -234,12 +255,13 @@ void QueueBridge::remove(int id) {
     if (!item) return;
     if (!item->upload_id.empty() && item->state != pbc::ItemState::Done && item->state != pbc::ItemState::Sending) {
         // the upload folder on the server goes first (best effort), which needs the worker
-        c_.worker->post([this, id] {
+        const std::vector<std::string> folders = folders_of(item);
+        c_.worker->post([this, id, folders] {
             make_sender({})->remove_item(id);
-            QMetaObject::invokeMethod(this, [this] {
+            QMetaObject::invokeMethod(this, [this, folders] {
                 reload();
                 emit changed();
-                note_action();
+                note_action(folders);
             }, Qt::QueuedConnection);
         });
         return;
@@ -247,7 +269,7 @@ void QueueBridge::remove(int id) {
     actions_.remove_item(id);   // an item that is being sent is refused by the store
     reload();
     emit changed();
-    note_action();
+    note_action(folders_of(item));
 }
 
 void QueueBridge::leaveScreen() {
@@ -373,10 +395,11 @@ void QueueBridge::finish_run(const pbc::SendReport& rep) {
 }
 
 void QueueBridge::sendAgain(int id) {
+    const std::vector<std::string> folders = folders_of(c_.store->queue_item(id));
     if (!make_sender({})->send_again(id).ok()) return;
     reload();
     emit changed();
-    note_action();
+    note_action(folders);
 }
 
 void QueueBridge::checkUnknown(int id) {
@@ -402,12 +425,13 @@ void QueueBridge::checkUnknown(int id) {
 }
 
 void QueueBridge::markDone(int id) {
-    c_.worker->post([this, id] {
+    const std::vector<std::string> folders = folders_of(c_.store->queue_item(id));
+    c_.worker->post([this, id, folders] {
         make_sender({})->mark_unknown_done(id);
-        QMetaObject::invokeMethod(this, [this] {
+        QMetaObject::invokeMethod(this, [this, folders] {
             reload();
             emit changed();
-            note_action();
+            note_action(folders);
         }, Qt::QueuedConnection);
     });
 }
@@ -437,10 +461,13 @@ QVariantMap QueueBridge::lastRunCounts() const {
 
 // ---- Auto Sync (research R-14): one single-shot timer, armed only by the user's own actions ----
 
-void QueueBridge::note_action() {
+void QueueBridge::note_action(const std::vector<std::string>& remote_folders) {
     if (autoSync()) pbc::log::event("autosync.arm", {});
     scheduler_.note_action(now_ms());
     evaluate_auto_sync();
+    if (c_.on_user_action)
+        for (const std::string& folder : remote_folders)   // the pairs that hold these folders may compare (they only store a plan)
+            if (!folder.empty()) c_.on_user_action(folder);
 }
 
 void QueueBridge::on_timer() { evaluate_auto_sync(); }
@@ -488,7 +515,7 @@ QVariantMap QueueBridge::answerCollision(const QString& askId, const QString& ch
     if (r.error.ok()) asks_.erase(askId);   // a refused answer (a bad name, no strong version) leaves the question open for another try
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action({ask.target_folder});
     return result_map(r);
 }
 
@@ -531,7 +558,8 @@ void QueueBridge::resolve(int id, const QString& choice, const QString& newName)
     const std::string etag = prepared_etag_.count(id) ? prepared_etag_[id] : std::string();
     const bool prepared = prepared_etag_.count(id) == 1;
     prepared_etag_.erase(id);
-    c_.worker->post([this, id, choice, name, etag, prepared] {
+    const std::vector<std::string> folders = folders_of(c_.store->queue_item(id));
+    c_.worker->post([this, id, choice, name, etag, prepared, folders] {
         const auto sender = make_sender({});
         pbc::Error err;
         if (choice == QLatin1String("keep_both")) err = sender->resolve_keep_both(id, name);
@@ -541,11 +569,11 @@ void QueueBridge::resolve(int id, const QString& choice, const QString& newName)
         else if (choice == QLatin1String("apply_anyway")) err = prepared ? sender->resolve_apply_anyway(id, etag) : pbc::make_error(pbc::ErrorClass::Protocol, "refresh_first");
         else if (choice == QLatin1String("discard") || choice == QLatin1String("skip") || choice == QLatin1String("keep_entry")) err = sender->resolve_discard(id);
         else err = pbc::make_error(pbc::ErrorClass::Protocol, "protocol_error", "unknown choice");
-        QMetaObject::invokeMethod(this, [this, id, err] {
+        QMetaObject::invokeMethod(this, [this, id, err, folders] {
             reload();
             emit changed();
             emit resolveFinished(id, err.ok() ? QString() : q(err.key));
-            if (err.ok()) note_action();
+            if (err.ok()) note_action(folders);
         }, Qt::QueuedConnection);
     });
 }
@@ -554,7 +582,7 @@ QVariantMap QueueBridge::newFolder(const QString& parent, const QString& name) {
     const pbc::AddResult r = actions_.new_folder(parent.toStdString(), name.toStdString());
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action({parent.toStdString()});
     QVariantMap m = result_map(r);
     m["exists"] = !r.error.ok() && r.error.key == "name_exists";
     return m;
@@ -564,7 +592,7 @@ QVariantMap QueueBridge::rename(const QString& remotePath, const QString& newNam
     const pbc::AddResult r = actions_.rename_entry(remotePath.toStdString(), newName.toStdString());
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action({pbc::parent_of(remotePath.toStdString())});
     QVariantMap m = result_map(r);
     m["exists"] = !r.error.ok() && r.error.key == "name_exists";
     return m;
@@ -576,7 +604,11 @@ QVariantMap QueueBridge::moveOrCopy(const QString& kind, const QStringList& remo
     const pbc::AddResult r = actions_.move_or_copy(kind == QLatin1String("copy") ? pbc::ItemKind::Copy : pbc::ItemKind::Move, paths, targetFolder.toStdString());
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) {
+        std::vector<std::string> folders = parents_of(remotePaths);
+        folders.push_back(targetFolder.toStdString());
+        note_action(folders);
+    }
     return result_map(r);
 }
 
@@ -599,6 +631,6 @@ QVariantMap QueueBridge::deleteEntries(const QStringList& remotePaths, bool conf
     const pbc::AddResult r = actions_.delete_entries(paths);
     reload();
     emit changed();
-    if (!r.queued.empty()) note_action();
+    if (!r.queued.empty()) note_action(parents_of(remotePaths));
     return result_map(r);
 }

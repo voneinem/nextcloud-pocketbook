@@ -1,0 +1,49 @@
+{
+ "ocs": {
+  "meta": {
+   "status": "ok",
+   "statuscode": 100,
+   "message": "OK"
+  },
+  "data": [
+   {
+    "id": {
+     "x": 1
+    },
+    "share_type": 3,
+    "permissions": 1
+   },
+   {
+    "id": "41",
+    "share_type": "3",
+    "permissions": "x",
+    "expiration": 12
+   },
+   {
+    "id": "-5",
+    "share_type": 3,
+    "permissions": 1
+   },
+   {
+    "id": "0",
+    "share_type": 3,
+    "permissions": 1
+   },
+   {
+    "id": "abc",
+    "share_type": 3,
+    "permissions": 1
+   },
+   "not an object",
+   7,
+   null,
+   {
+    "id": 42,
+    "share_type": 3,
+    "permissions": 1,
+    "item_type": "file",
+    "label": "ok"
+   }
+  ]
+ }
+}

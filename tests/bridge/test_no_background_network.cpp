@@ -12,7 +12,10 @@
 #include "fake_storage.h"
 #include "fake_nextcloud_server.h"
 #include "pbc/store.h"
+#include "pbc/folder_service.h"
 #include "queue_bridge.h"
+#include "share_bridge.h"
+#include "sync_bridge.h"
 #include "test_support.h"
 #include "tmp_dir.h"
 #include "transfer_bridge.h"
@@ -63,6 +66,8 @@ struct App {
     std::unique_ptr<TransferBridge> transfer;
     std::unique_ptr<BrowseBridge> browse;
     std::unique_ptr<QueueBridge> queue;
+    std::unique_ptr<SyncBridge> sync;
+    std::unique_ptr<ShareBridge> share;
     std::string picker_root;
 
     // The queue with Auto Sync's quiet period shortened to milliseconds. The reader's storage is a folder of the test.
@@ -81,6 +86,73 @@ struct App {
         q.download_root = dir.file("PBCloud");
         q.auto_sync_quiet_ms = quiet_ms;
         queue = std::make_unique<QueueBridge>(q);
+    }
+    // The sync with the pairs "Books" (start-up and Auto Sync as given) and the reader's storage as a folder of the test. Like main.cpp, the start-up
+    // comparison is connected to the end of the account check, once.
+    void make_sync(int quiet_ms, bool startup, bool auto_sync, int pairs = 1) {
+        picker_root = dir.file("root");
+        ::mkdir(picker_root.c_str(), 0700);
+        for (const char* d : {"Downloads", "Books", "Books2"}) ::mkdir((picker_root + "/" + d).c_str(), 0700);
+        SyncBridge::Config s;
+        s.store = store.get();
+        s.worker = &worker;
+        s.http = &server;
+        s.clock = &clock;
+        s.rules.root = picker_root;
+        s.download_root = dir.file("PBCloud");
+        s.wifi_up = [this] { return wifi; };
+        s.ensure_network = [this](std::function<void(bool)> done) { done(wifi); };
+        s.format_date_time = [](qint64 t) { return QString::number(t); };
+        s.storage = &storage;
+        s.downloader_options.sleep_ms = [](int) {};
+        s.auto_sync_quiet_ms = quiet_ms;
+        sync = std::make_unique<SyncBridge>(s);
+        server.add_folder("/Books");
+        server.add_file("/Books/one.epub", "first");
+        server.add_folder("/Books2");
+        server.add_file("/Books2/two.epub", "second");
+        for (int i = 0; i < pairs; ++i) {
+            QVariantMap m;
+            m["readerFolder"] = QString::fromStdString(picker_root + (i == 0 ? "/Books" : "/Books2"));
+            m["remoteFolder"] = QString::fromLatin1(i == 0 ? "/Books" : "/Books2");
+            m["startupSync"] = startup;
+            const QVariantMap added = sync->addPair(m);
+            if (!added.value("ok").toBool()) PB_FAIL_AT("addPair failed: " + added.value("errorKey").toString().toStdString());
+            auto pair = store->sync_pair(added.value("id").toLongLong());
+            pair->auto_sync = auto_sync;   // set in the store: saving through the bridge would itself arm the pair
+            if (!store->sync_pair_update(*pair).ok()) PB_FAIL_AT("sync_pair_update failed");
+        }
+        QObject::connect(connection.get(), &ConnectionBridge::startCheckFinished, sync.get(), [this](bool ok) {
+            if (ok) sync->startupCompare();
+        });
+        server.clear_log();
+    }
+    // The share bridge as main.cpp wires it: a tap may ask the system for Wi-Fi (counted in network_requests), the clipboard on. /Docs/Reports is listed and cached.
+    int network_requests = 0;
+    void make_share() {
+        ShareBridge::Config c;
+        c.store = store.get();
+        c.worker = &worker;
+        c.http = &server;
+        c.clock = &clock;
+        c.wifi_up = [this] { return wifi; };
+        c.ensure_network = [this](std::function<void(bool)> done) {
+            ++network_requests;
+            done(wifi);
+        };
+        c.clipboard_available = true;
+        share = std::make_unique<ShareBridge>(c);
+        server.add_folder("/Docs");
+        server.add_folder("/Docs/Reports");
+        pbc::FolderService fs(*store, server, clock);
+        if (!fs.load("/Docs", pbc::Fetch::Always).error.ok()) PB_FAIL_AT("cannot cache /Docs");
+        server.clear_log();
+    }
+    size_t share_requests() const {
+        size_t n = 0;
+        for (const auto& r : server.log())
+            if (r.path.find("/files_sharing/") != std::string::npos) ++n;
+        return n;
     }
     QString file(const std::string& rel, const std::string& data) {
         const std::string path = picker_root + "/" + rel;
@@ -349,6 +421,175 @@ PB_TEST(without_wifi_at_the_end_of_the_quiet_period_nothing_is_sent_and_nothing_
     idle(600);
     PB_CHECK_EQ(a.server.request_count(), size_t(0));
     PB_CHECK_EQ(a.queue->openCount(), 1);
+}
+
+// Folder sync (specs/003-folder-sync US5, FR-006, SC-005): a comparison starts at the start (after the account check, Wi-Fi already on), after the user's
+// own change once the quiet period is over, and on a tap - never otherwise. A comparison reads listings and writes nothing; only an approval transfers.
+size_t writes(const pbtest::FakeNextcloud& server) {
+    size_t n = 0;
+    for (const char* m : {"PUT", "MKCOL", "MOVE", "COPY", "DELETE", "PROPPATCH"}) n += server.count(m);
+    return n;
+}
+
+PB_TEST(folder_sync_at_start_compares_each_pair_with_the_switch_on_once_and_then_nothing_follows) {
+    App a;
+    a.sign_in();
+    a.make_sync(40, true, false, 2);
+    a.connection->checkAtStart();
+    idle(900);
+    PB_CHECK_EQ(a.server.count("PROPFIND"), size_t(2));   // one listing per pair
+    PB_CHECK_EQ(file_gets(a.server), size_t(0));
+    PB_CHECK_EQ(writes(a.server), size_t(0));
+    PB_CHECK_EQ(a.sync->readyCount(), 2);                  // the plans wait for the user
+    a.server.clear_log();
+    idle(500);
+    a.wifi = false;
+    idle(200);
+    a.wifi = true;   // a Wi-Fi that comes back, a finished comparison, an idle hour: no trigger
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+}
+
+PB_TEST(folder_sync_at_start_without_wifi_or_with_the_switch_off_sends_nothing) {
+    {
+        App a;
+        a.sign_in();
+        a.make_sync(40, true, false);
+        a.wifi = false;
+        a.connection->checkAtStart();
+        idle(600);
+        PB_CHECK_EQ(a.server.request_count(), size_t(0));
+        a.wifi = true;
+        idle(600);
+        PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    }
+    App b;
+    b.sign_in();
+    b.make_sync(40, false, true);
+    b.connection->checkAtStart();
+    idle(600);
+    PB_CHECK_EQ(b.server.count("PROPFIND"), size_t(0));   // only the account check ran
+    PB_CHECK_EQ(b.sync->readyCount(), 0);
+}
+
+PB_TEST(folder_sync_auto_sync_compares_one_pair_after_the_quiet_period_and_a_file_written_outside_the_app_is_no_trigger) {
+    App a;
+    a.sign_in();
+    a.make_sync(120, false, true, 2);
+    // a file that appears in the reader folder without the app's doing is not noticed: no watching
+    a.file("Books/dropped.epub", "from a computer");
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    // the user's own action below the server folder arms that pair only
+    a.sync->noteAction("/Books/Novels");
+    idle(40);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // the quiet period is not over
+    idle(900);
+    PB_CHECK_EQ(a.server.count("PROPFIND"), size_t(1));
+    PB_CHECK_EQ(file_gets(a.server), size_t(0));
+    PB_CHECK_EQ(writes(a.server), size_t(0));
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // once, then quiet
+}
+
+PB_TEST(folder_sync_with_the_global_auto_sync_off_or_no_wifi_at_the_end_of_the_quiet_period_compares_nothing) {
+    App a;
+    a.sign_in();
+    a.make_sync(60, false, true);
+    PB_CHECK(a.store->set_setting("auto_sync", "0").ok());
+    a.sync->noteAction("/Books/x");
+    idle(500);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK(a.store->set_setting("auto_sync", "1").ok());
+    a.sync->noteAction("/Books/x");
+    a.wifi = false;
+    idle(500);
+    a.wifi = true;
+    idle(500);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // it waited; nothing retried
+}
+
+PB_TEST(folder_sync_transfers_only_after_the_approval) {
+    App a;
+    a.sign_in();
+    a.make_sync(40, true, false);
+    a.connection->checkAtStart();
+    idle(900);
+    PB_CHECK_EQ(file_gets(a.server), size_t(0));
+    PB_CHECK_EQ(writes(a.server), size_t(0));
+    const QVariantList pairs = a.sync->pairs();
+    PB_CHECK_EQ(pairs.size(), 1);
+    const auto plan = a.store->sync_ready_plan(pairs.at(0).toMap().value("id").toLongLong());
+    PB_CHECK(plan.has_value());
+    QSignalSpy finished(a.sync.get(), &SyncBridge::runFinished);
+    PB_CHECK(a.sync->approve(static_cast<qlonglong>(*plan)).value("ok").toBool());
+    PB_CHECK(finished.wait(10000));
+    PB_CHECK_EQ(file_gets(a.server), size_t(1));
+    a.server.clear_log();
+    idle(500);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+}
+
+// ---- share links (specs/004-share-links FR-030, SC-009) ----
+
+PB_TEST(sharing_sends_nothing_at_start_while_idle_when_wifi_cycles_or_when_a_screen_is_left_and_only_taps_read) {
+    App a;
+    a.sign_in();
+    a.connection->checkAtStart();
+    idle(300);
+    a.make_share();
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // nothing from sharing at start or while idle
+    a.wifi = false;
+    idle(150);
+    a.wifi = true;
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // a Wi-Fi that comes and goes is no trigger
+    PB_CHECK(a.share->open("/Docs/Reports").value("ok").toBool());   // the tap
+    QElapsedTimer t;
+    t.start();
+    while (a.share->busy() && t.elapsed() < 10000) QTest::qWait(5);
+    PB_CHECK_EQ(a.server.request_count(), size_t(3));   // the capabilities and the two lists, once
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // the open screen asks for nothing more by itself
+    a.share->onApplicationStateChanged(Qt::ApplicationInactive);   // leaving the screen is silent too
+    a.wifi = false;
+    idle(100);
+    a.wifi = true;
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+}
+
+PB_TEST(sharing_asks_the_system_for_wifi_only_after_a_tap_and_sends_nothing_when_it_stays_off) {
+    App a;
+    a.sign_in();
+    a.make_share();
+    a.wifi = false;
+    idle(400);
+    PB_CHECK_EQ(a.network_requests, 0);   // nothing by itself: not at start, not while idle
+    PB_CHECK(a.share->open("/Docs/Reports").value("ok").toBool());   // the tap asks once ...
+    idle(300);
+    PB_CHECK_EQ(a.network_requests, 1);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // ... and with Wi-Fi still off nothing is sent
+    a.wifi = true;   // and when it comes up later nothing follows on its own
+    idle(400);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.network_requests, 1);
+}
+
+PB_TEST(the_auto_sync_timers_of_the_queue_and_the_pairs_never_start_a_sharing_request) {
+    App a;
+    a.sign_in();
+    a.make_share();
+    a.make_queue(40);
+    QSignalSpy finished(a.queue.get(), &QueueBridge::sendFinished);
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    PB_CHECK(finished.wait(10000));
+    idle(300);
+    PB_CHECK_EQ(a.share_requests(), size_t(0));
 }
 
 PB_TEST_MAIN()

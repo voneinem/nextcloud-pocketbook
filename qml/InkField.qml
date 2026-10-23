@@ -10,6 +10,7 @@ Column {
     property alias placeholderText: field.placeholderText
     property alias field: field
     property string errorText
+    property bool secretField: false   // plain text that holds a secret: no Copy or Cut, no suggestions from the keyboard (specs/004-share-links R-10)
     signal accepted()
     signal textEdited()
     signal fieldFocus(Item item, bool gained)   // the text control got or lost the focus
@@ -31,13 +32,13 @@ Column {
         height: 78
         font.pixelSize: Style.bodySize
         color: Style.ink
-        inputMethodHints: Qt.ImhNoPredictiveText
+        inputMethodHints: root.secretField ? (Qt.ImhSensitiveData | Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase) : Qt.ImhNoPredictiveText
         verticalAlignment: TextInput.AlignVCenter
         background: Rectangle { color: Style.paper; radius: Style.radiusField; border.width: Style.ruleWidth; border.color: Style.ink }
         onAccepted: root.accepted()
         onTextEdited: root.textEdited()
         onActiveFocusChanged: root.fieldFocus(field, activeFocus)
-        TextMenu { target: field }
+        TextMenu { target: field; forceSecret: root.secretField }
     }
     Text {
         objectName: "inkFieldError"

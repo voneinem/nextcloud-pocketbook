@@ -3,6 +3,37 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.4.0 - 2026-10-22
+
+Share links of files and folders (specs/004-share-links). Tested on the host against a fake Nextcloud server; nothing is verified against a real server or on a
+reader (`docs/live-server-checklist.md` LV-L1 ..., `docs/device-test-checklist.md` DT-L1 ...). No database change: nothing about sharing is stored.
+
+### Share links
+- *Select* an entry in the folder listing (or open a file's details) and tap **Share**: the public links and the shares with users and groups of the item,
+  page by page (users and groups are listed only; the app does not create, change or remove them).
+- **Create link** with an optional password, an optional expiry date and read only or, for a folder, read and upload, after a confirmation that says what the
+  link will allow. The link is shown in large letters on its own screen; **Copy** exists only where the platform has a system clipboard: not on the reader
+  (a test showed that nothing copied there reaches another app), so the link is read and typed from the large display. Change a link's password, expiry date or permission one confirmed action at a time, and remove it after a confirmation.
+- Clear messages when the server forbids public links, forces a password or an expiry date, limits the permissions or refuses an item; the controls show the
+  server's rules before you act. A change made by someone else meanwhile is never overwritten; a lost answer is an unknown outcome and is never repeated.
+- A tap on a sharing action with Wi-Fi off asks the system to bring Wi-Fi up, like the rest of the app, and goes on; if it does not come up the action says so and sends
+  nothing. The app never does this by itself.
+- Links and passwords are secrets: shown only on the screen you asked for, never in a list, a log, an error text or a file, never opened by the app; a typed
+  password is sent once and discarded. New mechanical rules N8 (the share code cannot log), N9 (nothing opens a link), U7 and U8 (the link display is plain and
+  cannot be tapped; a password entry is a secret field).
+
+## 0.3.0 - 2026-10-22
+
+Folder synchronization (specs/003-folder-sync). Tested on the host against a fake Nextcloud server; nothing is verified against a real server or on a
+reader (`docs/live-server-checklist.md`, `docs/device-test-checklist.md`).
+
+### Sync
+- Pairs of a server folder and a reader folder, download only, upload only or two-way, with limits (files and bytes) and a free-space reserve.
+- Comparisons only at start, on the button and shortly after your own change; they write nothing. You review the plan, approve it, and see the result.
+- Uploads go through the queue of 0.2.0; downloads through the download engine with the planned version required.
+- A change on both sides keeps both versions; deletions are proposals that need a confirmation naming the file; interrupted syncs are repeatable.
+- Database schema 5 (sync pairs, records, plans; extra queue and download columns). A 0.2.0 database is migrated at start.
+
 ## 0.2.0 - 2026-10-21
 
 Upload and manage files on the server (specs/002-manage-server-files). Tested on the host against a fake Nextcloud server with a write side; nothing

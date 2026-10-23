@@ -8,6 +8,9 @@
 //   touch <path>   change a file on the server, so that the next Update finds it newer
 //   lose-next-answer [METHOD [part]]   the next write is done but its answer is lost (feature 002)
 //   drop-after <bytes>   cut the next upload body longer than that; quota <bytes>; lock <path>; no-trash; ignore-conditions
+//   remove <path>  delete a file or a folder on the server (feature 003: a deletion the sync must only propose)
+//   partial <folder> [mode]   from now on the listing of that folder fails: partial (default), truncated, timeout, error; "partial <folder> off" clears
+//   ls-etag [path]  print the ETag of a path (default: the root) and of its children
 //   drop           the next download loses its connection after half of the file
 //   offline|online switch the server off and on
 //   quit
@@ -104,6 +107,32 @@ void fill_tree(pbtest::FakeNextcloud& s) {
     s.set_favorite("/Books/Moby Dick.epub", true);
     s.set_favorite("/Documents/notes.txt", true);
     s.set_quota(1500ll * 1024 * 1024, 8ll * 1024 * 1024 * 1024);
+    // share links (feature 004): a folder with a link, a user, a group and a share of another kind, and a link made by someone else
+    pbtest::FakeNextcloud::Share link;
+    link.path = "/Books";
+    link.permissions = 1;
+    link.label = "Reading list";
+    s.add_share(link);
+    pbtest::FakeNextcloud::Share user;
+    user.type = 0;
+    user.path = "/Books";
+    user.with = "bob";
+    user.with_display = "Bob Example";
+    s.add_share(user);
+    pbtest::FakeNextcloud::Share group = user;
+    group.type = 1;
+    group.with = "team";
+    group.with_display = "Team Example";
+    s.add_share(group);
+    pbtest::FakeNextcloud::Share mail = user;
+    mail.type = 4;
+    mail.with = "guest@example.org";
+    mail.with_display = "guest@example.org";
+    s.add_share(mail);
+    pbtest::FakeNextcloud::Share foreign = link;
+    foreign.owner = "carol";
+    foreign.label = "Carol's link";
+    s.add_share(foreign);
 }
 
 }  // namespace
@@ -179,6 +208,27 @@ int main(int argc, char** argv) {
             } else {
                 std::cout << "no such file: " << arg << std::endl;
             }
+        } else if (cmd == "remove" && !arg.empty()) {
+            if (fake->has(arg)) {
+                fake->remove(arg);
+                std::cout << "removed " << arg << std::endl;
+            } else {
+                std::cout << "no such path: " << arg << std::endl;
+            }
+        } else if (cmd == "partial" && !arg.empty()) {
+            std::istringstream a(arg);
+            std::string folder, mode = "partial";
+            a >> folder >> mode;
+            fake->set_listing_failure(folder, mode == "off" ? std::string() : mode);
+            std::cout << "the listing of " << folder << (mode == "off" ? " works again" : " now fails: " + mode) << std::endl;
+        } else if (cmd == "ls-etag") {
+            const std::string path = arg.empty() ? std::string("/") : arg;
+            if (!fake->has(path)) {
+                std::cout << "no such path: " << path << std::endl;
+            } else {
+                std::cout << path << " " << fake->etag_of(path) << std::endl;
+                for (const std::string& c : fake->children(path)) std::cout << "  " << c << " " << fake->etag_of(c) << std::endl;
+            }
         } else if (cmd == "drop") {
             drop_next = true;
             std::cout << "the next download will lose its connection half way" << std::endl;
@@ -207,12 +257,44 @@ int main(int argc, char** argv) {
         } else if (cmd == "no-trash") {
             fake->set_trash(false);
             std::cout << "the server has no trash now (deleting would be permanent)" << std::endl;
+        } else if (cmd == "trash") {
+            fake->set_trash(true);
+            std::cout << "the server has a trash again" << std::endl;
+        } else if (cmd == "share-rules") {   // share-rules <sharing|public|password|expiry|upload> <on|off|N>
+            std::istringstream a(arg);
+            std::string what, value;
+            a >> what >> value;
+            const bool on = value != "off";
+            if (what == "sharing") fake->set_sharing_enabled(on);
+            else if (what == "public") fake->set_public_links_enabled(on);
+            else if (what == "password") fake->set_password_enforced(on);
+            else if (what == "upload") fake->set_public_upload(on);
+            else if (what == "expiry") fake->set_expiry(on, on, std::atoi(value.c_str()) > 0 ? std::atoi(value.c_str()) : 7);
+            else {
+                std::cout << "usage: share-rules <sharing|public|password|upload> <on|off>   or   share-rules expiry <days|off>" << std::endl;
+                continue;
+            }
+            std::cout << "share rule " << what << " is now " << (value.empty() ? "on" : value) << std::endl;
+        } else if (cmd == "share-list") {   // the shares of a path (ids, kinds, permissions; no addresses)
+            const std::string path = arg.empty() ? std::string("/Books") : arg;
+            int n = 0;
+            for (int64_t id = 1000; id < 1000 + 5000; ++id) {
+                const auto* sh = fake->find_share(id);
+                if (!sh || sh->path != path) continue;
+                std::cout << "  #" << sh->id << " type " << sh->type << " perms " << sh->permissions << " owner " << sh->owner
+                          << (sh->password.empty() ? "" : " password") << (sh->expiration.empty() ? "" : " expires " + sh->expiration) << std::endl;
+                ++n;
+            }
+            std::cout << n << " shares on " << path << std::endl;
+        } else if (cmd == "unshare" && !arg.empty()) {   // removes a share behind the app's back
+            fake->remove_share(std::atoll(arg.c_str()));
+            std::cout << "removed share " << arg << std::endl;
         } else if (cmd == "ignore-conditions") {
             fake->ignore_conditions_on_assemble(true);
             std::cout << "the final MOVE of a chunked upload ignores its conditions" << std::endl;
         } else if (!cmd.empty()) {
-            std::cout << "commands: approve, touch <path>, drop, offline, online, lose-next-answer [METHOD [part]], drop-after <bytes>, quota <bytes>, "
-                         "lock <path>, no-trash, ignore-conditions, quit" << std::endl;
+            std::cout << "commands: approve, touch <path>, remove <path>, partial <folder> [mode], ls-etag [path], drop, offline, online, lose-next-answer [METHOD [part]], drop-after <bytes>, quota <bytes>, "
+                         "lock <path>, no-trash, trash, ignore-conditions, share-rules <what> <value>, share-list [path], unshare <id>, quit" << std::endl;
         }
     }
     return 0;

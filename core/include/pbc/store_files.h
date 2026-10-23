@@ -102,6 +102,12 @@ struct DownloadJournalRow {
     std::string state;                 // running | waiting | paused
     int64_t started_at = 0;
     int64_t updated_at = 0;
+    // The downloads of a folder pair (specs/003-folder-sync): the pair that records the result, the absolute folder `target_path` is relative to
+    // (empty = the download root), the checksum the file is verified against and whether the version in `expected_etag` is required (If-Match).
+    int64_t pair_id = 0;
+    std::string target_root;
+    std::string checksum;
+    bool strict = false;
 };
 
 // A "keep offline" mark (data-model.md "offline_marks"): a file, or a folder with everything below it.

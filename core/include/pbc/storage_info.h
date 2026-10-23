@@ -18,6 +18,8 @@ public:
     // The largest file that can be written there.
     virtual int64_t max_file_bytes(const std::string& path) const = 0;
     virtual bool writable(const std::string& path) const = 0;
+    // The size of the volume (the free-space reserve of a sync is a share of it); nullopt = unknown.
+    virtual std::optional<int64_t> total_bytes(const std::string&) const { return std::nullopt; }
 };
 
 class PosixStorageInfo : public StorageInfo {
@@ -27,6 +29,7 @@ public:
     std::optional<int64_t> free_bytes(const std::string& path) const override;
     int64_t max_file_bytes(const std::string& path) const override;
     bool writable(const std::string& path) const override;
+    std::optional<int64_t> total_bytes(const std::string& path) const override;
 
 private:
     bool always_fat_;

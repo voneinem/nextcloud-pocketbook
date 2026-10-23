@@ -54,6 +54,7 @@ struct Env {
     bool wifi = true;
     bool net_ok = true;       // what ensure_network answers
     int ensure_calls = 0;
+    std::vector<std::string> actions;   // the folders the bridge told about the user's own actions (specs/003-folder-sync)
     int quiet_ms = 600000;    // Auto Sync's quiet period: long, so that only the tests of Auto Sync ever see it end
     std::string root;
     std::unique_ptr<QueueBridge> queue;
@@ -100,6 +101,7 @@ struct Env {
         c.format_date_time = [](qint64 t) { return QString::number(t); };
         c.download_root = dir.file("PBCloud");
         c.auto_sync_quiet_ms = quiet_ms;
+        c.on_user_action = [this](const std::string& folder) { actions.push_back(folder); };
         queue = std::make_unique<QueueBridge>(c);
     }
     ~Env() {
@@ -942,6 +944,39 @@ PB_TEST(a_failed_upload_whose_folder_is_gone_is_given_another_target_from_the_br
     e.queue->send();
     PB_CHECK(finished.wait(20000));
     PB_CHECK(e.server.has("/Docs/Other/a.txt"));
+}
+
+PB_TEST(every_queuing_action_of_the_user_tells_the_sync_which_folder_and_nothing_else_does) {
+    Env e;
+    e.server.add_file("/Docs/a.pdf", "x");
+    e.server.add_folder("/Docs/Old");
+    e.cache("/Docs");
+    // reading, listing, a refused pick and an unknown token tell nothing
+    e.queue->items();
+    e.queue->refresh();
+    e.queue->addUploads("/Docs", {QStringLiteral("/nowhere/at/all.pdf")});
+    PB_CHECK(e.actions.empty());
+    e.queue->addUploads("/Docs", {e.file("Downloads/a2.pdf", "aaaa")});
+    PB_CHECK_EQ(e.actions.size(), size_t(1));
+    PB_CHECK_EQ(e.actions.back(), std::string("/Docs"));
+    e.queue->newFolder("/Docs", "Trips");
+    PB_CHECK_EQ(e.actions.size(), size_t(2));
+    PB_CHECK_EQ(e.actions.back(), std::string("/Docs"));
+    e.queue->newFolder("/Docs", "Old");   // exists: nothing queued
+    e.queue->newFolder("/Docs", "bad/name");
+    PB_CHECK_EQ(e.actions.size(), size_t(2));
+    e.queue->rename("/Docs/a.pdf", "b.pdf");
+    PB_CHECK_EQ(e.actions.size(), size_t(3));
+    PB_CHECK_EQ(e.actions.back(), std::string("/Docs"));
+    e.queue->deleteEntries({"/Docs/Old"}, false);   // only asking
+    PB_CHECK_EQ(e.actions.size(), size_t(3));
+    e.queue->deleteEntries({"/Docs/Old"}, true);
+    PB_CHECK_EQ(e.actions.size(), size_t(4));
+    // a send that ends starts nothing and tells nothing
+    QSignalSpy finished(e.queue.get(), &QueueBridge::sendFinished);
+    e.queue->send();
+    PB_CHECK(finished.wait(20000));
+    PB_CHECK_EQ(e.actions.size(), size_t(4));
 }
 
 PB_TEST_MAIN()

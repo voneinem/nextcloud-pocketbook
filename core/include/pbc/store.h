@@ -5,15 +5,18 @@
 // Principle III: a database with a newer schema than this build knows is refused and never modified; upgrades are
 // one-way, run in one transaction after a backup copy, and are followed by an integrity check.
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "pbc/queue_types.h"
 #include "pbc/server_caps.h"
 #include "pbc/store_files.h"
+#include "pbc/sync_types.h"
 #include "pbc/types.h"
 
 struct sqlite3;
@@ -48,7 +51,7 @@ struct SyncState {
 
 class Store {
 public:
-    static constexpr int kSchemaVersion = 4;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites; 4: the queue
+    static constexpr int kSchemaVersion = 5;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites; 4: the queue; 5: folder synchronization
 
     // Creates `dir` (mode 0700) if needed and opens `dir/pbcloud.db` (0600).
     // Errors: "schema_too_new" (the file is left untouched), "migration_failed" (rolled back, backup kept),
@@ -160,7 +163,8 @@ public:
     int queue_count_open() const;                        // every state except done
     // Queued rows of this account whose dependency (if any) is done: what a run can take.
     int queue_count_sendable(const std::string& server, const std::string& user_id) const;
-    std::optional<QueueItem> queue_next(const std::string& server, const std::string& user_id) const;   // the oldest of them
+    // the oldest of them; only_group != 0: of that group only (a sync sends its own uploads and never the user's other items)
+    std::optional<QueueItem> queue_next(const std::string& server, const std::string& user_id, int64_t only_group = 0) const;
     // Writes the fields a run or the user may change (state, step, the upload fields, reason, names, replace and ETags, depends_on, results). The
     // account, the kind and the creation time never change. A new name is validated. A row that is gone is an error.
     Error queue_update(const QueueItem& item);
@@ -192,6 +196,65 @@ public:
     std::vector<QueueItem> queue_items_for_source(const std::string& remote_path) const;
     std::vector<QueueItem> queue_items_below(const std::string& folder) const;
 
+    // ---- folder synchronization (store_sync.cpp, specs/003-folder-sync/data-model.md) ----
+    // Pairs are durable user configuration. sync_pair_add validates the bound (pair_limit: 8) and the limits (pair_limit_invalid: 1-5,000 files,
+    // 1 MiB-64 GiB) in the same transaction as the insert; the folder rules of sync_rules.h are wired in there as well.
+    // The folder rules of sync_rules.h are wired in through a validator the app sets once (it knows the picker root, the data folder and the download
+    // root): it gets the candidate and the other pairs inside the same transaction, may replace candidate.local_folder by its canonical form, and
+    // returns the error to refuse with. Without a validator only the store's own checks apply.
+    using PairValidator = std::function<Error(SyncPair& candidate, const std::vector<SyncPair>& others)>;
+    void set_pair_validator(PairValidator validator);
+    Result<int64_t> sync_pair_add(const SyncPair& pair);
+    Error sync_pair_update(const SyncPair& pair);   // folders, direction, limits and the two switches; nothing else of the row changes
+    Error sync_pair_remove(int64_t id);             // the pair's rows only (records, plans); files on both sides and queue items stay. sync_busy while it runs
+    std::vector<SyncPair> sync_pairs() const;
+    std::optional<SyncPair> sync_pair(int64_t id) const;
+    // The lock of FR-034, in one transaction: new_state is comparing or running; taken from idle, plan_ready or interrupted, else sync_busy.
+    Error sync_pair_lock(int64_t id, const std::string& new_state);
+    // Ends a lock: state is idle, plan_ready or interrupted; only a pair that is comparing or running can be unlocked.
+    Error sync_pair_unlock(int64_t id, const std::string& state, const std::string& problem_key);
+    Error sync_set_result(int64_t id, const std::string& outcome, const std::string& result_json, int64_t at);
+    // What a comparison found: the time and what the reader scan holds (shown against the limits).
+    Error sync_pair_compared(int64_t id, int64_t at, std::optional<int64_t> held_files, std::optional<int64_t> held_bytes);
+    // FR-050: pairs of another server or user get problem_key account_changed (no row is deleted); pairs of this account lose that mark.
+    // save_account and clear_account (empty arguments) call the same code in their own transaction.
+    Error sync_pairs_mark_account(const std::string& server, const std::string& user_id);
+
+    // The records (sync_files). Bounded at kSyncMaxRecords (records_full); two names that differ only by case are refused (name_collision).
+    std::optional<SyncRecord> sync_record(int64_t pair_id, const std::string& rel) const;
+    std::vector<SyncRecord> sync_records(int64_t pair_id) const;   // sorted by rel (bytes)
+    int64_t sync_record_count() const;
+    Error sync_record_put(const SyncRecord& record);
+    Error sync_record_drop(int64_t pair_id, const std::string& rel);   // idempotent
+    // One transaction: the record of a finished download of a pair is written or advanced and the journal row of the download ends (job_id > 0): both
+    // or neither (research R-3, R-7).
+    Error sync_commit_download(int64_t pair_id, const SyncRecord& record, int64_t job_id);
+    // The 001 view of a file inside a pair's server folder (research R-15): the pair folder, the reader name, the version and the size and time
+    // recorded; nullopt for a path that no pair of the current account holds or that has no record.
+    std::optional<SyncedCopy> synced_copy(const std::string& remote_path) const;
+    // The names with an open queue item that a sync created for this pair (state not done).
+    std::set<std::string> queue_sync_open_rels(int64_t pair_id) const;
+
+    // The plans. sync_plan_store supersedes the ready (and interrupted) plans of the pair, keeps at most kSyncFinalPlansKept finished ones and
+    // stores more than kSyncMaxPlanEntries entries as a header with `truncated` and no entries. All in one transaction.
+    // The id of the pair's plan that waits for the user (state ready), if there is one.
+    std::optional<int64_t> sync_ready_plan(int64_t pair_id) const;
+    // The newest plan of the pair that a kill or a cancel left interrupted; nullopt when the last run of the pair did not end that way.
+    std::optional<int64_t> sync_interrupted_plan(int64_t pair_id) const;
+    Result<int64_t> sync_plan_store(const SyncPlan& plan);
+    std::optional<SyncPlan> sync_plan(int64_t id) const;          // header and totals, no entries
+    // section: transfers (download, upload, keep_both) | skips | proposals | all; in seq order, SQL paging.
+    PlanPage sync_plan_page(int64_t plan_id, const std::string& section, int offset, int limit) const;
+    // Only download, upload and keep_both entries of a ready plan; the totals of the plan are recomputed (a removed entry counts as skipped).
+    Error sync_plan_remove_entry(int64_t plan_id, int seq, bool removed);
+    Error sync_plan_set_choice(int64_t plan_id, int seq, Choice choice);   // only a proposal; Choice::None clears; else only an allowed choice
+    Error sync_plan_state(int64_t plan_id, const std::string& state);      // enforces plan_transition_allowed
+    // The user's Cancel of a ready plan, in one transaction: the plan becomes cancelled and a pair that was plan_ready goes back to idle. Nothing else changes.
+    Error sync_plan_cancel(int64_t plan_id);
+    Error sync_entry_result(int64_t plan_id, int seq, const std::string& state, const std::string& result_key);   // planned|done|failed|skipped; recounts n_failed
+    // At start, no network: pairs in comparing or running, and plans in approved or running, become interrupted. Nothing else is touched.
+    SyncRecoveryReport sync_recover();
+
     // Test seams (the product code uses the typed methods). debug_exec returns the
     // SQLite error text ("" on success); debug_query returns the first column of the first row as text.
     std::string debug_exec(const std::string& sql);
@@ -205,8 +268,10 @@ private:
     // holds this mutex for its whole transaction, so a reader never sees a half-applied batch.
     std::optional<ServerCaps> server_caps_locked() const;   // the mutex is already held
     Error validate_queue_item(const QueueItem& item, const ServerCaps& caps) const;
+    std::vector<SyncPair> pairs_locked() const;   // the mutex is already held
     mutable std::mutex mu_;
     sqlite3* db_ = nullptr;
+    PairValidator pair_validator_;
     bool search_table_ = false;   // the temporary table of search results exists in this connection
     std::string dir_;
     Clock* clock_ = nullptr;

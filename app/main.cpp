@@ -3,6 +3,7 @@
 
 #include <sys/stat.h>
 
+#include <QClipboard>
 #include <QDir>
 #include <QFont>
 #include <QFontDatabase>
@@ -31,6 +32,8 @@
 #include "qr_image_provider.h"
 #include "settings_bridge.h"
 #include "space_bridge.h"
+#include "share_bridge.h"
+#include "sync_bridge.h"
 #ifndef PLATFORM_POCKETBOOK
 #include "ui_script.h"
 #endif
@@ -41,6 +44,7 @@
 #include "pbc/curl_transport.h"
 #include "pbc/log.h"
 #include "pbc/reader_zone.h"
+#include "pbc/share_date.h"
 #include "pbc/storage_info.h"
 #include "pbc/store.h"
 #include "pbc/tz.h"
@@ -165,6 +169,9 @@ int main(int argc, char** argv) {
     std::unique_ptr<PickerBridge> pickerBridge;
     std::unique_ptr<QueueBridge> queueBridge;
     std::unique_ptr<FolderChooserBridge> chooserBridge;
+    // (declared before the sync bridge: destroyed after it, so that the sync bridge cancels a running sync before any bridge waits for the worker)
+    std::unique_ptr<ShareBridge> shareBridge;
+    std::unique_ptr<SyncBridge> syncBridge;
     // where the downloads go: a folder the reader's library scans on the device, a throw-away folder on the host
 #ifdef PLATFORM_POCKETBOOK
     const QString download_root = QStringLiteral("/mnt/ext1/PBCloud");
@@ -263,6 +270,7 @@ int main(int argc, char** argv) {
         PickerBridge::Config pc;
         pc.store = store.get();
         pc.rules = source_rules;
+        pc.downloadRoot = download_root.toStdString();   // shown disabled when a reader folder is chosen for a pair
         // the seven folders of the attach browser of PB Notes, and this app's own download folder (so that an edited copy can be sent back)
         pc.topFolders = {QStringLiteral("Audio Books"), QStringLiteral("Downloads"), QStringLiteral("Music"), QStringLiteral("My pictures"),
                          QStringLiteral("Notes"), QStringLiteral("Photo"), QStringLiteral("screens"), QStringLiteral("PBCloud")};
@@ -278,6 +286,9 @@ int main(int argc, char** argv) {
         qc.ensure_network = cc.ensure_network;
         qc.format_date_time = tc.format_date_time;
         qc.download_root = download_root.toStdString();
+        qc.on_user_action = [&syncBridge](const std::string& path) {
+            if (syncBridge) syncBridge->noteAction(QString::fromStdString(path));   // only a pair with Auto Sync on arms anything
+        };
         queueBridge = std::make_unique<QueueBridge>(qc);
 
         FolderChooserBridge::Config fc;
@@ -288,6 +299,50 @@ int main(int argc, char** argv) {
         fc.wifi_up = cc.wifi_up;
         fc.ensure_network = cc.ensure_network;
         chooserBridge = std::make_unique<FolderChooserBridge>(fc);
+
+        // Folder synchronization (specs/003-folder-sync): the pairs. Nothing is compared or transferred at start in this version of the wiring.
+        SyncBridge::Config sbc;
+        sbc.store = store.get();
+        sbc.worker = &worker;
+        sbc.http = http.get();
+        sbc.clock = &clock;
+        sbc.rules = source_rules;
+        sbc.download_root = download_root.toStdString();
+        sbc.storage = &storage;
+        sbc.wifi_up = cc.wifi_up;
+        sbc.ensure_network = cc.ensure_network;
+        sbc.format_date_time = tc.format_date_time;
+        syncBridge = std::make_unique<SyncBridge>(sbc);
+
+        // Share links (specs/004-share-links): every request follows a tap on a sharing screen; a tap brings Wi-Fi up like in the files client (never at start, never
+        // by itself, nothing is queued). A link
+        // and a typed password live only while their screen is shown: the bridge clears them when the application is not active and when the account changes.
+        ShareBridge::Config shc;
+        shc.store = store.get();
+        shc.worker = &worker;
+        shc.http = http.get();
+        shc.clock = &clock;
+        shc.wifi_up = cc.wifi_up;
+        shc.ensure_network = cc.ensure_network;
+        shc.format_date = [zone, &tzdb](const std::string& iso_day) {
+            const auto day = pbc::parse_iso_day(iso_day);
+            if (!day) return QString::fromStdString(iso_day);
+            return QString::fromStdString(pbc::format_date(*day * 86400 + 43200, *zone, tzdb.get()));   // noon UTC, so that no zone moves the day
+        };
+        shc.set_clipboard = [](const QString& text) { QGuiApplication::clipboard()->setText(text); };
+        shc.clear_clipboard_if_equal = [](const QString& text) {
+            if (QGuiApplication::clipboard()->text() == text) QGuiApplication::clipboard()->clear();
+        };
+        // Copy is offered only where the reader has a clipboard that other apps can use. On the reader that is unmeasured (DT-L2, qml/TextMenu.qml notes that the
+        // clipboard is the app's own as far as pasting from other apps goes), so the device build has it off (PBC_DEVICE_CLIPBOARD): DT-L2 on 2026-10-23 showed that nothing copied here reaches another app.
+#ifdef PLATFORM_POCKETBOOK
+        shc.clipboard_available = PBC_DEVICE_CLIPBOARD != 0;
+#else
+        shc.clipboard_available = true;
+#endif
+        shareBridge = std::make_unique<ShareBridge>(shc);
+        QObject::connect(&app, &QGuiApplication::applicationStateChanged, shareBridge.get(), &ShareBridge::onApplicationStateChanged);
+        QObject::connect(connectionBridge.get(), &ConnectionBridge::changed, shareBridge.get(), &ShareBridge::onConnectionChanged);
     }
 
     // About screens: the manifest and the license texts live in pbcloud-licenses/ next to the app on the reader,
@@ -345,6 +400,8 @@ int main(int argc, char** argv) {
     if (pickerBridge) engine.rootContext()->setContextProperty(QStringLiteral("picker"), pickerBridge.get());
     if (queueBridge) engine.rootContext()->setContextProperty(QStringLiteral("queue"), queueBridge.get());
     if (chooserBridge) engine.rootContext()->setContextProperty(QStringLiteral("chooser"), chooserBridge.get());
+    if (syncBridge) engine.rootContext()->setContextProperty(QStringLiteral("sync"), syncBridge.get());
+    if (shareBridge) engine.rootContext()->setContextProperty(QStringLiteral("share"), shareBridge.get());
     if (connectionBridge) {
         engine.rootContext()->setContextProperty(QStringLiteral("connection"), connectionBridge.get());
         engine.addImageProvider(QStringLiteral("qr"), new QrImageProvider(connectionBridge.get()));   // the engine owns it
@@ -356,7 +413,19 @@ int main(int argc, char** argv) {
     }
     if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) device.setWindow(window);
 
-    // The one network action at start: a single check that the login still works - only when Wi-Fi is already on, never in the self-test.
+    // A run may have queued, sent or left uploads in the Queue: its screen reads the queue again.
+    if (syncBridge && queueBridge) QObject::connect(syncBridge.get(), &SyncBridge::runFinished, queueBridge.get(), [&queueBridge](const QVariantMap&) { queueBridge->refresh(); });
+
+    // The one network action at start: a single check that the login still works - only when Wi-Fi is already on, never in the self-test. The comparison of
+    // the pairs that have "Sync at start" on follows it, once, and only when that check succeeded (it only stores plans; nothing is transferred).
+    if (connectionBridge && syncBridge && !self_test) {
+        auto started = std::make_shared<bool>(false);
+        QObject::connect(connectionBridge.get(), &ConnectionBridge::startCheckFinished, syncBridge.get(), [started, &syncBridge](bool ok) {
+            if (*started) return;
+            *started = true;
+            if (ok && syncBridge) syncBridge->startupCompare();
+        });
+    }
     if (connectionBridge && !self_test) connectionBridge->checkAtStart();
 
 #ifndef PLATFORM_POCKETBOOK
@@ -389,8 +458,36 @@ int main(int argc, char** argv) {
                 }
                 delete widget;
             }
+            // a secret entry (the password of a share link) must never offer Cut or Copy: TextMenu treats a field as secret when forceSecret is set or the
+            // echo mode is not Normal (specs/004-share-links R-10)
+            {
+                struct SecretCase { const char* qml; bool secret; };
+                const SecretCase cases[] = {
+                    {"TextInput { TextMenu { objectName: \"m\"; forceSecret: true } }", true},
+                    {"TextInput { TextMenu { objectName: \"m\" } }", false},
+                    {"TextInput { echoMode: TextInput.Password; TextMenu { objectName: \"m\" } }", true},
+                };
+                for (const SecretCase& c : cases) {
+                    QQmlComponent comp(&engine);
+                    comp.setData(QByteArray("import QtQuick\n") + c.qml, QUrl(QStringLiteral("qrc:/qml/SelfTest.qml")));
+                    QObject* root = comp.isError() ? nullptr : comp.create();
+                    QObject* menu = root ? root->findChild<QObject*>(QStringLiteral("m")) : nullptr;
+                    if (!menu || menu->property("secret").toBool() != c.secret) {
+                        std::cerr << "[pbcloud] TextMenu secret check failed: " << c.qml << " " << comp.errorString().toStdString() << std::endl;
+                        ++failed;
+                    }
+                    delete root;
+                }
+            }
+#ifndef PLATFORM_POCKETBOOK
+            // the host build always offers Copy for a share link (the tests and the demo exercise it); the reader's build has it off until DT-L2
+            if (!shareBridge || !shareBridge->clipboardAvailable()) {
+                std::cerr << "[pbcloud] the host build must offer Copy for share links" << std::endl;
+                ++failed;
+            }
+#endif
             // the pages and the dialog that the queue, the picker and the chooser stand on must be in the package
-            for (const char* required : {"pages/QueuePage.qml", "pages/FolderChooserPage.qml", "pages/FilePickerPage.qml", "CollisionDialog.qml"}) {
+            for (const char* required : {"pages/QueuePage.qml", "pages/FolderChooserPage.qml", "pages/FilePickerPage.qml", "CollisionDialog.qml", "pages/SyncPage.qml", "pages/PairPage.qml", "pages/PlanPage.qml", "pages/ResultPage.qml"}) {
                 if (!QFile::exists(QStringLiteral(":/qml/") + QLatin1String(required))) {
                     std::cerr << "[pbcloud] missing from the package: " << required << std::endl;
                     ++failed;

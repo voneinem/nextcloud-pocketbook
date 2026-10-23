@@ -1,11 +1,12 @@
 # PB Cloud
 
 A **Nextcloud files client** for the PocketBook InkPad One. Browse your files page by page, download them on demand, keep
-chosen files and folders offline, open them in the reader's own viewer, and upload and manage files on your server. Built for an
+chosen files and folders offline, open them in the reader's own viewer, upload and manage files on your server, and share files and folders with
+public links. Built for an
 e-ink screen, offline first, with no background network activity: the app writes to the server only on your action.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.2.0-informational.svg)
+![Version](https://img.shields.io/badge/version-0.4.0-informational.svg)
 ![Platform: PocketBook InkPad One](https://img.shields.io/badge/platform-PocketBook%20InkPad%20One-lightgrey.svg)
 ![Status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)
 
@@ -63,6 +64,22 @@ author). It is a separate app with its own binary, launcher and data folder.
 - **Queue and Auto Sync.** The Queue screen shows what waits, what failed and why, what needs your decision. **Send** runs the queue.
   With **Auto Sync** (Settings; on by default, switchable) the queue is also sent a few seconds after your own action, when Wi-Fi is
   already on; never at start, never when Wi-Fi comes back, never again by itself after a failure.
+- **Folder sync.** *Sync* pairs a server folder with a folder on the reader, as **download only** (the default), **upload only** (for an
+  Outbox) or **two-way**. A comparison runs only at start (when Wi-Fi is already on, for pairs that have it switched on), on the **Sync**
+  button, or shortly after your own change (Auto Sync, per pair); never in the background. Every comparison ends in a **plan you review**:
+  what is downloaded, uploaded, kept in both versions or skipped. Nothing changes until you approve it, and the result is shown with
+  counts afterwards. A file changed on both sides **keeps both versions** under distinct names. **Nothing is ever deleted
+  automatically**: a file removed on one side is only a proposal, and deleting needs your confirmation naming the file (on the server it goes to the trash; on the
+  reader it cannot be recovered with this app). Every pair has a limit of files and bytes (500 files and 2 GB by default) and a reserve
+  of free space; a plan over a limit cannot be approved. An interrupted sync is finished by the next one without doubled or partial files.
+- **Share links.** *Select* an entry in a folder listing (or open a file's details) and tap **Share**. You see what is already shared: public links, and
+  shares with users and groups (listed only; this app does not create, change or remove those). **Create link** takes a read-only link or, for a
+  folder, one that also lets visitors **upload**, with an optional **password** and an optional **expiry date**, and asks for a confirmation that
+  says in plain words what the link will allow. A link is shown **in large letters** on its own screen so you can read it off or type it elsewhere;
+  **Copy** is offered only where the reader has a clipboard that other apps can use (it is off in this version on the reader, see below). You can change a
+  link's password, expiry date or permission, one confirmed action at a time, and **remove** a link after a confirmation that says the file itself is not
+  deleted. When the server forbids public links, forces a password or an expiry date, or limits the permissions, you get a plain message and a next
+  step. Nothing about sharing is queued, retried, cached or sent without your tap, and the app **never opens a link**.
 - **Clear refusals.** A full account, a name the server does not accept, a file that is too large or of a type the server refuses, a
   locked file and a revoked password each have their own message and a next step; the item stays in the queue.
 - **Storage.** Lists everything the app downloaded with sizes, removes local copies (the server is never touched), shows free space
@@ -72,7 +89,7 @@ The interface is English with a German translation (Settings > Language; texts i
 
 ## Not in this version
 
-Sharing, screens for the trash and for file versions, permanent deletion, folder synchronization, automatic upload of any kind, any
+Creating shares with users or groups, share-by-mail, notes to the recipient, QR codes for links, screens for the trash and for file versions, permanent deletion, photo auto-upload, live watching of folders, any
 background activity, several accounts, end-to-end encrypted folders (they are shown as such and cannot be opened), Talk, photo upload,
 editing documents, notifications. PB Cloud writes to the server only when you ask it to: through the queue, with a condition on
 every request, and never by itself.
@@ -98,6 +115,14 @@ certificate authority, and tap Test in Settings.
 - Server addresses, user names, file names, paths, search terms and tokens are not written to the log and not shown in error texts. The reader's libraries print the path of a book when it is opened; the launcher filters those lines out of the log.
 - Names that come from the server are never trusted as local paths: they are cleaned and checked before any file is created, and a
   link or an unexpected file in the download folder stops the download.
+- **Share links and their passwords are secrets.** A link or a password is shown as plain text only on the screen you asked for. Neither is shown in a
+  list, written to the log or an error text, stored in the database or in a file, or exported; the app never opens a link or asks the server for its page.
+  The password you type is sent **once** with the request that needs it and is then discarded: the app stores no copy of it (not even after a failed request:
+  you type it again). The memory the app controls is overwritten, but the on-screen keyboard and the interface's text fields are libraries the app cannot
+  wipe, so the honest statement is "never stored, never logged, never shown again", not "gone from every byte of RAM". The link screen clears the link when you
+  leave it, when the account changes and when the app is no longer the active one. **Copy** puts the link on the system clipboard, where other apps can read
+  it until you copy something else; the reader has no system clipboard (a test on 2026-10-23: nothing copied here could be pasted into PB Office), so **Copy is not offered on the reader**
+  (build option `PBC_DEVICE_CLIPBOARD`, off) and the link is shown in large letters for typing. On a platform with a clipboard Copy is offered.
 - Nothing is sent in the background. The app asks the server only at start (one check that the login still works, and only when
   Wi-Fi is already on) and when you tap something that needs it.
 
@@ -141,6 +166,7 @@ What is checked and what is not:
 
 ## Documentation
 
+- [specs/004-share-links/spec.md](specs/004-share-links/spec.md): share links (spec, plan, research, contracts, acceptance).
 - [specs/001-nextcloud-files-client/spec.md](specs/001-nextcloud-files-client/spec.md): what the app does and why.
 - [specs/001-nextcloud-files-client/plan.md](specs/001-nextcloud-files-client/plan.md), `research.md`, `data-model.md`, `contracts/`.
 - [.specify/memory/constitution.md](.specify/memory/constitution.md): the rules this project is held to.

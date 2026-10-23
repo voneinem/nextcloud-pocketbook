@@ -4,14 +4,16 @@ import QtQuick
 // TextInput / TextArea / TextEdit; it fills that item. A tap puts the caret there and shows the keyboard; a press-and-hold
 // selects the word under the finger and opens a bubble with Cut, Copy, Paste, Delete and Select all, and two markers can be
 // dragged to change the selection (the same look as the reader's own). The clipboard is the toolkit's (copy/cut/paste of the
-// item). A password field never offers Cut or Copy: a secret is typed or pasted in, never copied out.
+// item). A password field (or a field with forceSecret) never offers Cut or Copy: a secret is typed or pasted in, never copied out.
 // The bubble is put on the page's stage (objectName "stage" in Main.qml), above dialogs, so no form clips it.
 Item {
     id: root
     objectName: "textMenu"
     property Item target: parent
     property bool multiline: false
-    readonly property bool secret: target && target.echoMode !== undefined && target.echoMode !== 0   // TextInput.Normal = 0
+    // forceSecret: a field that shows its text in plain letters but holds a secret (the password of a share link, specs/004-share-links R-10)
+    property bool forceSecret: false
+    readonly property bool secret: forceSecret || !!(target && target.echoMode !== undefined && target.echoMode !== 0)   // TextInput.Normal = 0
     readonly property bool menuShown: menu.visible
     readonly property Item bubble: menu
 

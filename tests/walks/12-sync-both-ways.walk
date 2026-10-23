@@ -1,0 +1,54 @@
+# Folder synchronization, two-way (specs/003-folder-sync US6, US4). Run after 11-folder-sync.walk with the same server and folders: the reader folder Mirror still
+# holds the files that walk downloaded from Books, the server holds the same names, and no pair exists any more - so every name is on both sides without a record, and
+# a first sync of a two-way pair keeps both versions instead of choosing one. (The server's room and trash are restored first: walks 09 and 10 filled the account and
+# removed the trash.)
+# server quota 100000000000
+# server trash
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeSync
+waitfor syncEmpty No pairs yet
+tap syncAdd
+waitfor pairServerFolder
+tap pairServerFolder
+waitfor chooserRow
+tap chooserRow 1
+waitfor chooserPath Books
+tap chooserChoose
+waitfor pairServerFolder Books
+tap pairReaderFolder
+waitfor pickerPath
+tap pickerRow 1
+wait 500
+tap pickerChooseFolder
+waitfor pairReaderFolder Mirror
+tap pairDirection 2
+wait 300
+expect pairDirection Two-way (selected)
+shot @OUT@/110-pair-two-way.png
+tap pairSave
+waitfor dialogText can be sent to
+shot @OUT@/111-send-confirm.png
+tap footerButton 1
+waitfor syncPairRow
+# compare: nothing changes yet; the plan keeps both versions of every name that is on both sides
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planTotals kept both
+expect planKeepBothNote Both versions are kept
+expect planRowCaption Keep both
+shot @OUT@/112-plan-keep-both.png
+tap planApprove
+waitfor resultCounts kept both
+shot @OUT@/113-result-kept-both.png
+tap resultDone
+waitfor syncPairRow
+# the same sync again finds everything kept apart: nothing to transfer
+tap syncPairRow
+wait 400
+tap choiceRow 0
+waitfor planTotals skipped
+shot @OUT@/114-plan-again.png
+tap planCancel
+waitfor syncPairRow

@@ -44,8 +44,9 @@ public:
     QueueSender(Store& store, HttpTransport& http, const Clock& clock, Random& random, SourceRules rules, std::string download_root,
                 SenderOptions options = {});
 
-    // One run: the whole queue, or only the item `only` (a Retry). Blocks the caller (the worker thread).
-    SendReport run(Cancel& cancel, int64_t only = 0);
+    // One run: the whole queue, or only the item `only` (a Retry), or only the items of the group `only_group` (a sync sends its own uploads and never
+    // the user's other items; specs/003-folder-sync). Blocks the caller (the worker thread).
+    SendReport run(Cancel& cancel, int64_t only = 0, int64_t only_group = 0);
 
     // The choices for an item whose outcome is unknown (research R-7). The check and the best-effort read of the version in mark_unknown_done use the
     // network; the rest are short transactions.

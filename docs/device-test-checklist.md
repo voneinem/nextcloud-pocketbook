@@ -86,6 +86,33 @@ Added by `specs/002-manage-server-files/`. Same legend as above.
 | DT-W8 | The picker's real top level and the `PBCloud` folder | the eight folders are listed when they exist; nothing else | U | | |
 | DT-W9 | Auto Sync on a reader whose Wi-Fi is off | the queue waits and the user is told; note the experience (owner point 2 of plan.md) | U | | |
 
+## Folder synchronization (feature 003)
+
+Added by `specs/003-folder-sync/`. Same legend as above.
+
+| ID | Item | Expected | Status | Date | Value / note |
+|----|------|----------|--------|------|--------------|
+| DT-S1 | Start-up compare with Wi-Fi on and with Wi-Fi off | with Wi-Fi on one comparison per pair that has the switch on and nothing is transferred; with Wi-Fi off nothing is requested | U | | |
+| DT-S2 | Modification-time resolution and stability of FAT files (a file copied from a PC) | size and mtime of a copied file stay stable between two scans; note the resolution | U | | |
+| DT-S3 | The reader's library finds the files downloaded into a pair folder | a book downloaded into the pair folder appears in the library | U | | |
+| DT-S4 | An Outbox folder written by another PocketBook app (PB Notes export) | its files are planned as uploads and are not changed or moved by the sync | U | | |
+| DT-S5 | The free-space reserve with a nearly full card | downloads that would go below the reserve are marked and not approvable; nothing fills the card | U | | |
+| DT-S6 | Peak memory and compare time (a compare of 1,000 files; a 500 MB file transferred) | peak `VmHWM` <= 150 MB; compare <= 10 s; note both | U | | |
+| DT-S7 | Kill or battery pull during a sync | after restart the pair says "Interrupted"; a new sync gives the same final state; no partial file in the library | U | | |
+| DT-S8 | Removable storage absent while a pair points to it | the pair shows "Reader folder not available"; nothing is proposed or deleted | U | | |
+
+## Share links (feature 004)
+
+Added by `specs/004-share-links/`. Same legend and rules as above.
+
+| ID | Item | Expected | Status | Date | Build/result |
+|----|------|----------|--------|------|--------------|
+| DT-L1 | The Share tool in the select-mode panel of the folder page (six tools: Rename, Share, Move, Copy, Delete, Done) and in the details panel of a file (five tools: Download, Keep offline, Update, Open, Share) | all fit at the usual touch size; if the select-mode panel is too tight, Done becomes a top-bar action | U | | |
+| DT-L2 | Text copied in the app, pasted into another app | decides `PBC_DEVICE_CLIPBOARD` (a CMake option of `app/CMakeLists.txt`); note the result either way | O | 2026-10-23 | Owner copied a link in PB Cloud and pasted in PB Office: "the clipboard is empty". The reader has no system clipboard (PB Office records the same, DT-WR-5). `PBC_DEVICE_CLIPBOARD` is OFF; Copy is not offered on the reader |
+| DT-L3 | The link screen on sleep and on switching apps | note whether Qt reports an inactive state and whether the link is cleared | U | | |
+| DT-L4 | The Share screen with 200 shares: time from the tap to the first page, and peak memory | first page <= 5 s on Wi-Fi; peak `VmHWM` <= 150 MB; note both | U | | |
+| DT-L5 | A 120-character link at reading distance, and the plain password field with the on-screen keyboard | the whole link is legible without scrolling sideways; the keyboard shows no suggestions for the password | U | | |
+
 ## Recording
 
 For each measured value write the build version (About) and the date. Findings that change a design decision

@@ -45,5 +45,24 @@ else
 fi
 echo
 
+echo "== modification-time stability of files on the reader's storage (DT-S2, folder sync)"
+# A file the probe makes in the data directory: its size and modification time are read twice, a moment apart; folder sync decides "unchanged" from them
+# together with the records, so they must be stable on this storage. Only seconds and whole numbers are printed; no name, no path.
+mt_file="$DATADIR/.probe-mtime.$$"
+if [ -d "$DATADIR" ] && : >"$mt_file" 2>/dev/null; then
+    printf 'probe' >"$mt_file"
+    first=$(stat -c '%s %Y' "$mt_file" 2>/dev/null || echo "stat-unavailable")
+    sleep 2
+    second=$(stat -c '%s %Y' "$mt_file" 2>/dev/null || echo "stat-unavailable")
+    printf 'probe-two' >"$mt_file"
+    third=$(stat -c '%s %Y' "$mt_file" 2>/dev/null || echo "stat-unavailable")
+    echo "size and mtime, untouched for 2 s: $first -> $second ($([ "$first" = "$second" ] && echo stable || echo CHANGED))"
+    echo "after a rewrite: $third (the mtime moves by whole seconds; on FAT it is kept in 2-second steps)"
+    rm -f "$mt_file"
+else
+    echo "the data directory is not writable here; the probe was skipped."
+fi
+echo
+
 echo "== note"
 echo "QueryNetwork() (R-11) cannot be called from a shell: it is read by the app and logged as network.connect."

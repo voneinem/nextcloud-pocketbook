@@ -10,6 +10,8 @@
 
 #include <sys/stat.h>
 
+#include "pbc/sync_rules.h"
+
 #include "browse_bridge.h"
 #include "download_env.h"
 #include "fake_nextcloud_server.h"
@@ -639,6 +641,94 @@ PB_TEST(delete_is_offered_only_when_the_last_account_check_reported_a_trash) {
     PB_CHECK(e.store->save_server_caps(caps).ok());
     e.browse->refreshRows();
     PB_CHECK(!e.browse->deleteOffered());
+}
+
+// ---------------------------------------------------------------------------------------------- files a folder pair keeps (specs/003-folder-sync)
+
+namespace {
+
+// A pair for /Books with a reader folder and a recorded copy of book2.epub that matches what is on the card.
+int64_t pair_with_copy(Env& e, const std::string& rel, const std::string& etag, const std::string& content) {
+    const std::string reader = e.dir.file("Reader");
+    ::mkdir(reader.c_str(), 0700);
+    pbc::SyncPair p = pbc::default_pair(e.server.base_url(), "demo");
+    p.remote_folder = "/Books";
+    p.local_folder = reader;
+    auto r = e.store->sync_pair_add(p);
+    PB_CHECK(r.ok());
+    std::ofstream(reader + "/" + rel, std::ios::binary) << content;
+    struct stat st;
+    PB_CHECK(::stat((reader + "/" + rel).c_str(), &st) == 0);
+    pbc::SyncRecord rec;
+    rec.pair_id = r.value;
+    rec.rel = rel;
+    rec.local_rel = rel;
+    rec.origin = "download";
+    rec.server_etag = etag;
+    rec.local_size = st.st_size;
+    rec.local_mtime = st.st_mtime;
+    rec.synced_at = 1;
+    PB_CHECK(e.store->sync_record_put(rec).ok());
+    return r.value;
+}
+
+QVariantMap row_named(Env& e, const char* name) {
+    for (const QVariant& v : e.browse->rows())
+        if (v.toMap().value("name").toString() == name) return v.toMap();
+    return QVariantMap();
+}
+
+}  // namespace
+
+PB_TEST(a_file_a_pair_keeps_is_shown_as_downloaded_and_carries_the_pair) {
+    Env e;
+    e.browse->open("/Books");
+    e.settle();
+    const std::string etag = e.server.etag_of("/Books/book2.epub");
+    const int64_t pair = pair_with_copy(e, "book2.epub", etag, std::string(300, 'x'));
+    e.browse->refresh();
+    e.settle();
+    const QVariantMap row = row_named(e, "book2.epub");
+    PB_CHECK_EQ(row.value("syncedBy").toLongLong(), static_cast<qlonglong>(pair));
+    PB_CHECK_EQ(row.value("state").toString().toStdString(), std::string("downloaded"));
+    // a file of the folder with no record is not synced
+    PB_CHECK_EQ(row_named(e, "book3.epub").value("syncedBy").toLongLong(), 0LL);
+    PB_CHECK_EQ(row_named(e, "book3.epub").value("state").toString().toStdString(), std::string("not_downloaded"));
+    // a folder carries none
+    PB_CHECK_EQ(row_named(e, "Novels").value("syncedBy").toLongLong(), 0LL);
+    // the server has a newer version, and the copy was changed on the reader: the words of feature 001
+    e.server.touch_file("/Books/book2.epub", "newer on the server", 1790009999);
+    e.browse->refresh();
+    e.settle();
+    PB_CHECK_EQ(row_named(e, "book2.epub").value("state").toString().toStdString(), std::string("outdated"));
+    std::ofstream(e.dir.file("Reader/book2.epub"), std::ios::trunc) << "changed on the reader, and longer than before";
+    e.browse->refresh();
+    e.settle();
+    PB_CHECK_EQ(row_named(e, "book2.epub").value("state").toString().toStdString(), std::string("conflict"));
+}
+
+PB_TEST(a_download_of_feature_001_is_consulted_first_and_has_no_pair) {
+    Env e;
+    pair_with_copy(e, "book2.epub", "\"old\"", "x");
+    // the 001 copy of the same server path, in the download root
+    ::mkdir(e.dir.file("PBCloud").c_str(), 0700);
+    ::mkdir(e.dir.file("PBCloud/Books").c_str(), 0700);
+    std::ofstream(e.dir.file("PBCloud/Books/book2.epub")) << std::string(300, 'x');
+    pbc::LocalFile lf;
+    lf.remote_path = "/Books/book2.epub";
+    lf.local_path = "Books/book2.epub";
+    lf.size = 300;
+    struct stat st;
+    PB_CHECK(::stat(e.dir.file("PBCloud/Books/book2.epub").c_str(), &st) == 0);
+    lf.mtime = st.st_mtime;
+    lf.remote_etag = e.server.etag_of("/Books/book2.epub");
+    lf.downloaded_at = 1;
+    PB_CHECK(e.store->commit_download(lf, 0).ok());
+    e.browse->open("/Books");
+    e.settle();
+    const QVariantMap row = row_named(e, "book2.epub");
+    PB_CHECK_EQ(row.value("syncedBy").toLongLong(), 0LL);
+    PB_CHECK_EQ(row.value("state").toString().toStdString(), std::string("downloaded"));
 }
 
 PB_TEST_MAIN()

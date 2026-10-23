@@ -104,14 +104,19 @@ Error Store::save_account(const AccountRow& row) {
         st.bind_text(10, clean(row.problem_key, 64));
         if (st.step() != SQLITE_DONE) return storage_error(db_, "write_failed");
     }
+    // FR-050: the pairs of another server or user are marked in the same transaction and never used
+    if (!store_util::sync_mark_account_rows(db_, row.base_url, row.user_id)) return storage_error(db_, "write_failed");
     return tx.commit() ? Error() : storage_error(db_, "write_failed");
 }
 
 Error Store::clear_account() {
     std::lock_guard<std::mutex> lock(mu_);
+    store_util::Transaction tx(db_);
+    if (!tx.open) return storage_error(db_, "write_failed");
     std::string err;
     if (!sql::exec(db_, "DELETE FROM account; DELETE FROM server_caps;", &err)) return storage_error(db_, "write_failed");
-    return {};
+    if (!store_util::sync_mark_account_rows(db_, std::string(), std::string())) return storage_error(db_, "write_failed");   // no account: every pair is unusable
+    return tx.commit() ? Error() : storage_error(db_, "write_failed");
 }
 
 Error Store::touch_account_checked() {
@@ -504,7 +509,8 @@ Result<int64_t> Store::journal_begin(const DownloadJournalRow& row) {
     }
     std::lock_guard<std::mutex> lock(mu_);
     Stmt st(db_,
-            "INSERT INTO downloads(remote_path, target_path, expected_etag, expected_size, received, state, started_at, updated_at) VALUES(?,?,?,?,?,?,?,?)");
+            "INSERT INTO downloads(remote_path, target_path, expected_etag, expected_size, received, state, started_at, updated_at, pair_id, target_root, checksum,"
+            " strict) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)");
     if (!st.ok()) {
         out.error = storage_error(db_, "write_failed");
         return out;
@@ -518,6 +524,11 @@ Result<int64_t> Store::journal_begin(const DownloadJournalRow& row) {
     st.bind_text(6, row.state);
     st.bind_int64(7, row.started_at ? row.started_at : now);
     st.bind_int64(8, row.updated_at ? row.updated_at : now);
+    if (row.pair_id > 0) st.bind_int64(9, row.pair_id);
+    else st.bind_null(9);
+    st.bind_text(10, row.target_root);
+    st.bind_text(11, cap(row.checksum, 256));
+    st.bind_int64(12, row.strict ? 1 : 0);
     if (st.step() != SQLITE_DONE) {
         out.error = storage_error(db_, "write_failed");
         return out;
@@ -560,7 +571,8 @@ Error Store::journal_end(int64_t id) {
 std::vector<DownloadJournalRow> Store::journal() const {
     std::vector<DownloadJournalRow> out;
     std::lock_guard<std::mutex> lock(mu_);
-    Stmt st(db_, "SELECT id, remote_path, target_path, expected_etag, expected_size, received, state, started_at, updated_at FROM downloads ORDER BY id");
+    Stmt st(db_, "SELECT id, remote_path, target_path, expected_etag, expected_size, received, state, started_at, updated_at, pair_id, target_root, checksum, strict"
+                 " FROM downloads ORDER BY id");
     if (!st.ok()) return out;
     while (st.step() == SQLITE_ROW) {
         DownloadJournalRow j;
@@ -573,6 +585,10 @@ std::vector<DownloadJournalRow> Store::journal() const {
         j.state = st.text(6);
         j.started_at = st.int64(7);
         j.updated_at = st.int64(8);
+        j.pair_id = st.is_null(9) ? 0 : st.int64(9);
+        j.target_root = st.text(10);
+        j.checksum = st.text(11);
+        j.strict = st.int64(12) != 0;
         out.push_back(std::move(j));
     }
     return out;

@@ -21,6 +21,13 @@ set(PBC_CORE_SOURCES
     src/credentials_file.cpp
     src/store.cpp
     src/store_migrations.cpp
+    src/secret_text.cpp
+    src/share_rules.cpp
+    src/share_types.cpp
+    src/share_date.cpp
+    src/share_parse.cpp
+    src/share_diagnose.cpp
+    src/share_api.cpp
     src/store_state.cpp
     src/store_util.cpp
     src/log.cpp
@@ -54,10 +61,18 @@ set(PBC_CORE_SOURCES
     src/upload_session.cpp
     src/server_caps.cpp
     src/new_name.cpp
+    src/conflict_name.cpp
     src/source_walk.cpp
     src/upload_source.cpp
     src/queue_actions.cpp
     src/store_queue.cpp
+    src/sync_types.cpp
+    src/sync_rules.cpp
+    src/sync_scan.cpp
+    src/sync_planner.cpp
+    src/sync_runner.cpp
+    src/sync_scheduler.cpp
+    src/store_sync.cpp
 )
 
 # libcurl: the system package on the host (8.18.0 or newer), the bundled static build for the device.

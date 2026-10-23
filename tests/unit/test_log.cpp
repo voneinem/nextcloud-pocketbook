@@ -85,6 +85,42 @@ PB_TEST(versions_checksums_and_upload_ids_of_the_write_side_are_redacted_and_the
     }
 }
 
+PB_TEST(the_sync_events_log_counts_ids_and_reasons_only) {
+    Capture c;
+    // what the sync modules may say: a pair id, a plan id, an entry sequence number, counts and an error key (as `reason`)
+    log::event("sync.recover", {log::count("pairs", 2), log::count("plans", 1)});
+    log::event("sync.recover", {log::count("pair", 7), log::count("plan", 42), log::count("seq", 3), log::text("reason", "storage_full"), log::count("downloaded", 5)});
+    const std::string kept = c.all();
+    for (const char* ok : {"pairs=2", "plans=1", "pair=7", "plan=42", "seq=3", "reason=storage_full", "downloaded=5"}) PB_CHECK(contains(kept, ok));
+    // and whatever would name a file, a folder, a server or a version is redacted even if a careless call tried
+    Capture d;
+    log::event("sync.recover", {log::text("rel", "Books/secret.epub"), log::text("local_rel", "Books/secret (2).epub"), log::text("etag", "\"abc123\""),
+                                log::text("checksum", "SHA256:deadbeef"), log::text("name", "secret.epub"), log::text("remote_folder", "/Private"),
+                                log::text("local_folder", "/mnt/ext1/Private"), log::text("server", "https://cloud.example.org"),
+                                log::text("path", "/mnt/ext1/Private/secret.epub"), log::text("address", "cloud.example.org")});
+    const std::string out = d.all();
+    for (const char* leaked : {"secret", "abc123", "deadbeef", "Private", "cloud.example.org"}) PB_CHECK(!contains(out, leaked));
+    PB_CHECK(contains(out, "rel=[redacted]"));
+    PB_CHECK(contains(out, "local_rel=[redacted]"));
+    PB_CHECK(contains(out, "server=[redacted]"));
+    PB_CHECK(contains(out, "remote_folder=[redacted]"));
+}
+
+PB_TEST(the_share_events_log_a_status_and_counts_only_and_a_careless_call_cannot_leak_a_secret) {
+    Capture c;
+    log::event("share.open", {log::status(200), log::count("rows", 3), log::count("skipped", 1), log::count("inherited", 0)});
+    log::event("share.fail", {log::status(403), log::count("op", 1)});
+    const std::string kept = c.all();
+    for (const char* ok : {"share.open", "status=200", "rows=3", "skipped=1", "inherited=0", "share.fail", "status=403", "op=1"}) PB_CHECK(contains(kept, ok));
+    // N8 forbids these calls in the share modules; if one slipped in anyway the logger redacts what is named like a secret
+    Capture d;
+    log::event("share.create", {log::text("link", "https://cloud.example.org/s/TOKEN123"), log::text("token", "TOKEN123"), log::text("password", "Zx9-secret-pw"),
+                                log::text("url", "https://cloud.example.org/s/TOKEN123"), log::text("share_link", "https://cloud.example.org/s/TOKEN123"),
+                                log::text("new_password", "Zx9-secret-pw")});
+    const std::string out = d.all();
+    for (const char* leaked : {"TOKEN123", "Zx9-secret-pw", "cloud.example.org"}) PB_CHECK(!contains(out, leaked));
+}
+
 PB_TEST(harmless_text_fields_are_kept) {
     Capture c;
     log::event("sync.finished", {log::text("outcome", "success"), log::text("error_class", "none")});

@@ -58,6 +58,10 @@ struct QueueItem {
     std::string reason;                // an error key or a hold reason (name_exists, changed_on_server, source_gone, target_gone, no_answer)
     int64_t created_at = 0;
     int64_t updated_at = 0;
+    // specs/003-folder-sync: an item that a pair's approved plan created. The confirmation advances the pair's record (sync_rel) in its own transaction.
+    std::optional<int64_t> pair_id;
+    std::string sync_rel;              // the record the confirmation advances
+    std::string sync_role;             // "", "file", "conflict_copy", "delete"
 };
 
 struct QueuePage {

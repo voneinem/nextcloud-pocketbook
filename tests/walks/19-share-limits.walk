@@ -1,0 +1,56 @@
+# Share links when the server limits sharing (specs/004-share-links US6). Run after 18-share-links.walk with the same server: the server now forces a password,
+# forces an expiry date of at most 7 days and does not allow upload through public links. The create form says so before anything is entered, a tap on Create
+# with nothing entered is refused with the reason and marked fields, and nothing is created.
+# server share-rules password on
+# server share-rules expiry 7
+# server share-rules upload off
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderUp
+wait 400
+tap folderUp
+wait 400
+waitfor folderRow
+tap folderSelect
+wait 300
+tap folderRow 1
+wait 300
+tap folderShare
+waitfor shareRow
+tap shareCreate
+waitfor shareFormCreate
+shot @OUT@/195-share-form-rules.png
+expect shareFormPassword Required
+expect shareFormExpiry Required
+expect shareFormLimit At most 7 days
+expect shareFormPermissionRow Not allowed
+tap shareFormCreate
+wait 500
+shot @OUT@/196-share-form-refused.png
+expect shareFormMessage password
+expect shareFormMessage At most 7 days
+expect_absent dialogText
+# the password alone is not enough: the date is required as well, and a date beyond the maximum is refused with the limit stated
+tap shareFormPassword
+wait 400
+type Zx9-secret-pw
+key Return
+wait 400
+tap shareFormExpiry
+wait 400
+type 2099-01-01
+key Return
+wait 400
+tap shareFormCreate
+wait 500
+expect shareFormMessage too far
+expect shareFormMessage At most 7 days
+shot @OUT@/197-share-form-too-far.png
+tap shareFormBack
+wait 400
+tap shareBack
+wait 400
+tap folderSelectDone
+wait 300

@@ -13,13 +13,17 @@ Item {
     property var rows: picker.listDirectory(path)
     property string message: ""
     // "list" or "tile": the reader's last choice (kept by the bridge); a tap on the toggle changes and stores it
-    property string view: picker.view === "tile" ? "tile" : "list"
+    property string view: !folderMode && picker.view === "tile" ? "tile" : "list"
     property var pickData: null          // the counted folder pick that waits for the user's confirmation
     property var pickedFiles: []
     property var leftOut: []             // [{name, key}] of picks that could not be queued
     property int queuedCount: 0
     signal queued(int count, var asks)   // the questions are names that are taken: the caller asks them (nothing is queued for them yet)
     property var pendingAsks: []
+    // Folder mode (specs/003-folder-sync): choose ONE folder of the reader for a pair. Folders only, nothing is selected, nothing is queued;
+    // "Choose this folder" hands the path back. "New folder" makes one below the folder one is in.
+    property bool folderMode: false
+    signal chosen(string path)
 
     function trimSlash(p) { return p.length > 1 && p.charAt(p.length - 1) === "/" ? p.substring(0, p.length - 1) : p }
     // the top level: "Up" is not available here and the reader never sees the root of its storage
@@ -48,6 +52,7 @@ Item {
     function open(entry) {
         if (Date.now() - lastNavigation < 400) return
         message = ""
+        if (entry.disabled) { message = refusalText(entry.reason); return }
         if (entry.dir) { path = entry.path; changedFolder(); return }
         message = refusalText(picker.toggle(entry.path))
         if (message.trim().length === 0) message = ""
@@ -120,11 +125,21 @@ Item {
         confirm.open()
     }
 
-    Component.onDestruction: picker.clear()
+    function chooseThisFolder() {
+        message = ""
+        var r = picker.chooseFolder(trimSlash(path))
+        if (!r.ok) { message = refusalText(r.errorKey); return }
+        page.chosen(r.path)
+        if (page.StackView.view) page.StackView.view.pop()
+    }
+
+    Component.onCompleted: { if (folderMode) { picker.folderMode = true; reload() } }
+    Component.onDestruction: { picker.clear(); picker.folderMode = false }
 
     TopBar {
         id: topBar
-        title: qsTr("Upload to %1").arg(page.targetFolder === "/" ? qsTr("Files") : page.targetFolder.substring(page.targetFolder.lastIndexOf("/") + 1))
+        title: page.folderMode ? qsTr("Reader folder")
+            : qsTr("Upload to %1").arg(page.targetFolder === "/" ? qsTr("Files") : page.targetFolder.substring(page.targetFolder.lastIndexOf("/") + 1))
         leftItems: [ IconButton { objectName: "pickerCancel"; text: qsTr("Cancel"); icon: "chevron-left"; onClicked: { picker.clear(); page.StackView.view.pop() } } ]
         rightItems: [
             IconButton {
@@ -136,6 +151,7 @@ Item {
             // the layout toggle: shows the layout a tap switches to (a grid of squares while the list is shown, bars while tiles are shown)
             IconButton {
                 objectName: "pickerLayout"
+                visible: !page.folderMode
                 property string glyph: page.view === "list" ? "grid" : "list"
                 text: qsTr("Layout"); icon: glyph
                 onClicked: page.setView(page.view === "list" ? "tile" : "list")
@@ -159,7 +175,7 @@ Item {
         font.pixelSize: Style.captionSize
         font.bold: true
         color: Style.ink
-        text: page.selectionText()
+        text: page.folderMode ? qsTr("Choose the folder for the pair") : page.selectionText()
     }
     Text {
         id: notice
@@ -193,6 +209,8 @@ Item {
             width: list.width
             height: Style.rowHeight
             readonly property var entry: modelData
+            property string text: entry.name   // what a walk reads
+            opacity: entry.disabled ? 0.4 : 1.0
             Rectangle { anchors.fill: parent; color: Style.pressed; visible: tap.pressed }
             Icon {
                 id: mark
@@ -218,7 +236,7 @@ Item {
                     elide: Text.ElideRight
                     font.pixelSize: Style.captionSize
                     color: Style.ink
-                    text: entry.dir ? (entry.selected ? qsTr("Folder, selected with everything inside") : qsTr("Folder")) : (entry.selected ? qsTr("Selected") + "  ·  " : "") + entry.sizeText
+                    text: entry.disabled ? qsTr("Not available for a pair") : entry.dir ? (entry.selected ? qsTr("Folder, selected with everything inside") : qsTr("Folder")) : (entry.selected ? qsTr("Selected") + "  ·  " : "") + entry.sizeText
                 }
             }
             RowDivider { anchors.bottom: parent.bottom; x: 30; width: parent.width - 60 }
@@ -305,7 +323,8 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         font.pixelSize: Style.bodySize
         color: Style.ink
-        text: page.atTop ? qsTr("Nothing to browse here. None of the folders for uploads were found.")
+        text: page.folderMode ? qsTr("There are no folders in this one. Use New folder to make one.")
+            : page.atTop ? qsTr("Nothing to browse here. None of the folders for uploads were found.")
                          : qsTr("This folder is empty or cannot be read.")
     }
 
@@ -321,9 +340,24 @@ Item {
         anchors.bottom: parent.bottom
         tools: [
             ToolButton {
+                objectName: "pickerChooseFolder"
+                text: qsTr("Choose this folder")
+                icon: "check"
+                visible: page.folderMode
+                onClicked: page.chooseThisFolder()
+            },
+            ToolButton {
+                objectName: "pickerNewFolder"
+                text: qsTr("New folder")
+                icon: "plus-circle"
+                visible: page.folderMode
+                onClicked: newFolder.open("")
+            },
+            ToolButton {
                 objectName: "pickerUpload"
                 text: qsTr("Upload")
                 icon: "send"
+                visible: !page.folderMode
                 enabled: picker.hasSelection
                 onClicked: page.upload()
             },
@@ -331,13 +365,14 @@ Item {
                 objectName: "pickerAddFolder"
                 text: page.folderSelected() ? qsTr("Remove this folder") : qsTr("Add this folder")
                 icon: page.folderSelected() ? "minus-circle" : "plus-circle"
-                visible: !page.atTop
+                visible: !page.atTop && !page.folderMode
                 onClicked: page.toggleThisFolder()
             },
             ToolButton {
                 objectName: "pickerTarget"
                 text: qsTr("Target folder")
                 icon: "folder"
+                visible: !page.folderMode
                 onClicked: {
                     var chooserPage = page.StackView.view.push(Qt.resolvedUrl("FolderChooserPage.qml"), { startPath: page.targetFolder })
                     chooserPage.chosen.connect(function (path) { page.targetFolder = path })
@@ -347,6 +382,7 @@ Item {
                 objectName: "pickerClear"
                 text: qsTr("Clear")
                 icon: "close"
+                visible: !page.folderMode
                 enabled: picker.hasSelection
                 onClicked: { picker.clear(); page.message = ""; page.reload() }
             }
@@ -373,5 +409,18 @@ Item {
         showCancel: false
         onAccepted: page.done()
         onRejected: page.done()
+    }
+
+    TextEntryDialog {
+        id: newFolder
+        objectName: "pickerNewFolderEntry"
+        title: qsTr("New folder")
+        acceptText: qsTr("Add")
+        onAccepted: function (text) {
+            var r = picker.createFolder(page.trimSlash(page.path), text)
+            if (!r.ok) { errorText = Problems.title(r.errorKey) + " " + Problems.action(r.errorKey); return }
+            close()
+            page.reload()
+        }
     }
 }

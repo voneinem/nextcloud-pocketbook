@@ -1,0 +1,1 @@
+{"ocs":{"meta":{"status":"ok","statuscode":100,"message":"OK"},"data":{"capabilities":{"files_sharing":{"api_enabled":"yes","public":{"enabled":1,"password":{"enforced":"true","enforced_for":"all"},"expire_date":{"enabled":true,"days":"7","enforced":true},"upload":null},"resharing":[true]}}}}}

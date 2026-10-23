@@ -327,6 +327,7 @@ void ConnectionBridge::checkAtStart() {
             problem_ = error.ok() ? QString() : q(error.key);
             load_account();
             emit changed();
+            emit startCheckFinished(error.ok());
         }, Qt::QueuedConnection);
     });
 }

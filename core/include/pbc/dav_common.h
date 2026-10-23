@@ -58,7 +58,10 @@ public:
 
     // One request. The credentials go to the transport (Request::username/password), never into the URL. `cap` limits the answer in memory.
     // The HTTP Date header of an answer is remembered (last_server_time).
-    Response send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap = 8ll << 20);
+    // `total_timeout_s` 0 = the transport's default; `secret_body`: the body holds a secret (a share link password): the copy in the request is
+    // overwritten after the call (the caller wipes its own string).
+    Response send(const std::string& method, const std::string& url, const std::string& body, const Headers& headers, long long cap = 8ll << 20,
+                  long total_timeout_s = 0, bool secret_body = false);
 
     // One request whose body is a range of a file (an upload or one chunk of it): like send(), with Request::body_file/offset/length and a
     // progress callback that can cancel. The URL must lie on this session's origin; any other address sends nothing and answers status 0.

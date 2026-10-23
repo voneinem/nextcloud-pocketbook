@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Lists every text that the QML files pass to qsTr() (the source strings of the interface), one per line, in a stable order.
+"""Lists every text that the QML files pass to qsTr() and every text a bridge produces with bridge_tr() (the source strings of the interface), one per line,
+in a stable order.
 
     scripts/extract-strings.py            print the strings, escaped like qml/strings_de.tsv (\\n, \\t, \\\\)
     scripts/extract-strings.py --check    compare with qml/strings_de.tsv: missing entries, stale entries, placeholders that do not match
@@ -55,6 +56,10 @@ def unescape_tsv(text: str) -> str:
     return "".join(out)
 
 
+# the texts a bridge produces itself: bridge_tr("...") in bridge/src (format_util.h); C++ string literals, escaped like JavaScript for this purpose
+BRIDGE_CALL = re.compile(r'bridge_tr\(\s*("(?:[^"\\]|\\.)*")\s*\)')
+
+
 def sources():
     found, unsupported = {}, []
     for path in sorted(QML.rglob("*.qml")):
@@ -63,6 +68,10 @@ def sources():
             if m.group(2) == "+":
                 unsupported.append(f"{path.relative_to(ROOT)}: {m.group(1)[:60]}")
                 continue
+            found.setdefault(unescape_js(m.group(1)), path.relative_to(ROOT).as_posix())
+    for path in sorted((ROOT / "bridge" / "src").glob("*.cpp")):
+        text = path.read_text(encoding="utf-8")
+        for m in BRIDGE_CALL.finditer(text):
             found.setdefault(unescape_js(m.group(1)), path.relative_to(ROOT).as_posix())
     return found, unsupported
 

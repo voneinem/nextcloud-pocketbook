@@ -63,6 +63,7 @@ struct Env {
         c.rules.root = root;
         c.rules.deny = {root + "/system/pbcloud"};
         c.topFolders = {"Audio Books", "Downloads", "Music", "My pictures", "Notes", "Photo", "screens", "PBCloud"};
+        c.downloadRoot = root + "/PBCloud";
         picker = std::make_unique<PickerBridge>(c);
     }
     QStringList names(const QString& path) {
@@ -229,6 +230,97 @@ PB_TEST(clear_empties_the_selection) {
     PB_CHECK_EQ(e.picker->fileCount(), 0);
     PB_CHECK_EQ(e.picker->folderCount(), 0);
     PB_CHECK_EQ(e.picker->byteCount(), 0LL);
+}
+
+// ------------------------------------------------------------------------------------------------ folder mode (specs/003-folder-sync)
+
+PB_TEST(folder_mode_lists_folders_only_without_hidden_entries_or_links) {
+    Env e;
+    PB_CHECK(!e.picker->folderMode());
+    e.picker->setFolderMode(true);
+    PB_CHECK(e.picker->folderMode());
+    PB_CHECK_EQ(e.names(e.p("Downloads")).join(",").toStdString(), std::string("Series"));   // book.epub and .hidden are not listed
+    PB_CHECK(::symlink("/etc", (e.root + "/Downloads/LinkToEtc").c_str()) == 0);
+    mkdirs(e.root + "/Downloads/.hiddenfolder");
+    PB_CHECK_EQ(e.names(e.p("Downloads")).join(",").toStdString(), std::string("Series"));
+    // the root lists every folder, not only the standard top folders, so that a folder the user made there can be found
+    const QStringList top = e.names(e.picker->rootDirectory());
+    PB_CHECK(top.contains("Other") && top.contains("Downloads") && top.contains("system"));
+    for (const QVariant& v : e.picker->listDirectory(e.picker->rootDirectory())) PB_CHECK(v.toMap().value("dir").toBool());
+    e.picker->setFolderMode(false);   // and back to the normal browser
+    PB_CHECK_EQ(e.names(e.p("Downloads")).join(",").toStdString(), std::string("Series,book.epub"));
+}
+
+PB_TEST(folder_mode_shows_the_data_folder_and_the_download_folder_disabled_with_the_reason) {
+    Env e;
+    e.picker->setFolderMode(true);
+    QVariantMap pbcloud, data;
+    for (const QVariant& v : e.picker->listDirectory(e.picker->rootDirectory()))
+        if (v.toMap().value("name").toString() == "PBCloud") pbcloud = v.toMap();
+    for (const QVariant& v : e.picker->listDirectory(e.p("system")))
+        if (v.toMap().value("name").toString() == "pbcloud") data = v.toMap();
+    PB_CHECK(pbcloud.value("disabled").toBool());
+    PB_CHECK_EQ(pbcloud.value("reason").toString().toStdString(), std::string("pair_folder_forbidden"));
+    PB_CHECK(data.value("disabled").toBool());
+    PB_CHECK_EQ(data.value("reason").toString().toStdString(), std::string("pair_folder_forbidden"));
+    // an ordinary folder is not disabled
+    for (const QVariant& v : e.picker->listDirectory(e.p("Downloads"))) PB_CHECK(!v.toMap().value("disabled").toBool());
+    // what is inside them is not browsed
+    PB_CHECK(e.picker->listDirectory(e.p("system/pbcloud")).isEmpty());
+}
+
+PB_TEST(folder_mode_refuses_to_select_a_file) {
+    Env e;
+    e.picker->setFolderMode(true);
+    PB_CHECK_EQ(e.picker->toggle(e.p("Downloads/book.epub")).toStdString(), std::string("source_not_allowed"));
+    PB_CHECK_EQ(e.picker->fileCount(), 0);
+}
+
+PB_TEST(choose_folder_answers_for_the_pair_page_without_touching_the_selection) {
+    Env e;
+    e.picker->setFolderMode(true);
+    const QVariantMap ok = e.picker->chooseFolder(e.p("Downloads/Series"));
+    PB_CHECK(ok.value("ok").toBool());
+    PB_CHECK_EQ(ok.value("path").toString().toStdString(), e.root + "/Downloads/Series");
+    PB_CHECK_EQ(ok.value("errorKey").toString().toStdString(), std::string());
+    PB_CHECK_EQ(e.picker->fileCount() + e.picker->folderCount(), 0);
+    PB_CHECK_EQ(e.picker->chooseFolder(e.picker->rootDirectory()).value("errorKey").toString().toStdString(), std::string("pair_folder_forbidden"));
+    PB_CHECK_EQ(e.picker->chooseFolder(e.p("PBCloud")).value("errorKey").toString().toStdString(), std::string("pair_folder_forbidden"));
+    PB_CHECK_EQ(e.picker->chooseFolder(e.p("system")).value("errorKey").toString().toStdString(), std::string("pair_folder_forbidden"));   // contains the data folder
+    PB_CHECK_EQ(e.picker->chooseFolder(QStringLiteral("/etc")).value("errorKey").toString().toStdString(), std::string("source_not_allowed"));
+    PB_CHECK_EQ(e.picker->chooseFolder(e.p("Downloads/book.epub")).value("errorKey").toString().toStdString(), std::string("source_not_allowed"));   // a file
+    PB_CHECK_EQ(e.picker->chooseFolder(e.p("Nowhere")).value("errorKey").toString().toStdString(), std::string("reader_folder_missing"));
+}
+
+PB_TEST(new_folder_creates_one_folder_through_the_core_and_refuses_what_the_core_refuses) {
+    Env e;
+    e.picker->setFolderMode(true);
+    const QVariantMap made = e.picker->createFolder(e.p("Downloads"), QStringLiteral("Outbox"));
+    PB_CHECK(made.value("ok").toBool());
+    PB_CHECK_EQ(made.value("path").toString().toStdString(), e.root + "/Downloads/Outbox");
+    PB_CHECK_EQ(e.names(e.p("Downloads")).join(",").toStdString(), std::string("Outbox,Series"));
+    struct stat st;
+    PB_CHECK(::stat((e.root + "/Downloads/Outbox").c_str(), &st) == 0 && S_ISDIR(st.st_mode));
+    PB_CHECK_EQ(e.picker->createFolder(e.p("Downloads"), QStringLiteral("outbox")).value("errorKey").toString().toStdString(), std::string("name_exists"));
+    for (const char* bad : {"..", "a/b", ".hidden", "", "CON"})
+        PB_CHECK_EQ(e.picker->createFolder(e.p("Downloads"), QString::fromUtf8(bad)).value("errorKey").toString().toStdString(), std::string("name_forbidden"));
+    PB_CHECK_EQ(e.picker->createFolder(QStringLiteral("/etc"), QStringLiteral("Outbox")).value("errorKey").toString().toStdString(), std::string("source_not_allowed"));
+    PB_CHECK_EQ(e.picker->createFolder(e.p("system/pbcloud"), QStringLiteral("Outbox")).value("errorKey").toString().toStdString(), std::string("source_not_allowed"));
+    PB_CHECK_EQ(e.names(e.p("Downloads")).join(",").toStdString(), std::string("Outbox,Series"));   // nothing else appeared
+}
+
+PB_TEST(browsing_in_folder_mode_changes_nothing_on_the_card) {
+    Env e;
+    e.picker->setFolderMode(true);
+    auto count = [&]() {
+        int n = 0;
+        for (const char* d : {"", "Downloads", "Downloads/Series", "system", "PBCloud", "Notes"}) n += static_cast<int>(e.picker->listDirectory(e.p(d)).size());
+        return n;
+    };
+    const int before = count();
+    for (int i = 0; i < 3; ++i) PB_CHECK_EQ(count(), before);
+    PB_CHECK(e.picker->chooseFolder(e.p("Downloads")).value("ok").toBool());
+    PB_CHECK_EQ(count(), before);
 }
 
 PB_TEST_MAIN()

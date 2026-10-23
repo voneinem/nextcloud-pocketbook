@@ -11,6 +11,16 @@ Item {
 
     function reload() { info = transfer.details(remotePath) }
     function mine() { return transfer.jobPath === remotePath }
+    // Share (specs/004-share-links): the same as in select mode of the folder page
+    function openShare() {
+        var r = share.open(remotePath)
+        if (r.errorKey === "busy" || r.errorKey === "share_item_gone") {
+            shareFail.text = Problems.title(r.errorKey) + " " + Problems.action(r.errorKey)
+            shareFail.open()
+            return
+        }
+        page.StackView.view.push(Qt.resolvedUrl("SharePage.qml"))
+    }
     function jobActive() { return mine() && transfer.jobBusy }
     function failedText() {
         var key = transfer.jobError
@@ -62,6 +72,14 @@ Item {
             InkRow { objectName: "detailsOnReader"; text: qsTr("On the reader"); value: info.onReader ? qsTr("Yes") : qsTr("No") }
             InkRow { objectName: "detailsState"; visible: info.kind === "file"; text: qsTr("State"); value: EntryWords.stateWord(info.state) }
             InkRow { objectName: "detailsKept"; visible: info.kind === "file"; text: qsTr("Kept offline"); value: info.kept ? qsTr("Yes") : qsTr("No") }
+            InkRow {
+                objectName: "detailsSynced"
+                visible: info.syncedBy > 0
+                text: qsTr("Managed by Sync")
+                value: qsTr("Pair")
+                chevron: true
+                onClicked: page.StackView.view.push(Qt.resolvedUrl("SyncPage.qml"))
+            }
             InkRow {
                 objectName: "detailsServer"
                 visible: info.onReader === true
@@ -117,7 +135,7 @@ Item {
                 objectName: "detailsDownload"
                 text: info.onReader ? qsTr("Download again") : qsTr("Download")
                 icon: "download"
-                visible: info.kind === "file" && info.available !== false && !page.jobActive()
+                visible: info.kind === "file" && info.available !== false && !page.jobActive() && !(info.syncedBy > 0)
                 enabled: !transfer.jobBusy && (!info.onReader || info.serverNewer === true || info.localChanged === true)
                 onClicked: page.startDownload()
             },
@@ -125,7 +143,7 @@ Item {
                 objectName: "detailsKeep"
                 text: info.kept ? qsTr("Kept offline") : qsTr("Keep offline")
                 icon: info.kept ? "check" : "download"
-                visible: info.kind === "file" && info.available !== false && !page.jobActive()
+                visible: info.kind === "file" && info.available !== false && !page.jobActive() && !(info.syncedBy > 0)
                 enabled: !info.kept || info.keptDirect === true
                 onClicked: { transfer.setKept(page.remotePath, "file", !info.keptDirect); page.reload() }
             },
@@ -143,6 +161,13 @@ Item {
                 icon: "eye"
                 visible: info.canOpen === true && !page.jobActive()
                 onClicked: transfer.open(page.remotePath)
+            },
+            ToolButton {
+                objectName: "detailsShare"
+                text: qsTr("Share")
+                icon: "share"
+                visible: info.kind === "file" && !page.jobActive()
+                onClicked: page.openShare()
             },
             ToolButton {
                 objectName: "detailsResume"
@@ -172,5 +197,12 @@ Item {
         text: qsTr("This file is %1. Downloading it can take a long time and uses the battery. Download it?").arg(sizeText)
         acceptText: qsTr("Download")
         onAccepted: transfer.download(page.remotePath, true)
+    }
+
+    ConfirmDialog {
+        id: shareFail
+        objectName: "shareFailDialog"
+        title: qsTr("Share")
+        showCancel: false
     }
 }
