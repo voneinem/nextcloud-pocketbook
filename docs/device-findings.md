@@ -65,3 +65,37 @@ rests on and is therefore **unverified** (items DT-W1 ... DT-W9 in `docs/device-
 - A chunk of 10 MiB streams without memory growth; the checksum pass over a 500 MB file is fast enough on the card (DT-W3, DT-W4).
 - The reader's real storage shows the folders the picker lists, and the download folder `PBCloud` is among them (DT-W8).
 - Auto Sync on a reader whose Wi-Fi is off leaves the queue waiting and says so (DT-W9).
+
+## Starting one app from another with text (observed 2026-10-23, InkPad One, hand-off probe)
+
+Observed with `pbc-handoff.bin` and `pbcloud-handoff-target.app` (INSTALL.md, "Hand-off probe"); the target was a stand-in script, **not PB Office**. The texts were fixed
+test strings. Source: `system/pbcloud/handoff-probe.txt`.
+
+- `OpenBook(<path of an .app>, "<text>", 0)` starts that file as an application and the text arrives as **one** argument (`$1`, `argc=1`), unchanged: spaces, quotes,
+  non-ASCII letters and the euro sign intact. `OpenBook2(<path>, argc, argv, 0)` delivers each argument as given, including one with a line break.
+- 1500 bytes in one argument arrived completely (no limit found up to that size).
+- The call returns 0 at once; the target starts within about a second; its parent process is `init` and its working directory is `/`; `$0` is the path of the .app.
+- The calling app **keeps running**: it receives EVT_BACKGROUND (152) and, after the target ended, EVT_FOREGROUND (151). It is not closed by the hand-off.
+- The system's own log lines about the call name only the path of the started app (`iv_OpenBook filename = [<path>]`, `task_findbybook`, `task_findbyappname`),
+  not the text; the launcher's log filter removes those lines anyway.
+- **Not measured:** a real, long-running target such as PB Office; what happens when the target is **already running** (the log shows the system looks the app up
+  by name, `task_findbyappname`, so a second start may switch to the running instance and the text may not arrive); the state of the caller after the user leaves
+  the target; the length limit above 1500 bytes. While the target runs, its arguments are visible in its process list entry, so a launcher must not print or log
+  them and should pass the text on in a way that is not a command-line argument of a long-running program.
+
+### Handing text to the real PB Office 0.4.0 (observed 2026-10-23 and 2026-10-24, InkPad One, box D of the probe)
+
+Box D calls `OpenBook2("/mnt/ext1/applications/pboffice.app", 5, {"pbo-mail-v1", "text=…", "textlen=…", "subject=…", "to=…"}, 0)` with a fixed test text of 110 bytes
+(contract v1 of PB Office, `specs/003-receive-shared-text/contracts/handoff-contract.md`). Nothing is sent by PB Office; the result is a draft.
+
+- **PB Office not running (cold start): works, twice.** The call returns 0, PB Office starts and opens a new message with the text, subject and recipient. Its log
+  has `handoff.received text_chars=105` and `handoff.drafted count=1`; the folder `system/pboffice/handoff/` is empty afterwards; the test marker appears in no log
+  and no probe file.
+- **After the user leaves PB Office:** Back shows PB Office's main screen, not the caller; Home shows the caller (the probe screen) again. The caller received
+  EVT_BACKGROUND at the call and EVT_FOREGROUND when it was shown again. Judged acceptable by the owner.
+- **PB Office already running (case without a request listener in PB Office 0.4.0): not delivered, and the sender can tell.** `OpenBook2` returned **1**
+  (observed twice, 09:03 and 09:10 on 2026-10-24) instead of 0; PB Office comes to the front and shows its own screen; no draft is made, nothing is logged by PB Office,
+  nothing is left in `handoff/`. The caller still received EVT_BACKGROUND.
+- **Not measured:** a running PB Office that has a request listener (the listener probe of PB Office, `run-listener-probe`). The probe runs that were meant for it ended
+  without data: in two of them the listener instance was not the one running at the time of the call (the flag is used up by the first start), and in the last one
+  the reader restarted (uptime 0 min in the next launch's log) before the call. A reader restart while the listener probe was active may be a finding for PB Office.

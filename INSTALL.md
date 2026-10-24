@@ -106,6 +106,20 @@ personal data. To run them:
    the file is removed.
 3. Connect the reader again and read `system/pbcloud/probe.txt`.
 
+## Hand-off probe
+
+Only for development: it answers whether one app of the reader can start another with text as a parameter (the idea of mailing a share link from PB
+Cloud). It hands over fixed test strings, never real data, and is part of the package only when it was built with it.
+`applications/` then also holds `pbc-handoff.bin` and `pbcloud-handoff-target.app`.
+
+1. Create an empty file named `run-handoff-probe` in `system/pbcloud/`.
+2. Start **PB Cloud** once from the reader. A screen with three boxes appears instead of the app. Tap box **A**, wait until the screen has changed back
+   (or nothing happens), start **PB Cloud** again with a new `run-handoff-probe` file and tap box **B**, then once more for box **C**. One box per start,
+   because a successful hand-off may close the probe.
+3. Connect the reader and read `system/pbcloud/handoff-probe.txt`: the lines `caller:` say what the probe saw (the return value of the call, the events
+   it received afterwards, whether it was closed); the lines `target:` say what the started app received (how many parameters, their sizes, the first and
+   last characters, whether the caller was still running). Send the file for the specification.
+
 ## After installing: what has been checked
 
 The tests of this project use a fake Nextcloud and the host. Work through `docs/device-test-checklist.md` on the reader and

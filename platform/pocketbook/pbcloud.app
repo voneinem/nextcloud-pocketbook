@@ -47,6 +47,14 @@ if [ -e "$DATADIR/run-probe" ]; then
     exit 0
 fi
 
+# Hand-off probe (INSTALL.md, "Hand-off probe"): when the file run-handoff-probe exists in the data folder, this start runs the small InkView program that
+# tries to start pbcloud-handoff-target.app with parameters, instead of the app, once.
+if [ -e "$DATADIR/run-handoff-probe" ]; then
+    rm -f "$DATADIR/run-handoff-probe"
+    echo "=== pbcloud: run-handoff-probe flag found, running the hand-off probe instead of the app ==="
+    exec "$APPDIR/pbc-handoff.bin" "$DATADIR"
+fi
+
 # The log must not hold the name or the path of any file of the user (Constitution IV), and the system's libraries print them: when a book
 # is opened, InkView writes "iv_OpenBook filename = <path>" and "task_findbybook('<path>')". Everything the app prints goes through
 # this filter before it reaches the log: a line that names anything on the storage, or one of those two calls, is replaced by a notice.

@@ -71,6 +71,19 @@ check grep -q "probe args: $tmp/app/pbc-probe.bin $tmp/data" "$tmp/data/probe.tx
 sh "$tmp/launch.sh"                                          # next start: the app again
 check [ "$(runs)" = 1 ]
 
+# 5b. the hand-off probe: a run-handoff-probe flag file makes the launcher run the InkView probe with the data folder instead of the app, once
+launch 'echo app-started >&2; exit 0'
+printf '#!/bin/sh\necho "handoff args: $1" > "$(dirname "$0")/../data/handoff-args.txt"\n' > "$tmp/app/pbc-handoff.bin"
+chmod +x "$tmp/app/pbc-handoff.bin"
+mkdir -p "$tmp/data"; : > "$tmp/data/run-handoff-probe"
+rm -f "$tmp/count"
+sh "$tmp/launch.sh"
+check [ ! -e "$tmp/count" ]                                  # the app was not started
+check [ ! -e "$tmp/data/run-handoff-probe" ]                 # the flag is consumed: no loop
+check grep -q "handoff args: $tmp/data" "$tmp/data/handoff-args.txt"
+sh "$tmp/launch.sh"                                          # next start: the app again
+check [ "$(runs)" = 1 ]
+
 # 6. no file name or path reaches the log: the lines the system's libraries print when a book is opened are replaced; the app's own
 #    lines, the exit code and the path of the app itself stay
 body=$(cat <<EOF
