@@ -79,7 +79,10 @@ else()
                 ${CMAKE_SOURCE_DIR}/tests/walks/17-sync-interrupted.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/18-share-links.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/19-share-limits.walk
-                ${CMAKE_SOURCE_DIR}/tests/walks/20-mail-link.walk)
+                ${CMAKE_SOURCE_DIR}/tests/walks/20-mail-link.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/21-trash-restore.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/22-versions-and-delete-for-good.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/23-apps-off.walk)
             set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 900)
             if(PBC_SANITIZE)
                 set_property(TEST ui_walk APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")

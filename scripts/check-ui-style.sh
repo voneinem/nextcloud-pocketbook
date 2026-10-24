@@ -16,6 +16,7 @@
 #   U7 (feature 004) qml/pages/ShareLinkPage.qml: the link is shown as Text.PlainText wrapped with Text.WrapAnywhere and has no MouseArea,
 #      onLinkActivated, TapHandler, PointerHandler, HoverHandler or Qt.openUrl (nothing in the display can be tapped or opened).
 #   U8 (feature 004) a qml/pages/Share*.qml that has a password entry (objectName containing "sharePassword") sets `secret: true` on it.
+#   U9 (feature 006) a ConfirmDialog that sets `destructive: true` (an irreversible step) also sets `defaultCancel: true` in the same dialog.
 set -u
 
 SELF="$(basename "${BASH_SOURCE[0]}")"
@@ -46,6 +47,18 @@ scan() {
                     done
                     ;;
             esac
+            hits="$(awk '
+                # a ConfirmDialog block: from its opening line to the closing brace of its body
+                /ConfirmDialog[[:space:]]*\{/ && !inblock { inblock = 1; depth = 0; start = NR; destructive = 0; cancel = 0 }
+                inblock {
+                    line = $0
+                    if (line ~ /destructive:[[:space:]]*true/) destructive = 1
+                    if (line ~ /defaultCancel:[[:space:]]*true/) cancel = 1
+                    n = gsub(/\{/, "{", line); m = gsub(/\}/, "}", line)
+                    depth += n - m
+                    if (depth <= 0) { if (destructive && !cancel) print start ": ConfirmDialog with destructive: true and no defaultCancel: true"; inblock = 0 }
+                }' "$f" || true)"
+            if [ -n "$hits" ]; then echo "U9 $f: an irreversible dialog must default to Cancel"; echo "$hits" | sed 's/^/    /'; bad=1; fi
             case "$f" in
                 */pages/Share*.qml)
                     if grep -q 'sharePassword' "$f" && ! grep -qE 'secret:[[:space:]]*true' "$f"; then
@@ -105,6 +118,19 @@ Button { text: \"x\" }" \
     mk u8bad; mkdir -p "$tmp/u8bad/qml/pages"
     printf 'import QtQuick\nItem { TextEntryDialog { objectName: "sharePasswordDialog" } }\n' > "$tmp/u8bad/qml/pages/ShareFormPage.qml"
     if scan "$tmp/u8bad" >/dev/null; then echo "self-test: U8 was not detected (password dialog without secret: true)" >&2; rc=1; fi
+    # U9 (feature 006): an irreversible dialog defaults to Cancel
+    mk u9ok
+    printf 'import QtQuick\nItem { ConfirmDialog { objectName: "a"; destructive: true; defaultCancel: true; onAccepted: x() } ConfirmDialog { objectName: "b"; title: "y" } }\n' > "$tmp/u9ok/qml/D.qml"
+    scan "$tmp/u9ok" >/dev/null || { echo "self-test: a destructive dialog with defaultCancel was reported" >&2; rc=1; }
+    mk u9multi
+    printf 'import QtQuick\nItem {\n ConfirmDialog {\n  id: a\n  destructive: true\n  defaultCancel: true\n }\n ConfirmDialog {\n  id: b\n  title: "t"\n }\n}\n' > "$tmp/u9multi/qml/D.qml"
+    scan "$tmp/u9multi" >/dev/null || { echo "self-test: separate blocks were mixed up" >&2; rc=1; }
+    mk u9bad
+    printf 'import QtQuick\nItem { ConfirmDialog { objectName: "a"; destructive: true; onAccepted: x() } }\n' > "$tmp/u9bad/qml/D.qml"
+    if scan "$tmp/u9bad" >/dev/null; then echo "self-test: U9 was not detected (destructive without defaultCancel)" >&2; rc=1; fi
+    mk u9bad2
+    printf 'import QtQuick\nItem {\n ConfirmDialog {\n  id: ok\n  destructive: true\n  defaultCancel: true\n }\n ConfirmDialog {\n  id: bad\n  destructive: true\n }\n}\n' > "$tmp/u9bad2/qml/D.qml"
+    if scan "$tmp/u9bad2" >/dev/null; then echo "self-test: U9 was not detected for the second of two dialogs" >&2; rc=1; fi
     # the qmldir and the resource list are scanned too
     mk bad2
     printf 'InkButton 1.0 InkButton.qml\n' > "$tmp/bad2/qml/qmldir"

@@ -36,3 +36,13 @@ shapes), `lists/` (share lists of a path), `details/` (single shares with and wi
 `hostile/` (huge, truncated, mistyped and control-character variants). The same rules apply: reserved example names and hosts, no
 `Authorization` value, no real tokens, and the `.unverified` suffix before the extension until a live run produced the exchange
 (constitution Principle IX).
+
+## Trash and versions (feature 006)
+
+`trash/` holds the answers the trash and versions screens read: `trash_list_*.unverified.xml` (the trashbin listing: a normal one,
+an empty one and a hostile one with unsafe names, impossible locations, deletion times and sizes, a failed member, a foreign and a
+duplicate href), `versions_list_*.unverified.xml` (the version list of a file: a normal and a hostile one) and
+`caps_*.unverified.json` (the `files` object of the capabilities answer with the trash and versions apps on, off, missing and
+without a `files` object). The same rules apply: reserved example names, user `demo`, no `Authorization` value, and the
+`.unverified` suffix before the extension until a live run produced the exchange (constitution Principle IX). The file names
+follow the project convention (`name.unverified.xml`), not the order written in the task list of feature 006.

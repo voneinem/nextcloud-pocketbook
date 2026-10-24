@@ -67,6 +67,13 @@
 #        excepted); the marker pbo-mail-v1 and the key names exist only in core/src/mail_handoff.cpp; the hand-off modules (core/src/mail_handoff.cpp,
 #        core/include/pbc/mail_handoff.h, app/mail_handoff.cpp, app/mail_handoff.h) cannot log (the pattern list of N8); and app/mail_handoff.cpp does not
 #        look at the reader's files or applications (no access/stat/fopen/opendir, std::filesystem, QFile, QDir).
+#   N2 (feature 006) core/src/trash_api.cpp is a fifth audited module: it may name MOVE (restore from the trash, restore a version) and DELETE (one
+#        item of the trash); it names no other write verb. Every other trash_* module, the trash and versions bridges and the QML name none.
+#   N11 The trash and versions endpoints (feature 006): the literals "trashbin" and "/dav/versions/" appear in core/, bridge/, app/ and qml/ only in
+#        core/src/trash_parse.cpp and core/src/trash_api.cpp (comments excepted); every other file reaches them through those two modules.
+#   N12 The irreversible call of the trash (feature 006, constitution 1.3.0): delete_item and empty_trash are named in core/, bridge/, app/ and qml/ only in
+#        core/src/trash_api.cpp (and its header) and bridge/src/trash_bridge.cpp (comments excepted); no queue, sync, update, Auto Sync, store, share, versions or
+#        app file and no QML file can delete from the trash.
 #   R10 libcurl tracing is never switched on (it would write LOGIN / AUTH PLAIN passwords to the log):
 #        CURLOPT_VERBOSE, CURLOPT_DEBUGFUNCTION, CURLOPT_DEBUGDATA, CURLOPT_STDERR, curl -v / --verbose /
 #        --trace* in core/, bridge/, app/ and scripts/.
@@ -200,6 +207,10 @@ scan() {
                 # feature 004: the share requests (POST, PUT, DELETE on the sharing resources) live here and nowhere else; no WebDAV write verb
                 report N2 "$f" "$p" '"(MKCOL|MOVE|COPY|PROPPATCH|LOCK|UNLOCK)"' && bad=1
                 ;;
+            core/src/trash_api.cpp)
+                # feature 006: the trash and versions requests (MOVE to restore, DELETE of one trash item) live here and nowhere else; no other write verb
+                report N2 "$f" "$p" '"(PUT|MKCOL|COPY|PROPPATCH|LOCK|UNLOCK)"' && bad=1
+                ;;
             core/src/curl_transport.cpp|core/src/http_transport.cpp|core/src/dav_common.cpp) ;;
             app/probe/pbc_probe.cpp)
                 report N2 "$f" "$p" '"(MKCOL|MOVE|COPY|DELETE|PROPPATCH|LOCK|UNLOCK)"' && bad=1
@@ -304,6 +315,30 @@ scan() {
                     *)
                         out="$(grep -nE 'pbo-mail-v[0-9]' "$p" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)')" && {
                             printf '%s\n' "$out" | sed "s#^#N10 $f:#"; bad=1; }
+                        ;;
+                esac
+                ;;
+        esac
+        # N11: the trash and versions endpoints (feature 006): the literals only in the two modules that read and build them
+        case "$f" in
+            core/*|bridge/*|app/*|qml/*.qml)
+                case "$f" in
+                    core/src/trash_parse.cpp|core/src/trash_api.cpp) ;;
+                    *)
+                        out="$(grep -nE 'trashbin|/dav/versions/' "$p" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)')" && {
+                            printf '%s\n' "$out" | sed "s#^#N11 $f:#"; bad=1; }
+                        ;;
+                esac
+                ;;
+        esac
+        # N12: the irreversible call of the trash is made by the trash bridge only (feature 006)
+        case "$f" in
+            core/*|bridge/*|app/*|qml/*.qml)
+                case "$f" in
+                    core/src/trash_api.cpp|core/include/pbc/trash_api.h|bridge/src/trash_bridge.cpp) ;;
+                    *)
+                        out="$(grep -nE '(^|[^A-Za-z0-9_])(delete_item|empty_trash)[[:space:]]*\(' "$p" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)')" && {
+                            printf '%s\n' "$out" | sed "s#^#N12 $f:#"; bad=1; }
                         ;;
                 esac
                 ;;
@@ -685,6 +720,45 @@ if [ "${1:-}" = "--self-test" ]; then
     done
     printf 'int status = 0; int staten = 1; const char* c = getenv("X"); int rv = OpenBook2(p, n, a, 0);\n' > "$tmp/app/mail_handoff.cpp"
     expect pass "N10: words that merely contain stat or status are fine in app/mail_handoff.cpp"; rm "$tmp/app/mail_handoff.cpp"
+    # feature 006 (trash and versions): N2 allow-list entry for trash_api.cpp (MOVE and DELETE), N11 (the endpoints are named in two modules only)
+    for verb in PUT MKCOL COPY PROPPATCH LOCK UNLOCK; do
+        violate core/src/trash_api.cpp "r.method = \"$verb\";" "N2: $verb in trash_api.cpp (it may name MOVE and DELETE only)"
+    done
+    for m in trash_parse trash_rules trash_types; do
+        for verb in MOVE DELETE; do
+            violate core/src/$m.cpp "r.method = \"$verb\";" "N2: $verb in $m.cpp (only trash_api.cpp may name it for the trash)"
+        done
+    done
+    for b in trash_bridge versions_bridge; do violate bridge/src/$b.cpp 'r.method = "MOVE";' "N2: MOVE in $b.cpp"; done
+    printf 'r.method = "PROPFIND"; r.method = "MOVE"; r.method = "DELETE"; r.method = "GET";\n' > "$tmp/core/src/trash_api.cpp"
+    expect pass "N2: trash_api.cpp may name PROPFIND, MOVE, DELETE and GET"; rm "$tmp/core/src/trash_api.cpp"
+    for lit in 'std::string u = base + "/remote.php/dav/trashbin/" + uid;' 'const char* v = "/remote.php/dav/versions/";' 'auto x = QStringLiteral("trashbin");'; do
+        violate core/src/other.cpp "$lit" "N11: $lit in another core module"
+        violate bridge/src/trash_bridge.cpp "$lit" "N11: $lit in the trash bridge"
+        violate app/a.cpp "$lit" "N11: $lit in the app"
+    done
+    violate qml/Page.qml 'property string p: "/remote.php/dav/trashbin/"' "N11: the trashbin path in QML"
+    printf 'std::string u = base + "/remote.php/dav/trashbin/" + uid; const char* v = "/dav/versions/";\n' > "$tmp/core/src/trash_parse.cpp"
+    printf 'std::string u = base + "/remote.php/dav/trashbin/" + uid; const char* v = "/dav/versions/";\n' > "$tmp/core/src/trash_api.cpp"
+    expect pass "N11: the endpoints may be named in trash_parse.cpp and trash_api.cpp"; rm "$tmp/core/src/trash_parse.cpp" "$tmp/core/src/trash_api.cpp"
+    printf '// the trashbin of the server is read in trash_parse.cpp, versions under /dav/versions/\n/* trashbin */\n * trashbin\n' > "$tmp/bridge/src/b.cpp"
+    expect pass "N11: a comment may name the endpoints"; rm "$tmp/bridge/src/b.cpp"
+    # feature 006, N12: the irreversible call of the trash exists in the API and is made only by the trash bridge
+    mkdir -p "$tmp/qml/pages"
+    for f in core/src/queue_sender.cpp core/src/sync_runner.cpp core/src/update.cpp core/src/auto_sync.cpp core/src/store_trash.cpp core/src/trash_rules.cpp \
+             bridge/src/queue_bridge.cpp bridge/src/sync_bridge.cpp bridge/src/versions_bridge.cpp bridge/src/share_bridge.cpp app/main.cpp app/mail_handoff.cpp qml/pages/TrashPage.qml; do
+        for lit in 'auto r = api.delete_item(item);' 'auto r = api.empty_trash(named, nullptr);'; do
+            violate $f "$lit" "N12: $lit in $f"
+        done
+    done
+    for f in core/src/trash_api.cpp core/include/pbc/trash_api.h bridge/src/trash_bridge.cpp; do
+        printf 'auto r = api.delete_item(item);\nauto s = api.empty_trash(named, nullptr);\nOperationResult delete_item(const TrashItem& item);\n' > "$tmp/$f"
+        expect pass "N12: delete_item and empty_trash may be named in $f"; rm "$tmp/$f"
+    done
+    printf '// delete_item is called only by the trash bridge; empty_trash too\n/* delete_item( */\n * empty_trash(\n' > "$tmp/core/src/queue_sender.cpp"
+    expect pass "N12: a comment may name them"; rm "$tmp/core/src/queue_sender.cpp"
+    printf 'int delete_items = 0; int undelete_item_count = 1; void remove_trash_item_row();\n' > "$tmp/core/src/store_files.cpp"
+    expect pass "N12: other names that merely contain the words are fine"; rm "$tmp/core/src/store_files.cpp"
     mkdir -p "$tmp/tests/qml" "$tmp/tests/bridge" "$tmp/tests/walks" "$tmp/tests/unit"
     printf 'add_executable(test_ok bridge/test_ok.cpp)\n' > "$tmp/tests/CMakeLists.txt"; printf 'tests/walks/01-a.walk\n' > "$tmp/app/CMakeLists.txt"
     printf 'int main() {}\n' > "$tmp/tests/bridge/test_ok.cpp"; printf 'size 1 1\n' > "$tmp/tests/walks/01-a.walk"; printf 'int main() {}\n' > "$tmp/tests/unit/test_u.cpp"

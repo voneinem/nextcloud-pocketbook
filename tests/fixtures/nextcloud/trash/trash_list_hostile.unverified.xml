@@ -1,0 +1,188 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/..%2Fevil.d1</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>../evil</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/evil</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000001</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/a%2Fb.d2</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>a/b</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/ab</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000002</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/ctl%01name.d3</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>ctlname</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/ctl</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000003</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.d4</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/long</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000004</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/dots.d5</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>dots</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/../../etc/passwd</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000005</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/gap.d6</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>gap</nc:trashbin-filename>
+      <nc:trashbin-original-location>A//B/gap</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000006</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/big.d7</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>big</nc:trashbin-filename>
+      <nc:trashbin-original-location>L/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000007</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/negative.d8</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>negative</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/negative</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>-5</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/huge.d9</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>huge</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/huge</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>99999999999999</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/missing.d10</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>missing</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/missing</nc:trashbin-original-location>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/forbidden.d11</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>forbidden</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/forbidden</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000011</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 403 Forbidden</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/other/trash/foreign.d12</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>foreign</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/foreign</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000012</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/dup.d13</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>dup</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/dup</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000013</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/dup.d13</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>dup</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/dup</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000013</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/locked.d14</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>locked</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/locked</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000014</nc:trashbin-deletion-time>
+      <d:getcontentlength>5</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>4814</oc:fileid>
+      <oc:permissions>G</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/crypt.d15</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>crypt</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/crypt</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000015</nc:trashbin-deletion-time>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:permissions>GD</oc:permissions>
+      <nc:is-encrypted>1</nc:is-encrypted>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/weird.d16</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>weird</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/weird</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000016</nc:trashbin-deletion-time>
+      <d:resourcetype><oc:odd/></d:resourcetype>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/badsize.d17</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>badsize</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/badsize</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000017</nc:trashbin-deletion-time>
+      <d:getcontentlength>-7</d:getcontentlength>
+      <d:resourcetype/>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

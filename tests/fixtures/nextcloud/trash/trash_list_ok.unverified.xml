@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/story.epub.d1760000000</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>story.epub</nc:trashbin-filename>
+      <nc:trashbin-original-location>Books/story.epub</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1760000000</nc:trashbin-deletion-time>
+      <d:getcontentlength>1234</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>4801</oc:fileid>
+      <oc:permissions>GD</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/Old%20Notes.d1759000000</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>Old Notes</nc:trashbin-filename>
+      <nc:trashbin-original-location>Documents/Old Notes</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1759000000</nc:trashbin-deletion-time>
+      <d:resourcetype><d:collection/></d:resourcetype>
+      <oc:fileid>4802</oc:fileid>
+      <oc:permissions>GD</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/report.pdf.d1758000000</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>report.pdf</nc:trashbin-filename>
+      <nc:trashbin-original-location>Documents/report.pdf</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1758000000</nc:trashbin-deletion-time>
+      <d:getcontentlength>2048</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>4803</oc:fileid>
+      <oc:permissions>GD</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/remote.php/dav/trashbin/demo/trash/report.pdf.d1757000000</d:href>
+    <d:propstat><d:prop>
+      <nc:trashbin-filename>report.pdf</nc:trashbin-filename>
+      <nc:trashbin-original-location>Documents/report.pdf</nc:trashbin-original-location>
+      <nc:trashbin-deletion-time>1757000000</nc:trashbin-deletion-time>
+      <d:getcontentlength>100</d:getcontentlength>
+      <d:resourcetype/>
+      <oc:fileid>4804</oc:fileid>
+      <oc:permissions>GD</oc:permissions>
+    </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  </d:response>
+</d:multistatus>

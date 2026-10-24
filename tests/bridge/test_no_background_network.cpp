@@ -17,6 +17,8 @@
 #include "share_bridge.h"
 #include "sync_bridge.h"
 #include "test_support.h"
+#include "trash_bridge.h"
+#include "versions_bridge.h"
 #include "tmp_dir.h"
 #include "transfer_bridge.h"
 #include "worker.h"
@@ -68,6 +70,8 @@ struct App {
     std::unique_ptr<QueueBridge> queue;
     std::unique_ptr<SyncBridge> sync;
     std::unique_ptr<ShareBridge> share;
+    std::unique_ptr<TrashBridge> trash;
+    std::unique_ptr<VersionsBridge> versions;
     std::string picker_root;
 
     // The queue with Auto Sync's quiet period shortened to milliseconds. The reader's storage is a folder of the test.
@@ -153,6 +157,43 @@ struct App {
         pbc::FolderService fs(*store, server, clock);
         if (!fs.load("/Docs", pbc::Fetch::Always).error.ok()) PB_FAIL_AT("cannot cache /Docs");
         server.clear_log();
+    }
+    // The trash and versions bridges as main.cpp wires them (specs/006-trash-and-versions): a tap may ask the system for Wi-Fi (counted in network_requests).
+    // /Docs/a.pdf is a cached file with older versions, the trash holds one item.
+    void make_trash(bool delete_enabled = false) {
+        TrashBridge::Config c;
+        c.delete_enabled = delete_enabled;
+        c.store = store.get();
+        c.worker = &worker;
+        c.http = &server;
+        c.clock = &clock;
+        c.wifi_up = [this] { return wifi; };
+        c.ensure_network = [this](std::function<void(bool)> done) {
+            ++network_requests;
+            done(wifi);
+        };
+        trash = std::make_unique<TrashBridge>(c);
+        VersionsBridge::Config v;
+        v.store = store.get();
+        v.worker = &worker;
+        v.http = &server;
+        v.clock = &clock;
+        v.wifi_up = c.wifi_up;
+        v.ensure_network = c.ensure_network;
+        versions = std::make_unique<VersionsBridge>(v);
+        server.add_folder("/Docs");
+        server.add_file("/Docs/a.pdf", "current", 1760000300);
+        server.add_version("/Docs/a.pdf", "older", 1760000100);
+        server.add_trash_file("/Docs/gone.txt", "x", server.server_time() - 100);
+        pbc::FolderService fs(*store, server, clock);
+        if (!fs.load("/Docs", pbc::Fetch::Always).error.ok()) PB_FAIL_AT("cannot cache /Docs");
+        server.clear_log();
+    }
+    void wait_trash() {
+        QElapsedTimer t;
+        t.start();
+        while ((trash->busy() || versions->busy()) && t.elapsed() < 10000) QTest::qWait(5);
+        QTest::qWait(20);
     }
     size_t share_requests() const {
         size_t n = 0;
@@ -625,6 +666,120 @@ PB_TEST(the_auto_sync_timers_of_the_queue_and_the_pairs_never_start_a_sharing_re
     PB_CHECK(finished.wait(10000));
     idle(300);
     PB_CHECK_EQ(a.share_requests(), size_t(0));
+}
+
+// ---- trash and versions (specs/006-trash-and-versions FR-031, constitution VI) ----
+
+PB_TEST(trash_and_versions_send_nothing_at_start_while_idle_when_wifi_cycles_or_a_screen_is_left_and_only_taps_read) {
+    App a;
+    a.sign_in();
+    a.connection->checkAtStart();
+    idle(300);
+    a.make_trash();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // nothing from the trash or the versions at start or while idle
+    a.wifi = false;
+    idle(150);
+    a.wifi = true;
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // a Wi-Fi that comes and goes is no trigger
+    PB_CHECK(a.trash->open().value("ok").toBool());      // the tap
+    a.wait_trash();
+    PB_CHECK_EQ(a.server.request_count(), size_t(2));    // the capabilities and the trash, once
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));    // the open screen asks for nothing more by itself
+    PB_CHECK(a.versions->open("/Docs/a.pdf").value("ok").toBool());
+    a.wait_trash();
+    PB_CHECK(a.server.request_count() >= size_t(1));
+    a.server.clear_log();
+    idle(600);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    a.wifi = false;                                      // leaving the screens, the Wi-Fi going and coming: silent
+    idle(100);
+    a.wifi = true;
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+}
+
+PB_TEST(trash_and_versions_ask_the_system_for_wifi_only_after_a_tap_and_send_nothing_when_it_stays_off) {
+    App a;
+    a.sign_in();
+    a.make_trash();
+    a.wifi = false;
+    idle(400);
+    PB_CHECK_EQ(a.network_requests, 0);   // nothing by itself: not at start, not while idle
+    a.trash->open();                      // the tap asks once ...
+    idle(300);
+    PB_CHECK_EQ(a.network_requests, 1);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // ... and with Wi-Fi still off nothing is sent
+    a.versions->open("/Docs/a.pdf");
+    idle(300);
+    PB_CHECK_EQ(a.network_requests, 2);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    a.wifi = true;                        // and when it comes up later nothing follows on its own
+    idle(400);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.network_requests, 2);
+}
+
+PB_TEST(the_auto_sync_timers_never_start_a_trash_or_versions_request) {
+    App a;
+    a.sign_in();
+    a.make_trash();
+    a.make_queue(40);
+    QSignalSpy finished(a.queue.get(), &QueueBridge::sendFinished);
+    a.queue->addUploads("/Docs", {a.file("Downloads/a.txt", "aaa")});
+    PB_CHECK(finished.wait(10000));
+    idle(300);
+    for (const auto& r : a.server.log()) PB_CHECK(r.path.find("/trashbin/") == std::string::npos && r.path.find("/versions/") == std::string::npos);
+}
+
+PB_TEST(an_emptied_trash_is_the_users_run_and_nothing_follows_it_by_itself_not_even_with_the_connection_coming_and_going) {
+    App a;
+    a.sign_in();
+    a.make_trash(true);
+    for (int i = 0; i < 6; ++i) a.server.add_trash_file("/Docs/x" + std::to_string(i) + ".txt", "x", a.server.server_time() - 10 - i);
+    a.trash->open();
+    a.wait_trash();
+    PB_CHECK_EQ(a.trash->total(), 7);   // the six and the one of make_trash
+    a.server.clear_log();
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // listing the trash deletes nothing and starts nothing
+    PB_CHECK(a.trash->beginEmpty().value("kind").toString() == "empty_trash");
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));   // a confirmation that waits sends nothing, however long
+    a.trash->confirmStep();
+    QSignalSpy done(a.trash.get(), &TrashBridge::actionFinished);
+    a.trash->confirmStep();
+    PB_CHECK(done.wait(10000));
+    PB_CHECK_EQ(a.server.count("DELETE"), size_t(7));
+    a.server.clear_log();
+    a.trash->onApplicationStateChanged(Qt::ApplicationInactive);   // leaving the screen, Wi-Fi going and coming: silent
+    a.wifi = false;
+    idle(150);
+    a.wifi = true;
+    idle(400);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.server.trashbin_count(), size_t(0));
+}
+
+PB_TEST(without_wifi_the_irreversible_actions_send_nothing_and_ask_for_no_wifi) {
+    App a;
+    a.sign_in();
+    a.make_trash(true);
+    a.trash->open();
+    a.wait_trash();
+    a.trash->choose(0);
+    a.server.clear_log();
+    a.network_requests = 0;
+    a.wifi = false;
+    PB_CHECK(a.trash->beginEmpty().value("errorKey").toString() == "no_network");
+    PB_CHECK(a.trash->beginDelete().value("errorKey").toString() == "no_network");
+    PB_CHECK(a.trash->restore().value("errorKey").toString() == "no_network");
+    idle(300);
+    PB_CHECK_EQ(a.server.request_count(), size_t(0));
+    PB_CHECK_EQ(a.network_requests, 0);   // the actions need a connection and never ask for one (spec FR-035)
 }
 
 PB_TEST_MAIN()

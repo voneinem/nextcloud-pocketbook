@@ -9,6 +9,7 @@ Item {
     id: page
     property string startPath: "/"
     property var blocked: []
+    property bool serverOnly: false   // a restore from the trash: only folders the server has, and no New folder
     property string verb: qsTr("Move")
     signal chosen(string path)
 
@@ -22,7 +23,8 @@ Item {
         return false
     }
 
-    Component.onCompleted: chooser.open(startPath)
+    Component.onCompleted: { chooser.serverOnly = serverOnly; chooser.open(startPath) }
+    Component.onDestruction: chooser.serverOnly = false
 
     TopBar {
         id: topBar
@@ -139,6 +141,7 @@ Item {
                 objectName: "chooserNewFolder"
                 text: qsTr("New folder")
                 icon: "plus-circle"
+                visible: !page.serverOnly
                 enabled: !chooser.busy && (chooser.hasListing || chooser.path === "/")
                 onClicked: newFolder.open("")
             }

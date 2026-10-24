@@ -127,6 +127,18 @@ const Entry kEntries[] = {
     {"expiry_in_past", ErrorClass::Protocol},
     {"password_invalid", ErrorClass::Protocol},
     {"permission_invalid", ErrorClass::Protocol},
+    // trash and versions (specs/006-trash-and-versions); trash_unavailable, refresh_first and outcome_unknown are older keys
+    {"versions_unavailable", ErrorClass::Unsupported},
+    {"restore_name_taken", ErrorClass::Server},
+    {"restore_parent_missing", ErrorClass::Server},
+    {"restore_place_unsupported", ErrorClass::Unsupported},
+    {"restore_into_self", ErrorClass::Protocol},
+    {"trash_item_gone", ErrorClass::Server},
+    {"version_changed_meanwhile", ErrorClass::Server},
+    {"version_gone", ErrorClass::Server},
+    {"file_gone", ErrorClass::Server},
+    {"no_older_versions", ErrorClass::Server},
+    {"trash_not_actionable", ErrorClass::Protocol},
     // the user
     {"cancelled", ErrorClass::Cancelled},
 };

@@ -276,10 +276,27 @@ ALTER TABLE queue_items ADD COLUMN sync_role TEXT NOT NULL DEFAULT '' CHECK(sync
 CREATE INDEX queue_items_by_pair ON queue_items(pair_id, state);
 )SQL";
 
+// Step 5 -> 6: the last trash list (specs/006-trash-and-versions/data-model.md). A copy of what the server's trash held at the last fetch, replaced
+// as a whole; it is cache, not user data: it may be dropped at any time. flags: bit 0 unreadable, bit 1 original place unknown, bits 2 to 4 the availability.
+const char* kStep5To6 = R"SQL(
+CREATE TABLE trash_items(
+    position INTEGER PRIMARY KEY,
+    trash_name TEXT NOT NULL,
+    name TEXT NOT NULL,
+    original_dir TEXT,
+    original_name TEXT,
+    deleted_at INTEGER,
+    kind INTEGER NOT NULL CHECK(kind IN (0,1)),
+    size INTEGER,
+    fileid INTEGER,
+    flags INTEGER NOT NULL
+);
+)SQL";
+
 }  // namespace
 
 const std::vector<Migration>& builtin_migrations() {
-    static const std::vector<Migration> list = {{1, 2, kStep1To2}, {2, 3, kStep2To3}, {3, 4, kStep3To4}, {4, 5, kStep4To5}};
+    static const std::vector<Migration> list = {{1, 2, kStep1To2}, {2, 3, kStep2To3}, {3, 4, kStep3To4}, {4, 5, kStep4To5}, {5, 6, kStep5To6}};
     return list;
 }
 

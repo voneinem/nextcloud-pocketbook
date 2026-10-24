@@ -755,3 +755,72 @@ The link is too long to mail.	Der Link ist zu lang für eine Mail.
 Type it from the screen instead.	Tippen Sie ihn stattdessen vom Bildschirm ab.
 This link cannot be mailed.	Dieser Link kann nicht per Mail gesendet werden.
 Open the link again or check the address.	Öffnen Sie den Link erneut oder prüfen Sie die Adresse.
+This server does not keep older versions.	Dieser Server bewahrt keine älteren Versionen auf.
+Ask the server's administrator to turn on the versions app.	Bitten Sie den Administrator des Servers, die Versionen-App einzuschalten.
+This name is taken in that place.	Dieser Name ist an diesem Ort schon vergeben.
+Choose another folder or another name.	Wählen Sie einen anderen Ordner oder einen anderen Namen.
+The folder it came from is no longer on the server.	Der Ordner, aus dem es stammt, ist nicht mehr auf dem Server.
+Choose another folder.	Wählen Sie einen anderen Ordner.
+This server can restore only to the original place.	Dieser Server kann nur an den ursprünglichen Ort wiederherstellen.
+Rename or move the file that is there, then restore again.	Benennen Sie die Datei dort um oder verschieben Sie sie, und stellen Sie dann erneut wieder her.
+A folder cannot be restored into itself.	Ein Ordner kann nicht in sich selbst wiederhergestellt werden.
+This item is no longer in the trash.	Dieser Eintrag ist nicht mehr im Papierkorb.
+Refresh the trash.	Aktualisieren Sie den Papierkorb.
+The file has changed since the list was read.	Die Datei hat sich seit dem Laden der Liste geändert.
+Reload the list.	Laden Sie die Liste neu.
+This version is no longer on the server.	Diese Version ist nicht mehr auf dem Server.
+There are no older versions of this file.	Es gibt keine älteren Versionen dieser Datei.
+Older versions appear after the file has been changed.	Ältere Versionen entstehen, wenn die Datei geändert wird.
+This item cannot be restored or deleted here.	Dieser Eintrag kann hier nicht wiederhergestellt oder gelöscht werden.
+Use the web interface of the server.	Verwenden Sie die Weboberfläche des Servers.
+From %1	Aus %1
+Unknown location	Unbekannter Ort
+Deleted %1	Gelöscht am %1
+Deletion date unknown	Löschdatum unbekannt
+Unreadable item	Unlesbarer Eintrag
+Trash	Papierkorb
+Chosen: %1	Ausgewählt: %1
+Only the newest %1 items are shown. More exist.	Es werden nur die neuesten %1 Einträge angezeigt. Es gibt mehr.
+The trash is empty.	Der Papierkorb ist leer.
+Deleted files cannot be listed or restored from here, and deleting on this server is permanent.	Gelöschte Dateien können von hier aus weder aufgelistet noch wiederhergestellt werden, und Löschen ist auf diesem Server endgültig.
+Ask the server's administrator.	Fragen Sie den Administrator des Servers.
+The server's answer was not clear.	Die Antwort des Servers war nicht eindeutig.
+Restore	Wiederherstellen
+Choose folder	Ordner wählen
+Restore %1 to %2? It goes back to its original place.	%1 nach %2 wiederherstellen? Es kommt an seinen ursprünglichen Ort zurück.
+Restore %1 to %2? You chose this place.	%1 nach %2 wiederherstellen? Sie haben diesen Ort gewählt.
+%1 cannot go back to its original place: the place is taken or the folder is gone. Choose another folder.	%1 kann nicht an seinen ursprünglichen Ort zurück: Der Ort ist vergeben oder der Ordner existiert nicht mehr. Wählen Sie einen anderen Ordner.
+%1 has no known original place. Choose a folder.	%1 hat keinen bekannten ursprünglichen Ort. Wählen Sie einen Ordner.
+New name	Neuer Name
+This name is taken there. Choose another name.	Dieser Name ist dort schon vergeben. Wählen Sie einen anderen Namen.
+Restored.	Wiederhergestellt.
+Restored, but the server put it under another name. Open the folder to see it.	Wiederhergestellt, aber der Server hat es unter einem anderen Namen abgelegt. Öffnen Sie den Ordner, um es zu sehen.
+Refresh to see what happened.	Aktualisieren Sie, um zu sehen, was passiert ist.
+Restoring needs a connection.	Zum Wiederherstellen ist eine Verbindung nötig.
+Versions	Versionen
+Older versions cannot be listed or restored from here.	Ältere Versionen können von hier aus weder aufgelistet noch wiederhergestellt werden.
+Restored. The server did not keep the previous content as a version.	Wiederhergestellt. Der Server hat den bisherigen Inhalt nicht als Version behalten.
+Restored. The previous content is kept as a version.	Wiederhergestellt. Der bisherige Inhalt bleibt als Version erhalten.
+Tap Reload to see what happened.	Tippen Sie auf Neu laden, um zu sehen, was passiert ist.
+Versions need a connection.	Für Versionen ist eine Verbindung nötig.
+Only the newest %1 versions are shown. More exist.	Es werden nur die neuesten %1 Versionen angezeigt. Es gibt mehr.
+in the future	in der Zukunft
+No older versions.	Keine älteren Versionen.
+Reload	Neu laden
+Restore %1 to the version of %2, %3? The current content is kept as one more version.	%1 auf die Version vom %2, %3 zurücksetzen? Der aktuelle Inhalt bleibt als weitere Version erhalten.
+Unknown date	Datum unbekannt
+Delete for good	Endgültig löschen
+Empty trash	Papierkorb leeren
+%n item(s)	%n Eintrag||%n Einträge
+This is the last step. Delete %1 for good? This cannot be undone.	Dies ist der letzte Schritt. %1 endgültig löschen? Das kann nicht rückgängig gemacht werden.
+Delete %1 for good (%2 of them folders with their content), among them %3? This cannot be undone.	%1 endgültig löschen (davon %2 Ordner mit ihrem Inhalt), darunter %3? Das kann nicht rückgängig gemacht werden.
+Only the newest items are listed here; older ones are not affected.	Hier sind nur die neuesten Einträge aufgelistet; ältere sind nicht betroffen.
+This is the last step. Delete the folder %1 for good? This cannot be undone.	Dies ist der letzte Schritt. Den Ordner %1 endgültig löschen? Das kann nicht rückgängig gemacht werden.
+Delete the folder %1 and everything in it for good? This cannot be undone.	Den Ordner %1 und alles darin endgültig löschen? Das kann nicht rückgängig gemacht werden.
+Delete %1 for good? This cannot be undone.	%1 endgültig löschen? Das kann nicht rückgängig gemacht werden.
+Deleted for good.	Endgültig gelöscht.
+%n item(s) deleted for good.	%n Eintrag endgültig gelöscht.||%n Einträge endgültig gelöscht.
+%n could not be deleted.	%n konnte nicht gelöscht werden.||%n konnten nicht gelöscht werden.
+%n were not tried.	%n wurde nicht versucht.||%n wurden nicht versucht.
+Stopped.	Angehalten.
+Deleting %1 of %2	Lösche %1 von %2

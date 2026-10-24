@@ -1,0 +1,72 @@
+# Trash and restore (specs/006-trash-and-versions): the trash is opened from the folder page and shows what was deleted, newest first, with the folder it came
+# from; one item at a time is chosen. Run after 20-mail-link.walk with the same server; the three items are added here and are the newest of the trash.
+# server trash-add /Books/walk-story.epub
+# server trash-add /Documents/walk-draft.txt
+# server trash-add /Documents/walk-old-notes folder
+# server trash-add /readme.txt
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+# US1: the Trash tool of the folder page opens the list
+tap folderTrash
+waitfor trashRow
+shot @OUT@/210-trash-list.png
+expect trashRowName walk-story.epub
+expect trashRowName walk-draft.txt
+expect trashRowName walk-old-notes
+expect trashRowCaption From /Books
+expect trashRowCaption From /Documents
+expect trashRowCaption Deleted
+expect trashAge Updated just now
+expect_absent trashExplain
+# one item is chosen, a second tap moves the mark
+tap trashRow 0
+expect trashChosen Chosen: walk-story.epub
+shot @OUT@/211-trash-chosen.png
+tap trashRow 1
+expect trashChosen Chosen: walk-draft.txt
+# Refresh reads the trash again; the list is the same
+tap trashRefresh
+wait 600
+waitfor trashRow
+expect trashRowName walk-story.epub
+tap trashBack
+waitfor folderRow
+# US2: a file comes back to its free original place in four taps from the folder page: Trash, the item, Restore, confirm
+taps_reset
+tap folderTrash
+waitfor trashRow
+tap trashRow 0
+expect trashChosen Chosen: walk-story.epub
+tap trashRestore
+waitfor dialogText original place
+expect dialogText walk-story.epub
+expect dialogText /Books
+shot @OUT@/212-restore-confirm.png
+tap footerButton 1
+waitfor trashResult Restored.
+expect_taps_max 4
+shot @OUT@/213-restored.png
+# the item left the trash: the next one is first now
+expect trashRowName walk-draft.txt
+# a name that is taken at the original place: readme.txt is in the root of the server; the user is sent to the folder chooser (which shows server folders only)
+tap trashRow 2
+expect trashChosen Chosen: readme.txt
+tap trashRestore
+waitfor dialogText cannot go back to its original place
+shot @OUT@/214-restore-taken.png
+tap footerButton 1
+waitfor chooserRow
+expect_absent chooserNewFolder
+tap chooserRow 0
+wait 800
+tap chooserChoose
+waitfor dialogText You chose this place
+shot @OUT@/215-restore-chosen-confirm.png
+tap footerButton 1
+waitfor trashResult Restored.
+shot @OUT@/216-restored-elsewhere.png
+tap trashBack
+waitfor folderRow
+quit

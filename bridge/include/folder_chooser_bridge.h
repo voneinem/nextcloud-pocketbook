@@ -29,6 +29,8 @@ class FolderChooserBridge : public QObject {
     Q_PROPERTY(int pageSize READ pageSize WRITE setPageSize NOTIFY changed)
     Q_PROPERTY(bool hasListing READ hasListing NOTIFY changed)               // this folder has a stored listing (or only queued folders)
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
+    // true: only folders the server really has are listed (a restore from the trash, specs/006-trash-and-versions): no folder that is merely queued, no New folder
+    Q_PROPERTY(bool serverOnly READ serverOnly WRITE setServerOnly NOTIFY changed)
     Q_PROPERTY(bool offline READ offline NOTIFY changed)
     Q_PROPERTY(QString errorKey READ errorKey NOTIFY changed)
 
@@ -52,6 +54,8 @@ public:
     int page() const { return page_; }
     int pageCount() const { return page_count_; }
     int pageSize() const { return page_size_; }
+    bool serverOnly() const { return server_only_; }
+    void setServerOnly(bool on);
     void setPageSize(int n);
     bool hasListing() const { return has_listing_; }
     bool busy() const { return busy_; }
@@ -77,6 +81,6 @@ private:
     std::vector<QVariantMap> all_;
     QVariantList rows_;
     int page_ = 0, page_count_ = 1, page_size_ = 10;
-    bool has_listing_ = false, busy_ = false;
+    bool has_listing_ = false, busy_ = false, server_only_ = false;
     QString error_;
 };

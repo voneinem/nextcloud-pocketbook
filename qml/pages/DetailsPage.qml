@@ -170,6 +170,13 @@ Item {
                 onClicked: page.openShare()
             },
             ToolButton {
+                objectName: "detailsVersions"
+                text: qsTr("Versions")
+                icon: "versions"
+                visible: info.kind === "file" && info.available !== false && !page.jobActive()
+                onClicked: page.StackView.view.push(Qt.resolvedUrl("VersionsPage.qml"), { remotePath: page.remotePath })   // DT-T1 checks that the panel still fits
+            },
+            ToolButton {
                 objectName: "detailsResume"
                 text: qsTr("Resume")
                 icon: "sync"

@@ -11,12 +11,14 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "pbc/queue_types.h"
 #include "pbc/server_caps.h"
 #include "pbc/store_files.h"
 #include "pbc/sync_types.h"
+#include "pbc/trash_types.h"
 #include "pbc/types.h"
 
 struct sqlite3;
@@ -51,7 +53,7 @@ struct SyncState {
 
 class Store {
 public:
-    static constexpr int kSchemaVersion = 5;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites; 4: the queue; 5: folder synchronization
+    static constexpr int kSchemaVersion = 6;   // 1: settings and sync state; 2: the tables of the files client; 3: availability of favorites; 4: the queue; 5: folder synchronization; 6: the last trash list
 
     // Creates `dir` (mode 0700) if needed and opens `dir/pbcloud.db` (0600).
     // Errors: "schema_too_new" (the file is left untouched), "migration_failed" (rolled back, backup kept),
@@ -254,6 +256,21 @@ public:
     Error sync_entry_result(int64_t plan_id, int seq, const std::string& state, const std::string& result_key);   // planned|done|failed|skipped; recounts n_failed
     // At start, no network: pairs in comparing or running, and plans in approved or running, become interrupted. Nothing else is touched.
     SyncRecoveryReport sync_recover();
+
+    // ---- the last trash list (store_trash.cpp; specs/006-trash-and-versions research R-4) ----
+    // Replaces the stored list as a whole in one transaction (a failure leaves the old list and its time), keeps at most kMaxTrashRows rows in the
+    // order given and remembers the time, the cut and the account. Unreadable items are kept as rows without a trash name.
+    Error replace_trash(const TrashList& list, int64_t fetched_at, int64_t account_id);
+    // The stored list with from_store = true; empty (and no time) when nothing is stored or it belongs to another account.
+    Result<TrashList> load_trash(int64_t account_id) const;
+    // Removes the row of one item by its trash name; an empty or unknown name removes nothing and is not an error.
+    Error remove_trash_item(std::string_view trash_name);
+    // Removes the list and its settings (also done when the account is signed out or another account is saved).
+    Error clear_trash();
+    // After a restore into `folder` (specs/006-trash-and-versions research R-14): the cached listing of that folder is dropped (the next visit fetches it, the root
+    // listing is kept) and the cached versions (ETags) of the folder and of every folder above are forgotten, as after a confirmed change of feature 002.
+    // Downloaded copies, offline marks and the queue are not touched.
+    Error forget_folder_after_change(const std::string& folder);
 
     // Test seams (the product code uses the typed methods). debug_exec returns the
     // SQLite error text ("" on success); debug_query returns the first column of the first row as text.
