@@ -28,6 +28,7 @@ set(PBC_CORE_SOURCES
     src/share_parse.cpp
     src/share_diagnose.cpp
     src/share_api.cpp
+    src/mail_handoff.cpp
     src/store_state.cpp
     src/store_util.cpp
     src/log.cpp

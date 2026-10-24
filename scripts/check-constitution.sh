@@ -63,6 +63,10 @@
 #   N9 Nothing opens a link (feature 004): no QProcess, system()/popen(), xdg-open, openUrlExternally/Qt.openUrl, QUrl::fromUserInput or
 #        QDesktopServices in core/, bridge/, app/ and qml/*.qml - except the one hand-over of a downloaded local file to the viewer in
 #        app/device_bridge.cpp (QDesktopServices::openUrl(QUrl::fromLocalFile(...))).
+#   N10 The hand-off to the mail app (feature 005, constitution 1.2.0): OpenBook2 is called only in app/mail_handoff.cpp (comments, app/probe/ and tests/
+#        excepted); the marker pbo-mail-v1 and the key names exist only in core/src/mail_handoff.cpp; the hand-off modules (core/src/mail_handoff.cpp,
+#        core/include/pbc/mail_handoff.h, app/mail_handoff.cpp, app/mail_handoff.h) cannot log (the pattern list of N8); and app/mail_handoff.cpp does not
+#        look at the reader's files or applications (no access/stat/fopen/opendir, std::filesystem, QFile, QDir).
 #   R10 libcurl tracing is never switched on (it would write LOGIN / AUTH PLAIN passwords to the log):
 #        CURLOPT_VERBOSE, CURLOPT_DEBUGFUNCTION, CURLOPT_DEBUGDATA, CURLOPT_STDERR, curl -v / --verbose /
 #        --trace* in core/, bridge/, app/ and scripts/.
@@ -283,6 +287,35 @@ scan() {
                         ;;
                     *) report N9 "$f" "$p" 'QDesktopServices' && bad=1 ;;
                 esac
+                ;;
+        esac
+        # N10: the single hand-off call (feature 005): one call site, one marker, no logging, no look at the reader's applications
+        case "$f" in
+            core/*|bridge/*|app/*|qml/*.qml)
+                case "$f" in
+                    app/mail_handoff.cpp|app/probe/*) ;;
+                    *)
+                        out="$(grep -nE '(^|[^A-Za-z0-9_])OpenBook2([^A-Za-z0-9_]|$)' "$p" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)')" && {
+                            printf '%s\n' "$out" | sed "s#^#N10 $f:#"; bad=1; }
+                        ;;
+                esac
+                case "$f" in
+                    core/src/mail_handoff.cpp|app/probe/*) ;;
+                    *)
+                        out="$(grep -nE 'pbo-mail-v[0-9]' "$p" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)')" && {
+                            printf '%s\n' "$out" | sed "s#^#N10 $f:#"; bad=1; }
+                        ;;
+                esac
+                ;;
+        esac
+        case "$f" in
+            core/src/mail_handoff.cpp|core/include/pbc/mail_handoff.h|app/mail_handoff.cpp|app/mail_handoff.h)
+                report N10 "$f" "$p" 'log::(text|path|Field|event|count|status)|(^|[^A-Za-z0-9_])(qDebug|qWarning|qInfo|qCritical)[[:space:]]*\(|std::(cerr|cout|clog)|(^|[^A-Za-z0-9_])(printf|fprintf|puts|fputs|perror)[[:space:]]*\(' && bad=1
+                ;;
+        esac
+        case "$f" in
+            app/mail_handoff.cpp)
+                report N10 "$f" "$p" '(^|[^A-Za-z0-9_.>])(access|stat|lstat|fopen|opendir|readdir)[[:space:]]*\(|std::filesystem|\bQFile\b|\bQDir\b' && bad=1
                 ;;
         esac
     done < <(list_files "$root")
@@ -627,6 +660,31 @@ if [ "${1:-}" = "--self-test" ]; then
     expect pass "N9: app/device_bridge.cpp may hand a local file to the viewer; QLocale::system() is not a shell call"; rm "$tmp/app/device_bridge.cpp"
     printf 'std::filesystem::path p; int systems = 0; bool ecosystem() { return true; } // opens nothing\n' > "$tmp/core/src/ok9.cpp"
     expect pass "N9: words that merely contain system are fine"; rm "$tmp/core/src/ok9.cpp"
+    # feature 005 (mail link): N10
+    mkdir -p "$tmp/app/probe"
+    for f in core/src/a.cpp bridge/src/a.cpp app/a.cpp qml/A.qml; do
+        violate $f 'int rv = OpenBook2(path, 1, argv, 0);' "N10: OpenBook2 in $f"
+    done
+    printf 'int rv = OpenBook2(path, 1, argv, 0);\n' > "$tmp/app/mail_handoff.cpp"
+    expect pass "N10: OpenBook2 in app/mail_handoff.cpp"; rm "$tmp/app/mail_handoff.cpp"
+    printf 'int rv = OpenBook2(path, 1, argv, 0);\nconst char* m = "pbo-mail-v1";\n' > "$tmp/app/probe/pbc_handoff.cpp"
+    expect pass "N10: the probe may call OpenBook2 and name the marker"; rm "$tmp/app/probe/pbc_handoff.cpp"
+    printf '// the call is OpenBook2 in app/mail_handoff.cpp and the marker is pbo-mail-v1\n' > "$tmp/bridge/src/b.cpp"
+    expect pass "N10: a comment may name the call and the marker"; rm "$tmp/bridge/src/b.cpp"
+    violate bridge/src/a.cpp 'const char* m = "pbo-mail-v1";' "N10: the marker outside core/src/mail_handoff.cpp"
+    violate app/a.cpp 'argv.push_back("pbo-mail-v1");' "N10: the marker in the app glue"
+    printf 'argv.emplace_back("pbo-mail-v1");\n' > "$tmp/core/src/mail_handoff.cpp"
+    expect pass "N10: the marker in core/src/mail_handoff.cpp"; rm "$tmp/core/src/mail_handoff.cpp"
+    for f in core/src/mail_handoff.cpp core/include/pbc/mail_handoff.h app/mail_handoff.cpp app/mail_handoff.h; do
+        for lit in 'log::text("x", s);' 'log::event("share.mail", {});' 'log::count("n", 1);' 'qDebug() << x;' 'qWarning() << x;' 'std::cerr << x;' 'printf("%s", s);' 'fprintf(stderr, "x");' 'puts(s);'; do
+            violate $f "$lit" "N10: $lit in $f"
+        done
+    done
+    for lit in 'if (access(p, F_OK) == 0) {}' 'struct stat st; stat(p, &st);' 'FILE* f = fopen(p, "r");' 'DIR* d = opendir(p);' 'std::filesystem::exists(p);' 'QFile f(p);' 'QDir d(p);'; do
+        violate app/mail_handoff.cpp "$lit" "N10: $lit in app/mail_handoff.cpp (no look at the reader's applications)"
+    done
+    printf 'int status = 0; int staten = 1; const char* c = getenv("X"); int rv = OpenBook2(p, n, a, 0);\n' > "$tmp/app/mail_handoff.cpp"
+    expect pass "N10: words that merely contain stat or status are fine in app/mail_handoff.cpp"; rm "$tmp/app/mail_handoff.cpp"
     mkdir -p "$tmp/tests/qml" "$tmp/tests/bridge" "$tmp/tests/walks" "$tmp/tests/unit"
     printf 'add_executable(test_ok bridge/test_ok.cpp)\n' > "$tmp/tests/CMakeLists.txt"; printf 'tests/walks/01-a.walk\n' > "$tmp/app/CMakeLists.txt"
     printf 'int main() {}\n' > "$tmp/tests/bridge/test_ok.cpp"; printf 'size 1 1\n' > "$tmp/tests/walks/01-a.walk"; printf 'int main() {}\n' > "$tmp/tests/unit/test_u.cpp"
