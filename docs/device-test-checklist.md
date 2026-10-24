@@ -120,10 +120,10 @@ returns 1 and takes nothing; observed with the hand-off probe on 2026-10-24, `do
 
 | ID | Item | Expected | Status | Date | Build/result |
 |----|------|----------|--------|------|--------------|
-| DT-M1 | Share a file, open the link, tap Mail link, confirm | PB Office opens a new message with the link as its text and the subject "Link to <name>"; two taps; the time from the confirm tap to the open editor is at most 10 s (note the seconds); the draft can be deleted afterwards | U | | |
+| DT-M1 | Share a file, open the link, tap Mail link, confirm | PB Office opens a new message with the link as its text and the subject "Link to <name>"; two taps; the time from the confirm tap to the open editor is at most 10 s (note the seconds); the draft can be deleted afterwards | O | 2026-10-24 | Owner: the tool opened a new message in PB Office, "everything fine". PB Office logged `handoff.received text_chars=68 fields=3` and `handoff.drafted count=1`. The seconds to the editor were not noted (SC-001 timing unmeasured). Build 0.5.0 |
 | DT-M2 | Start PB Office and leave it open, switch to PB Cloud, repeat; then (with PB Office not installed or its launcher renamed) repeat | the notice "PB Office could not take the link" the next time PB Cloud is shown; no draft; no second try; record the value that the call returned for the missing case (open item O-1 of `specs/005-mail-link/research.md`) | U | | |
-| DT-M3 | After DT-M1 and DT-M2 mount the reader and search `system/pbcloud/` (logs, database, probe files) for the link text and the item name in the logs | nothing found | U | | |
-| DT-M4 | After DT-M1 press Back in PB Office, then Home | PB Office's main screen, then PB Cloud with its list (the link screen is gone); record whether the link screen was already gone when PB Cloud came back | U | | |
+| DT-M3 | After DT-M1 and DT-M2 mount the reader and search `system/pbcloud/` (logs, database, probe files) for the link text and the item name in the logs | nothing found | O | 2026-10-24 | Searched PB Cloud's `pbcloud.log`, `pbcloud.log.prev` and `pbcloud.db` after the run: no link address (`/s/`), no subject, no `pbo-mail` marker. The item name was not searched by name (the listing cache holds names by design); PB Office's log holds no link either. Only the cold, accepted case was run |
+| DT-M4 | After DT-M1 press Back in PB Office, then Home | PB Office's main screen, then PB Cloud with its list (the link screen is gone); record whether the link screen was already gone when PB Cloud came back | O | 2026-10-24 | Owner: Back and Home after the hand-off behaved as expected ("everything fine"); whether the link screen was already gone on return was not noted separately |
 
 ## Recording
 

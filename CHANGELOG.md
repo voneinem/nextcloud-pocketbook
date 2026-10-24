@@ -5,8 +5,8 @@ Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERS
 
 ## 0.5.0 - 2026-10-24
 
-Mail link (specs/005-mail-link). Tested on the host with a stand-in for the mail app; nothing is verified with PB Cloud's own tool on a reader
-(`docs/device-test-checklist.md` DT-M1 ...). The hand-off itself was observed on the reader with the probe of 0.4.0 (`docs/device-findings.md`). No database change.
+Mail link (specs/005-mail-link). Tested on the host with a stand-in for the mail app; on the reader DT-M1, DT-M3 and DT-M4 were run (the draft opens); DT-M2 (PB Office
+running or missing) is still to be run (`docs/device-test-checklist.md`). The hand-off itself was observed on the reader with the probe of 0.4.0 (`docs/device-findings.md`). No database change.
 
 ### Mail link
 - On the screen of a share link a new tool **Mail link** hands the link to PB Office, which opens a new mail message with it and the subject "Link to <name>". A

@@ -32,8 +32,13 @@ are listed at the end.
 - The wiping of the buffers inside `ShareBridge::mailLink` cannot be observed from a test (the strings are destroyed); it is guaranteed by one scope object whose
   destructor wipes on every way out, and by the unit test of `MailHandoff::wipe()`.
 
+## Device results (2026-10-24, PB Cloud 0.5.0 on the InkPad One)
+
+DT-M1, DT-M3 and DT-M4 were run by the owner and recorded in `docs/device-test-checklist.md` (cold PB Office: the draft opens; nothing of the link in PB Cloud's logs or
+database). **DT-M2 was not run**: the notice after a refused hand-off on the reader, and the value returned when PB Office is not installed, stay unverified.
+
 ## Gates (2026-10-24)
 
 `scripts/pre-merge.sh` passed on the host: 179 tests including `ui_walk` (walks 01-20), the secret scan, the constitution check with N10 and R11 and their
 self-tests, the translation check and the version check (0.5.0). The sanitizer build passes `test_mail_handoff`, `test_mail_link` and `test_share_bridge`. The device
-package `pbcloud-inkpad-one-0.5.0.zip` (4.3 MB, limit 25 MB) was built; nothing in it has been run on a reader (DT-M1 .. DT-M4 are unverified).
+package `pbcloud-inkpad-one-0.5.0.zip` (4.3 MB, limit 25 MB) was built; DT-M1, DT-M3 and DT-M4 have since been run (see above); DT-M2 has not.
