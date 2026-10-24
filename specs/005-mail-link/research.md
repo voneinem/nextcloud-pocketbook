@@ -5,7 +5,7 @@
 Decisions taken before the design was fixed. Evidence labels (constitution Principle IX):
 
 - **[REPO]** read from this repository on 2026-10-24.
-- **[SIBLING]** read from the sibling project PB Office (`/home/voneinem/Projekte/office-pocketbook`, same owner): its contract
+- **[SIBLING]** read from the sibling project PB Office (the repository office-pocketbook, same owner): its contract
   `specs/003-receive-shared-text/contracts/handoff-contract.md` (v1) and its `INSTALL.md`. A statement about what PB Office *does*; not observed by this
   project except where [DEVICE] says so.
 - **[DEVICE]** observed on the InkPad One on 2026-10-23/24 with the hand-off probe of this project (`docs/device-findings.md`, section "Handing text to the
