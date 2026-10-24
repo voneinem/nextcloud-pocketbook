@@ -14,6 +14,7 @@ Item {
     property string pendingPassword: ""    // a typed password until it is confirmed (then handed over and forgotten) or cancelled
     property string pendingExpiry: ""
     property string pendingPermission: ""
+    property string mailMessage: ""        // why Mail link answered without a hand-off (the key's text); a refused hand-off shows share.mailNotice instead
 
     function stateWarning() {
         switch (share.detail.linkState) {
@@ -47,8 +48,17 @@ Item {
         if (r.needsConfirm) { changeConfirm.text = r.effectText; changeConfirm.open() }
         else pendingPassword = ""
     }
+    // Mail link: the bridge says where the link goes (and calls nothing); the hand-off follows the confirmation
+    function askMail() {
+        page.copied = false
+        page.mailMessage = ""
+        var r = share.mailLink(false)
+        if (r.needsConfirm) { mailConfirm.text = r.text; mailConfirm.open() }
+        else if (r.errorKey) page.mailMessage = Problems.title(r.errorKey) + " " + Problems.action(r.errorKey)
+    }
     function leave() {
         pendingPassword = ""
+        share.dismissMailNotice()
         share.leaveLink()
         if (page.StackView.view) page.StackView.view.pop()
     }
@@ -130,6 +140,19 @@ Item {
                 text: page.messageText().length > 0 ? "✗ " + page.messageText() : ""
             }
             Text {
+                objectName: "shareLinkMailMessage"
+                x: 30
+                width: parent.width - 60
+                bottomPadding: 14
+                wrapMode: Text.Wrap
+                visible: text.length > 0
+                font.pixelSize: Style.captionSize
+                font.bold: true
+                color: Style.ink
+                text: page.mailMessage.length > 0 ? "✗ " + page.mailMessage
+                      : share.mailNotice.length > 0 ? "✗ " + Problems.title(share.mailNotice) + " " + Problems.action(share.mailNotice) : ""
+            }
+            Text {
                 objectName: "shareLinkCopied"
                 x: 30
                 width: parent.width - 60
@@ -201,6 +224,14 @@ Item {
                 onClicked: page.copied = share.copyLink()
             },
             ToolButton {
+                objectName: "shareLinkMail"
+                text: qsTr("Mail link")
+                icon: "send"
+                visible: share.detail.linkState === "ok" || share.detail.linkState === "not_secure"
+                enabled: !share.busy
+                onClicked: page.askMail()
+            },
+            ToolButton {
                 objectName: "shareLinkRemove"
                 text: qsTr("Remove link")
                 icon: "trash"
@@ -257,6 +288,18 @@ Item {
         onRejected: page.pendingPassword = ""
     }
 
+    // Mail link: says where the link goes, that a password is not included, and that the draft is saved to the Drafts folder later; Cancel is the default
+    ConfirmDialog {
+        id: mailConfirm
+        objectName: "shareMailConfirm"
+        title: qsTr("Mail link")
+        acceptText: qsTr("Mail link")
+        onAccepted: {
+            var r = share.mailLink(true)
+            if (r.errorKey && r.errorKey !== "mail_not_accepted") page.mailMessage = Problems.title(r.errorKey) + " " + Problems.action(r.errorKey)
+        }
+    }
+
     // Remove: the confirmation names the item and says the link stops working at once and the item is not deleted; the first button (Cancel) is the default
     ConfirmDialog {
         id: removeConfirm
@@ -269,6 +312,9 @@ Item {
     // the link is gone (removed now, or already removed): back to the list, which is read again
     Connections {
         target: share
+        function onMailHandedOver() {
+            if (page.StackView.view) page.StackView.view.pop()
+        }
         function onRemoveFinished(ok, errorKey) {
             if (ok && page.StackView.view) page.StackView.view.pop()
         }

@@ -99,3 +99,12 @@ Box D calls `OpenBook2("/mnt/ext1/applications/pboffice.app", 5, {"pbo-mail-v1",
 - **Not measured:** a running PB Office that has a request listener (the listener probe of PB Office, `run-listener-probe`). The probe runs that were meant for it ended
   without data: in two of them the listener instance was not the one running at the time of the call (the flag is used up by the first start), and in the last one
   the reader restarted (uptime 0 min in the next launch's log) before the call. A reader restart while the listener probe was active may be a finding for PB Office.
+
+DT-M2 of feature 005 records the value that the call returns when PB Office is not installed: it is not known yet (open item O-1 of `specs/005-mail-link/research.md`).
+
+### Mail link with PB Cloud's own tool (observed 2026-10-24, PB Cloud 0.5.0, InkPad One)
+
+- PB Office not running: Mail link and its confirmation opened a new message in PB Office (DT-M1). PB Office's log shows one hand-over (`text_chars=68`) and one draft.
+  PB Cloud's logs and database hold no link, subject or marker (DT-M3, searched for the link address and the marker, not for the item name).
+- Not run: the running-PB-Office case and the missing-PB-Office case (DT-M2), so the notice after the app was switched away and the value returned for a missing PB Office
+  are still unobserved. The seconds from the confirm tap to the editor were not noted.

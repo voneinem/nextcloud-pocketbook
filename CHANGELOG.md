@@ -3,6 +3,20 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.5.0 - 2026-10-24
+
+Mail link (specs/005-mail-link). Tested on the host with a stand-in for the mail app; on the reader DT-M1, DT-M3 and DT-M4 were run (the draft opens); DT-M2 (PB Office
+running or missing) is still to be run (`docs/device-test-checklist.md`). The hand-off itself was observed on the reader with the probe of 0.4.0 (`docs/device-findings.md`). No database change.
+
+### Mail link
+- On the screen of a share link a new tool **Mail link** hands the link to PB Office, which opens a new mail message with it and the subject "Link to <name>". A
+  confirmation (Cancel is the default) says where the link goes, that a password is not included and that the draft is saved to your Drafts folder later. You choose
+  the recipient and send the mail in PB Office; PB Cloud sends nothing. It needs PB Office 0.4.0 or later, installed and not running.
+- If PB Office does not take the link (it is running or not installed), a short notice says so the next time the app is shown; nothing is retried and the link is not
+  shown again. A running PB Office does not take the link (observed on the reader).
+- The link is never logged, stored or put on a clipboard, a password is never handed over, and the buffers that held the link are overwritten right after the call.
+  New mechanical rule N10 (one call site for the hand-off, one marker, no logging in the hand-off modules); constitution 1.2.0 names the file that makes the call.
+
 ## 0.4.0 - 2026-10-22
 
 Share links of files and folders (specs/004-share-links). Tested on the host against a fake Nextcloud server; nothing is verified against a real server or on a

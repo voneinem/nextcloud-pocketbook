@@ -120,6 +120,8 @@ void start(QQuickWindow* window, const QString& path) {
                 if (!found) fail(QStringLiteral("not there after 20 s"));
             } else if (cmd == "expect_absent") {
                 if (!find_all(window->contentItem(), parts.value(1)).isEmpty()) fail(QStringLiteral("item is visible"));
+            } else if (cmd == "handoff") {   // handoff <n>: the answer of the host stand-in for the hand-off to the mail app (0 = passed on), for the next taps
+                qputenv("PBC_HOST_HANDOFF_RESULT", parts.value(1).toUtf8());
             } else if (cmd == "taps_reset") {
                 taps = 0;
             } else if (cmd == "expect_taps_max") {   // the taps since taps_reset must not be more than this (the step budgets of the success criteria)

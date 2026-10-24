@@ -6,7 +6,7 @@ public links. Built for an
 e-ink screen, offline first, with no background network activity: the app writes to the server only on your action.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.4.0-informational.svg)
+![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)
 ![Platform: PocketBook InkPad One](https://img.shields.io/badge/platform-PocketBook%20InkPad%20One-lightgrey.svg)
 ![Status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)
 
@@ -80,6 +80,11 @@ author). It is a separate app with its own binary, launcher and data folder.
   link's password, expiry date or permission, one confirmed action at a time, and **remove** a link after a confirmation that says the file itself is not
   deleted. When the server forbids public links, forces a password or an expiry date, or limits the permissions, you get a plain message and a next
   step. Nothing about sharing is queued, retried, cached or sent without your tap, and the app **never opens a link**.
+- **Mail link.** On the screen of a link, **Mail link** hands the link to **PB Office**, which opens a new message with the link and the subject "Link to <name>"
+  (a confirmation that defaults to Cancel says where it goes and that a **password is not included**). You choose the recipient and send the mail in PB Office;
+  PB Cloud sends nothing. It needs PB Office 0.4.0 or later, installed and **not running**: a running PB Office does not take the link (a short notice says so).
+  The text is passed to PB Office and PB Office keeps it as a draft, which later syncs to your Drafts folder on the mail server; PB Cloud does not store it,
+  write it to a log or put it on a clipboard, never hands over a password, and overwrites the buffers it controls right after the call.
 - **Clear refusals.** A full account, a name the server does not accept, a file that is too large or of a type the server refuses, a
   locked file and a revoked password each have their own message and a next step; the item stays in the queue.
 - **Storage.** Lists everything the app downloaded with sizes, removes local copies (the server is never touched), shows free space
@@ -89,7 +94,7 @@ The interface is English with a German translation (Settings > Language; texts i
 
 ## Not in this version
 
-Creating shares with users or groups, share-by-mail, notes to the recipient, QR codes for links, screens for the trash and for file versions, permanent deletion, photo auto-upload, live watching of folders, any
+Creating shares with users or groups, sharing by mail through the server (Mail link above uses PB Office instead), notes to the recipient, QR codes for links, screens for the trash and for file versions, permanent deletion, photo auto-upload, live watching of folders, any
 background activity, several accounts, end-to-end encrypted folders (they are shown as such and cannot be opened), Talk, photo upload,
 editing documents, notifications. PB Cloud writes to the server only when you ask it to: through the queue, with a condition on
 every request, and never by itself.
@@ -167,6 +172,7 @@ What is checked and what is not:
 ## Documentation
 
 - [specs/004-share-links/spec.md](specs/004-share-links/spec.md): share links (spec, plan, research, contracts, acceptance).
+- [specs/005-mail-link/spec.md](specs/005-mail-link/spec.md): mailing a share link to PB Office (spec, plan, research, contracts, acceptance).
 - [specs/001-nextcloud-files-client/spec.md](specs/001-nextcloud-files-client/spec.md): what the app does and why.
 - [specs/001-nextcloud-files-client/plan.md](specs/001-nextcloud-files-client/plan.md), `research.md`, `data-model.md`, `contracts/`.
 - [.specify/memory/constitution.md](.specify/memory/constitution.md): the rules this project is held to.

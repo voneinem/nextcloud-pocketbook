@@ -745,3 +745,13 @@ The link to "%1" stops working at once for everyone who has it. The folder itsel
 The link to "%1" stops working at once for everyone who has it. The file itself is not deleted.	Der Link zu „%1“ funktioniert sofort für niemanden mehr. Die Datei selbst wird nicht gelöscht.
 Remove link	Link entfernen
 Share links and their passwords are shown only on the screen you asked for. They are never stored, never written to the log and never opened by the app.	Freigabe-Links und ihre Passwörter werden nur auf dem Bildschirm angezeigt, den Sie aufgerufen haben. Sie werden nie gespeichert, nie ins Protokoll geschrieben und nie von der App geöffnet.
+Mail link	Link per Mail senden
+Link to %1	Link zu %1
+The link will be passed to PB Office as a new mail draft. The draft is saved to your Drafts folder on the mail server later.	Der Link wird als neuer Entwurf an PB Office übergeben. Der Entwurf wird später im Ordner Entwürfe auf dem Mailserver gespeichert.
+The link will be passed to PB Office as a new mail draft. A password is not included: tell it to the recipient separately. The draft is saved to your Drafts folder on the mail server later.	Der Link wird als neuer Entwurf an PB Office übergeben. Ein Passwort ist nicht enthalten: Teilen Sie es dem Empfänger getrennt mit. Der Entwurf wird später im Ordner Entwürfe auf dem Mailserver gespeichert.
+PB Office could not take the link.	PB Office konnte den Link nicht übernehmen.
+Close PB Office and try again. If PB Office is not installed, the link cannot be mailed.	Schließen Sie PB Office und versuchen Sie es erneut. Ist PB Office nicht installiert, kann der Link nicht per Mail gesendet werden.
+The link is too long to mail.	Der Link ist zu lang für eine Mail.
+Type it from the screen instead.	Tippen Sie ihn stattdessen vom Bildschirm ab.
+This link cannot be mailed.	Dieser Link kann nicht per Mail gesendet werden.
+Open the link again or check the address.	Öffnen Sie den Link erneut oder prüfen Sie die Adresse.

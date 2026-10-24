@@ -47,6 +47,30 @@ ApplicationWindow {
             }
         }
 
+        // A hand-off to the mail app that was not accepted (specs/005-mail-link): the notice is shown the next time the app is shown, when no sharing
+        // screen is open (while the link screen is open it shows the notice itself). It holds a key only: no link, no name.
+        ConfirmDialog {
+            id: mailNoticeDialog
+            objectName: "mailNoticeDialog"
+            showCancel: false
+            title: Problems.title("mail_not_accepted")
+            text: Problems.action("mail_not_accepted")
+            onAccepted: share.dismissMailNotice()
+            onRejected: share.dismissMailNotice()
+        }
+        function showMailNotice() {
+            var onShareScreen = nav.currentItem && nav.currentItem.objectName.indexOf("share") === 0
+            if (share.mailNotice.length > 0 && Qt.application.state === Qt.ApplicationActive && !onShareScreen) mailNoticeDialog.open()
+        }
+        Connections {
+            target: share
+            function onMailNoticeChanged() { stage.showMailNotice() }
+        }
+        Connections {
+            target: Qt.application
+            function onStateChanged() { stage.showMailNotice() }
+        }
+
         Connections {
             target: device
             function onBackRequested() {

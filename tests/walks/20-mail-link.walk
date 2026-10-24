@@ -1,0 +1,76 @@
+# Mail link (specs/005-mail-link): on the link screen the link is handed to the mail app after a confirmation that defaults to Cancel. The host has no mail app:
+# a stand-in answers the hand-off (handoff 0 = passed on, handoff 1 = not accepted). Run after 19-share-limits.walk with the same server, so the rules that walk set
+# (a password and an expiry date forced, upload off) are switched off again here.
+# server share-rules password off
+# server share-rules expiry off
+# server share-rules upload on
+size 1404 1872
+handoff 0
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderUp
+wait 400
+tap folderUp
+wait 400
+waitfor folderRow
+# a link to mail: select Books, open Share, create a read-only link with the defaults; the list shows the user, group and other shares first, then the public links (row 4 is a link of the user)
+tap folderSelect
+wait 300
+tap folderRow 1
+wait 300
+tap folderShare
+waitfor shareRow
+tap shareCreate
+waitfor shareFormCreate
+tap shareFormCreate
+waitfor dialogText read this folder
+tap footerButton 1
+wait 1200
+waitfor shareRow
+# US1: the link screen has the tool; the confirmation says where the link goes and defaults to Cancel
+tap shareRow 4
+waitfor shareLinkText
+expect shareLinkText https://
+tap shareLinkMail
+waitfor dialogText PB Office
+shot @OUT@/200-mail-confirm.png
+expect dialogText new mail draft
+expect dialogText Drafts
+# Cancel: nothing is handed over, the link screen is as it was
+tap footerButton 0
+wait 400
+expect_absent dialogText
+expect shareLinkText https://
+# confirm: the stand-in passes it on, the link screen is gone and the list is shown (two taps from the link screen in all, SC-001)
+taps_reset
+tap shareLinkMail
+waitfor dialogText PB Office
+tap footerButton 1
+wait 800
+expect_taps_max 2
+expect_absent shareLinkText
+waitfor shareRow
+shot @OUT@/201-mail-handed-over.png
+# US2: the stand-in does not accept it (a running mail app answers 1): the link screen says so, shows no second try and keeps the link for a deliberate repeat
+handoff 1
+tap shareRow 4
+waitfor shareLinkText
+tap shareLinkMail
+waitfor dialogText PB Office
+tap footerButton 1
+wait 800
+waitfor shareLinkMailMessage could not take the link
+shot @OUT@/202-mail-not-accepted.png
+expect shareLinkMailMessage Close PB Office and try again
+expect shareLinkMailMessage not installed
+# Back leaves the link screen and drops the notice; nothing is shown again
+tap shareLinkBack
+wait 500
+expect_absent shareLinkText
+expect_absent shareLinkMailMessage
+handoff 0
+tap shareBack
+wait 400
+tap folderSelectDone
+wait 300

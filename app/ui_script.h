@@ -12,6 +12,7 @@
 //   waitfor <objectName> [substring]  wait (up to 20 s) until such an item is visible, with the substring in its text
 //   expect <objectName> <substring>   fail the walk if the item's text does not contain the substring
 //   expect_absent <objectName>        fail the walk if an item of that name is visible
+//   handoff <n>                       the answer of the host stand-in for the hand-off to the mail app, for what follows (0 = passed on)
 //   taps_reset                        start counting the taps
 //   expect_taps_max <n>               fail the walk if more than n taps were made since taps_reset
 //   quit

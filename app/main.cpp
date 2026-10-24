@@ -40,6 +40,7 @@
 #include "transfer_bridge.h"
 #include "table_translator.h"
 #include "device_bridge.h"
+#include "mail_handoff.h"
 #include "pbc/ca_selector.h"
 #include "pbc/curl_transport.h"
 #include "pbc/log.h"
@@ -340,6 +341,8 @@ int main(int argc, char** argv) {
 #else
         shc.clipboard_available = true;
 #endif
+        // Mail link (specs/005-mail-link): the one hand-off of a link to the mail app; ShareBridge calls it only after the user's confirmed tap.
+        shc.hand_off = send_mail_handoff;
         shareBridge = std::make_unique<ShareBridge>(shc);
         QObject::connect(&app, &QGuiApplication::applicationStateChanged, shareBridge.get(), &ShareBridge::onApplicationStateChanged);
         QObject::connect(connectionBridge.get(), &ConnectionBridge::changed, shareBridge.get(), &ShareBridge::onConnectionChanged);
