@@ -228,12 +228,13 @@ user learns them once and the code base shares one component set.
 - The app name, binary, launcher, data directory and package are `pbcloud`, and they MUST NOT
   collide with PB Notes or PB Office: no shared binary name, launcher entry or data directory.
   The one permitted contact with PB Office is a hand-off of a text by a single `OpenBook2` call to
-  its installed launcher, whose return value MUST be checked; a password MUST NOT be handed over,
-  and PB Cloud MUST NOT otherwise start, write to or read the data of another application. The
-  name of the PB Office launcher may therefore appear in the hand-off probe source
+  its installed launcher. That call exists once in the product, in `app/mail_handoff.cpp`, and is
+  made only after the user's confirmed tap. It passes a text and a subject only (never a password
+  and never a recipient), and its return value MUST be checked. PB Cloud MUST NOT otherwise start,
+  write to or read the data of another application. The name of the PB Office launcher may
+  therefore appear in `app/mail_handoff.cpp`, in the hand-off probe source
   (`app/probe/pbc_handoff.cpp`) and in `docs/device-findings.md`, and in no other tracked file
-  outside the places listed in `scripts/check-constitution.sh` (rule R11). The feature that ships the
-  hand-off (a "Mail link" action) MUST amend this paragraph for its own source files.
+  outside the places listed in `scripts/check-constitution.sh` (rule R11).
 - The license is MIT, "Copyright (c) 2026 Volker von Einem" (Principle VII).
 
 ## Licensing & Attribution
@@ -276,4 +277,4 @@ Compliance is reviewed in every pull request and in a mandatory Constitution Che
 which lists each principle with pass, justified deviation or not applicable. Unjustified violations
 block the merge.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-24
+**Version**: 1.2.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-24
