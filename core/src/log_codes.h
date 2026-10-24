@@ -58,12 +58,21 @@ inline constexpr const char* kAllowedCodes[] = {
     "sync.recover",
     "sync.run.end",
     "sync.run.start",
+    "trash.delete",
+    "trash.empty",
+    "trash.fail",
+    "trash.list",
+    "trash.open",
+    "trash.restore",
+    "trash.restore_chosen",
     "tz.unavailable",
     "update.run",
     "upload.done",
     "upload.fail",
     "upload.start",
     "upload.unknown",
+    "versions.list",
+    "versions.restore",
 };
 
 inline bool is_allowed_code(const std::string& code) {

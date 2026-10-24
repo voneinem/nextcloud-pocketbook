@@ -9,10 +9,14 @@ DialogFrame {
     property string acceptText: qsTr("OK")
     property string cancelText: qsTr("Cancel")
     property bool showCancel: true
+    // An irreversible step (specs/006-trash-and-versions, constitution 1.3.0): the dialog always shows Cancel, and `defaultCancel` says that Cancel is the answer of
+    // the close mark and of the Back key. scripts/check-ui-style.sh (U9) requires both properties on such a dialog.
+    property bool destructive: false
+    property bool defaultCancel: false
     signal accepted()
     signal rejected()
 
-    footer: showCancel ? [{ text: cancelText, role: "dismiss" }, { text: acceptText, role: "accept" }]
+    footer: (showCancel || destructive) ? [{ text: cancelText, role: "dismiss" }, { text: acceptText, role: "accept" }]
                        : [{ text: acceptText, role: "accept" }]
     onCloseRequested: { close(); rejected() }
     onFooterClicked: function(role) {

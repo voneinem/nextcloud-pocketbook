@@ -14,6 +14,8 @@
 #   lose-next-answer [METHOD [part]]  the next write is done on the server but its answer is lost (an upload with an unknown outcome)
 #   drop-after <bytes>  the next upload body longer than that is cut; quota <bytes>; lock <path>; no-trash; ignore-conditions
 #   share-rules <what> <value>   the server's sharing rules: sharing|public|password|upload on|off, or expiry <days>|off (specs/004-share-links)
+#   trash-add <path> [folder] | trash-list | trash-disable | trash-enable | versions-disable | versions-enable | versions-add <path> [text] | versions-list <path> |
+#   restore-to-files off|on   the trash and the versions of the server (specs/006-trash-and-versions)
 #   share-list [path]   the shares on a path (ids and kinds, no addresses); unshare <id>   remove a share behind the app's back
 #   quit           close the demo
 # Share links (specs/004-share-links quickstart step 3): Files > Select > an entry > Share. /Books has a link, a user, a group, another kind of share and
@@ -67,7 +69,7 @@ echo "App password:    $password"
 echo "Downloads go to: $tmp/downloads"
 echo "Data folder:     $tmp/data (the app writes no password, link or token here; search it after trying share links)"
 echo "Uploads come from: $tmp/picker (Downloads, Notes, PBCloud)"
-echo "Commands: approve | touch <path> | drop | offline | online | lose-next-answer [METHOD [part]] | drop-after <bytes> | quota <bytes> | lock <path> | no-trash | ignore-conditions | share-rules <what> <value> | share-list [path] | unshare <id> | quit"
+echo "Commands: approve | touch <path> | drop | offline | online | lose-next-answer [METHOD [part]] | drop-after <bytes> | quota <bytes> | lock <path> | no-trash | ignore-conditions | share-rules <what> <value> | share-list [path] | unshare <id> | trash-add <path> [folder] | trash-list | trash-disable | trash-enable | versions-disable | versions-enable | add-file <path> [text] | versions-add <path> [text] | versions-list <path> | restore-to-files off|on | quit"
 
 PBC_DATA_DIR="$tmp/data" PBC_DOWNLOAD_DIR="$tmp/downloads" PBC_PICKER_ROOT="$picker" "$APP" &
 app_pid=$!

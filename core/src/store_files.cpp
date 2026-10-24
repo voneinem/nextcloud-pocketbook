@@ -78,7 +78,7 @@ Error Store::save_account(const AccountRow& row) {
         const std::string previous = st.step() == SQLITE_ROW ? st.text(0) : std::string();
         if (!previous.empty() && previous != owner) {   // the cached listings belong to another server or user
             std::string err;
-            if (!sql::exec(db_, "DELETE FROM folders; DELETE FROM favorites; DELETE FROM server_caps; DELETE FROM settings WHERE key = 'favorites_fetched_at';", &err)) return storage_error(db_, "write_failed");
+            if (!sql::exec(db_, "DELETE FROM folders; DELETE FROM favorites; DELETE FROM server_caps; DELETE FROM trash_items; DELETE FROM settings WHERE key IN ('favorites_fetched_at', 'trash_fetched_at', 'trash_truncated', 'trash_account');", &err)) return storage_error(db_, "write_failed");
         }
     }
     {
@@ -114,7 +114,7 @@ Error Store::clear_account() {
     store_util::Transaction tx(db_);
     if (!tx.open) return storage_error(db_, "write_failed");
     std::string err;
-    if (!sql::exec(db_, "DELETE FROM account; DELETE FROM server_caps;", &err)) return storage_error(db_, "write_failed");
+    if (!sql::exec(db_, "DELETE FROM account; DELETE FROM server_caps; DELETE FROM trash_items; DELETE FROM settings WHERE key IN ('trash_fetched_at', 'trash_truncated', 'trash_account');", &err)) return storage_error(db_, "write_failed");
     if (!store_util::sync_mark_account_rows(db_, std::string(), std::string())) return storage_error(db_, "write_failed");   // no account: every pair is unusable
     return tx.commit() ? Error() : storage_error(db_, "write_failed");
 }

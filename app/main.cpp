@@ -33,6 +33,8 @@
 #include "settings_bridge.h"
 #include "space_bridge.h"
 #include "share_bridge.h"
+#include "trash_bridge.h"
+#include "versions_bridge.h"
 #include "sync_bridge.h"
 #ifndef PLATFORM_POCKETBOOK
 #include "ui_script.h"
@@ -172,6 +174,8 @@ int main(int argc, char** argv) {
     std::unique_ptr<FolderChooserBridge> chooserBridge;
     // (declared before the sync bridge: destroyed after it, so that the sync bridge cancels a running sync before any bridge waits for the worker)
     std::unique_ptr<ShareBridge> shareBridge;
+    std::unique_ptr<TrashBridge> trashBridge;
+    std::unique_ptr<VersionsBridge> versionsBridge;
     std::unique_ptr<SyncBridge> syncBridge;
     // where the downloads go: a folder the reader's library scans on the device, a throw-away folder on the host
 #ifdef PLATFORM_POCKETBOOK
@@ -346,6 +350,31 @@ int main(int argc, char** argv) {
         shareBridge = std::make_unique<ShareBridge>(shc);
         QObject::connect(&app, &QGuiApplication::applicationStateChanged, shareBridge.get(), &ShareBridge::onApplicationStateChanged);
         QObject::connect(connectionBridge.get(), &ConnectionBridge::changed, shareBridge.get(), &ShareBridge::onConnectionChanged);
+
+        // Trash and versions (specs/006-trash-and-versions): every request follows a tap on the trash or versions screen; a tap brings Wi-Fi up like in the files
+        // client (never at start, never by itself, nothing is queued).
+        TrashBridge::Config trc;
+        trc.store = store.get();
+        trc.worker = &worker;
+        trc.http = http.get();
+        trc.clock = &clock;
+        trc.wifi_up = cc.wifi_up;
+        trc.ensure_network = cc.ensure_network;
+        trc.format_date = bc.format_date;
+        trc.delete_enabled = true;   // constitution 1.3.0: Delete for good and Empty trash exist on the trash screen only, behind the confirmation chain (rule N12)
+        trashBridge = std::make_unique<TrashBridge>(trc);
+        QObject::connect(&app, &QGuiApplication::applicationStateChanged, trashBridge.get(), &TrashBridge::onApplicationStateChanged);
+        QObject::connect(connectionBridge.get(), &ConnectionBridge::changed, trashBridge.get(), &TrashBridge::onConnectionChanged);
+        VersionsBridge::Config vrc;
+        vrc.store = store.get();
+        vrc.worker = &worker;
+        vrc.http = http.get();
+        vrc.clock = &clock;
+        vrc.wifi_up = cc.wifi_up;
+        vrc.ensure_network = cc.ensure_network;
+        vrc.format_date = bc.format_date;
+        vrc.format_date_time = tc.format_date_time;
+        versionsBridge = std::make_unique<VersionsBridge>(vrc);
     }
 
     // About screens: the manifest and the license texts live in pbcloud-licenses/ next to the app on the reader,
@@ -405,6 +434,8 @@ int main(int argc, char** argv) {
     if (chooserBridge) engine.rootContext()->setContextProperty(QStringLiteral("chooser"), chooserBridge.get());
     if (syncBridge) engine.rootContext()->setContextProperty(QStringLiteral("sync"), syncBridge.get());
     if (shareBridge) engine.rootContext()->setContextProperty(QStringLiteral("share"), shareBridge.get());
+    if (trashBridge) engine.rootContext()->setContextProperty(QStringLiteral("trash"), trashBridge.get());
+    if (versionsBridge) engine.rootContext()->setContextProperty(QStringLiteral("versions"), versionsBridge.get());
     if (connectionBridge) {
         engine.rootContext()->setContextProperty(QStringLiteral("connection"), connectionBridge.get());
         engine.addImageProvider(QStringLiteral("qr"), new QrImageProvider(connectionBridge.get()));   // the engine owns it

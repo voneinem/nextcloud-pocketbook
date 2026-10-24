@@ -108,3 +108,11 @@ DT-M2 of feature 005 records the value that the call returns when PB Office is n
   PB Cloud's logs and database hold no link, subject or marker (DT-M3, searched for the link address and the marker, not for the item name).
 - Not run: the running-PB-Office case and the missing-PB-Office case (DT-M2), so the notice after the app was switched away and the value returned for a missing PB Office
   are still unobserved. The seconds from the confirm tap to the editor were not noted.
+
+## Trash and versions (feature 006, version 0.6.0)
+
+Not measured yet. DT-T1 decides where the Trash tool lives: the Home page has eight tools now, the normal panel of the folder page seven, and the details panel of a file up
+to seven with Versions. If a panel is too tight at the usual touch size, Trash moves to the top bar of the Home page and the folder page, and Versions becomes a row of the
+details list; the pages and bridges stay as they are. DT-T2 to DT-T4 record how the confirmations read on the panel, the time and memory of a 1,000-item trash and the
+behavior of Empty trash with the screen and Wi-Fi switched off. LV-T1 to LV-T10 in `docs/live-server-checklist.md` hold what only a real server can show; until they are run
+the plan's restore to a chosen place may degrade to the message "This server can restore only to the original place".

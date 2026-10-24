@@ -285,6 +285,14 @@ Item {
                 icon: "list"
                 onClicked: page.StackView.view.push(Qt.resolvedUrl("QueuePage.qml"))
             },
+            ToolButton {
+                objectName: "folderTrash"
+                text: qsTr("Trash")
+                icon: "trash"
+                visible: !browse.selecting
+                enabled: connection.hasAccount
+                onClicked: page.StackView.view.push(Qt.resolvedUrl("TrashPage.qml"))   // DT-T1 checks that the panel still fits at the usual touch size
+            },
             ToolButton { objectName: "folderSort"; text: qsTr("Sort"); icon: "filter"; visible: !browse.selecting; enabled: browse.hasListing; onClicked: page.openSortChoice() },
             ToolButton { objectName: "folderSettings"; text: qsTr("Settings"); icon: "gear"; visible: !browse.hasListing && !browse.busy; onClicked: page.StackView.view.push(Qt.resolvedUrl("SettingsPage.qml")) }
         ]

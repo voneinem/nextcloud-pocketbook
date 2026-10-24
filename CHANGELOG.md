@@ -3,6 +3,32 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.6.0 - 2026-10-24
+
+Trash and file versions (specs/006-trash-and-versions). Tested on the host against a fake Nextcloud server; nothing is verified against a real server or on a reader
+(`docs/live-server-checklist.md` LV-T1 ..., `docs/device-test-checklist.md` DT-T1 ...). **Database schema 6**: one table holds the last trash list (an older build refuses the
+upgraded database). Constitution 1.3.0 allows deleting from the trash, on the trash screen only.
+
+### Trash
+- **Trash** (Home page and folder page) lists what was deleted on the server, newest first, with the folder it came from, the day and the size; page by page; read only when
+  you open it or tap Refresh; the last list is shown, marked with its age, without a connection.
+- Choose one item and **Restore** it: after a confirmation it goes back to its original place. A taken name or a missing folder never leads to an overwrite, a rename or a created
+  folder: you choose another folder (server folders only) and, if needed, another name. Restore to a chosen place depends on the server and says so when it cannot. A restore whose
+  answer was lost is shown as outcome unknown and is never repeated by the app.
+- **Delete for good** and **Empty trash** exist only on this screen: one confirmation for a file, two for a folder and for Empty trash, each naming what is lost and with Cancel
+  first; only the named items are removed, one request at a time (an item that arrived meanwhile stays), a locked item is counted and the run goes on, a refused login, a pause
+  or a lost answer stops it, Cancel stops it between two requests. New mechanical rules N11 (the endpoints are named in two modules only) and N12 (only the trash bridge deletes
+  from the trash) and U9 (an irreversible dialog defaults to Cancel), each with a self-test.
+
+### Versions
+- **Versions** in the details of a file lists the older versions (date and size, newest first). **Restore** makes one the current content after a confirmation that names the file
+  and the version; the content that was current is kept by the server as one more version (the app reports a server that does not), and a file that changed after the list was
+  read is refused before anything is sent.
+
+### Messages
+- When the server's trash app or versions app is off, the screen says so in plain words and offers no action; an unclear answer is a generic message with a short code and never
+  the claim that an app is off. Nothing about the trash or the versions is queued, retried or sent in the background.
+
 ## 0.5.0 - 2026-10-24
 
 Mail link (specs/005-mail-link). Tested on the host with a stand-in for the mail app; on the reader DT-M1, DT-M3 and DT-M4 were run (the draft opens); DT-M2 (PB Office

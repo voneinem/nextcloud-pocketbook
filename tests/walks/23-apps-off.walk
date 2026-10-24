@@ -1,0 +1,32 @@
+# Trash and versions are server apps that an administrator can turn off (specs/006-trash-and-versions, Story 5): the screens say so in plain words and offer no
+# tool that cannot work. Run last, with the same server: it turns the trash app off before this run starts.
+# server trash-disable
+# server versions-disable
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeTrash
+waitfor trashExplain
+shot @OUT@/230-trash-off.png
+expect trashExplain This server has no trash
+expect trashExplain cannot be listed or restored
+expect trashExplain permanent
+expect trashExplain administrator
+expect_absent trashRow
+expect_absent trashCheck
+tap trashBack
+waitfor homeState Connected to Example Cloud
+# the versions app is off too: the versions screen of a file explains it and offers no restore (the app opens Files in the folder where the walk before left it)
+tap homeFiles
+waitfor folderPath 0-walk
+waitfor folderRow
+tap folderRow 0
+waitfor detailsVersions
+tap detailsVersions
+waitfor versionsExplain
+shot @OUT@/231-versions-off.png
+expect versionsExplain does not keep older versions
+expect versionsExplain cannot be listed or restored
+expect versionsExplain administrator
+expect_absent versionsRow
+expect_absent versionsRestore
+quit

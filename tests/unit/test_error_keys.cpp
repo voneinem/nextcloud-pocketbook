@@ -31,6 +31,10 @@ PB_TEST(every_key_of_the_contract_is_listed_exactly_once) {
         "share_upload_not_allowed", "share_item_not_shareable", "share_item_gone", "share_not_changeable", "share_gone",
         "share_changed_meanwhile", "share_unknown_outcome", "share_list_too_big", "share_refused",
         "expiry_invalid", "expiry_in_past", "password_invalid", "permission_invalid",
+        // trash and versions (specs/006-trash-and-versions/contracts/core-interfaces.md "error_keys additions"); trash_unavailable, refresh_first
+        // and outcome_unknown exist from feature 002
+        "versions_unavailable", "restore_name_taken", "restore_parent_missing", "restore_place_unsupported", "restore_into_self", "trash_item_gone",
+        "version_changed_meanwhile", "version_gone", "file_gone", "no_older_versions", "trash_not_actionable",
     };
     const auto& all = pbc::all_error_keys();
     std::set<std::string> seen(all.begin(), all.end());
@@ -65,6 +69,15 @@ PB_TEST(the_write_side_keys_have_the_classes_of_the_contract) {
     PB_CHECK(pbc::class_of("other_account") == pbc::ErrorClass::Auth);
     // an unknown key still falls back to a protocol error
     PB_CHECK(pbc::error_from_key("name_exist").key == "protocol_error");
+}
+
+PB_TEST(the_trash_and_version_keys_have_their_classes) {
+    for (const char* k : {"versions_unavailable", "restore_place_unsupported", "trash_unavailable", "refresh_first"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Unsupported);
+    for (const char* k : {"restore_name_taken", "restore_parent_missing", "trash_item_gone", "version_changed_meanwhile", "version_gone", "file_gone", "no_older_versions"})
+        PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Server);
+    for (const char* k : {"restore_into_self", "trash_not_actionable"}) PB_CHECK(pbc::class_of(k) == pbc::ErrorClass::Protocol);
+    PB_CHECK(pbc::class_of("outcome_unknown") == pbc::ErrorClass::Network);
 }
 
 PB_TEST(the_sync_keys_have_the_classes_of_the_data_model) {

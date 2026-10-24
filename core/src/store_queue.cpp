@@ -674,6 +674,19 @@ Error Store::queue_retarget(int64_t id, const std::string& new_parent) {
     return {};
 }
 
+Error Store::forget_folder_after_change(const std::string& folder) {
+    const std::string path = normalize_remote_path(folder);
+    std::lock_guard<std::mutex> lock(mu_);
+    store_util::Transaction tx(db_);
+    if (!tx.open) return storage_error(db_, "write_failed");
+    if (path != "/") {
+        if (!run_text(db_, "DELETE FROM entries WHERE parent = ?1", {path}) || !run_text(db_, "DELETE FROM folders WHERE path = ?1", {path}))
+            return storage_error(db_, "write_failed");
+    }
+    if (!forget_versions_up(db_, path)) return storage_error(db_, "write_failed");
+    return tx.commit() ? Error() : storage_error(db_, "write_failed");
+}
+
 Error Store::queue_confirm(int64_t id, const std::string& etag, std::optional<int64_t> fileid, const ConfirmContext& context) {
     std::lock_guard<std::mutex> lock(mu_);
     store_util::Transaction tx(db_);

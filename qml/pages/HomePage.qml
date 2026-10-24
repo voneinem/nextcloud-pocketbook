@@ -48,6 +48,13 @@ Item {
                 onClicked: page.push("QueuePage.qml")
             },
             ToolButton {
+                objectName: "homeTrash"
+                text: qsTr("Trash")
+                icon: "trash"
+                enabled: connection.hasAccount
+                onClicked: page.push("TrashPage.qml")   // DT-T1 checks that the eight tools still fit at the usual touch size
+            },
+            ToolButton {
                 objectName: "homeSync"
                 text: sync.readyCount > 0 ? qsTr("Sync (%1)").arg(sync.readyCount) : qsTr("Sync")
                 icon: "arrows-both"

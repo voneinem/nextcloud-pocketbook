@@ -30,6 +30,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -333,6 +334,97 @@ public:
         return d;
     }
 
+    // ---- the trash and the versions (specs/006-trash-and-versions, contracts/trash-requests.md) ----
+    // The trashbin is /remote.php/dav/trashbin/<uid>/trash/ (PROPFIND, MOVE to .../restore/<name> or to a files path, DELETE of one item) and the
+    // versions are /remote.php/dav/versions/<uid>/versions/<fileid>/ (PROPFIND, MOVE to .../restore/target). UNVERIFIED against a real server
+    // (docs/live-server-checklist.md LV-T*). Both exist only while their capability says so (set_trash, set_versions): an app that is off answers 404.
+    // A file deleted through the files endpoint of feature 002 while the trash is on lands in this trash too.
+    struct TrashEntry {
+        std::string trash_name;                  // "<name>.d<deleted_at>": the unique identity
+        std::string name;                        // nc:trashbin-filename
+        std::string original;                    // nc:trashbin-original-location, as the server sends it ("Books/story.epub")
+        int64_t deleted_at = 0;
+        bool folder = false;
+        std::map<std::string, Node> nodes;       // "" = the item itself, "/sub/x" = a member of a folder
+        std::string permissions = "GD";
+        bool encrypted = false;
+        bool locked = false;                     // a delete or restore answers 423
+        std::string odd_type;                    // a resource type element the app cannot know ("oc:odd")
+        int64_t fileid = 0;
+    };
+    struct Version {
+        std::string id;                          // the modification time the content had, as digits
+        std::string content;
+        int64_t mtime = 0;
+    };
+    std::string add_trash_file(const std::string& original_path, const std::string& content, int64_t deleted_at) {
+        TrashEntry e = make_entry(original_path, deleted_at, false);
+        Node n;
+        n.content = content;
+        n.mtime = deleted_at - 3600;
+        e.nodes[""] = n;
+        return store_entry(std::move(e));
+    }
+    // `files`: relative path ("/a.txt", "/sub/b.txt") -> content; the folders in between exist
+    std::string add_trash_folder(const std::string& original_path, int64_t deleted_at, const std::map<std::string, std::string>& files = {}) {
+        TrashEntry e = make_entry(original_path, deleted_at, true);
+        Node top = folder_node();
+        top.mtime = deleted_at - 3600;
+        e.nodes[""] = top;
+        for (const auto& kv : files) {
+            for (std::string dir = pbc::parent_of(kv.first); dir != "/"; dir = pbc::parent_of(dir))
+                if (!e.nodes.count(dir)) e.nodes[dir] = folder_node();
+            Node f;
+            f.content = kv.second;
+            f.mtime = deleted_at - 3600;
+            e.nodes[kv.first] = f;
+        }
+        return store_entry(std::move(e));
+    }
+    TrashEntry& trash_entry(const std::string& trash_name) {
+        for (auto& e : trashbin_)
+            if (e.trash_name == trash_name) return e;
+        throw std::runtime_error("no trash item " + trash_name);
+    }
+    std::vector<std::string> trash_names() const {
+        std::vector<std::string> out;
+        for (const auto& e : trashbin_) out.push_back(e.trash_name);
+        return out;
+    }
+    size_t trashbin_count() const { return trashbin_.size(); }
+    bool trashbin_has(const std::string& trash_name) const {
+        for (const auto& e : trashbin_)
+            if (e.trash_name == trash_name) return true;
+        return false;
+    }
+    void lock_trash_item(const std::string& trash_name, bool on = true) { trash_entry(trash_name).locked = on; }
+    void set_versions(std::optional<bool> on) { versions_cap_ = on; }   // files.versioning: true, false, or absent (nullopt)
+    // The capabilities answer fails (500) or has no "files" object at all.
+    void set_capabilities_failing(bool on) { caps_failing_ = on; }
+    void set_capabilities_without_files(bool on) { caps_without_files_ = on; }
+    // The server puts an item back under another name ("name (restored).ext") instead of refusing when the name is taken.
+    void set_restore_renames(bool on) { restore_renames_ = on; }
+    // 0 = a trash item can be moved to a files path (the default); otherwise that status is the answer (403: the server cannot).
+    void set_restore_to_files_status(long status) { restore_to_files_status_ = status; }
+    // The versions of a file. `id` is the file's modification time at that moment; the newest is last.
+    void add_version(const std::string& path, const std::string& content, int64_t mtime) {
+        Version v;
+        v.id = std::to_string(mtime);
+        v.content = content;
+        v.mtime = mtime;
+        versions_[node(pbc::normalize_remote_path(path)).fileid].push_back(v);
+    }
+    const std::vector<Version>& versions_of(const std::string& path) const {
+        static const std::vector<Version> none;
+        auto it = tree_.find(pbc::normalize_remote_path(path));
+        if (it == tree_.end()) return none;
+        auto v = versions_.find(it->second.fileid);
+        return v == versions_.end() ? none : v->second;
+    }
+    // false: restoring a version drops the current content instead of keeping it as one more version (a server that breaks the rule)
+    void set_versions_keep_current(bool on) { versions_keep_current_ = on; }
+    std::string content_of(const std::string& path) const { return tree_.at(pbc::normalize_remote_path(path)).content; }
+
     // ---- share links (specs/004-share-links, contracts/share-requests.md) ----
     // The shares side: list, inherited, one share, create, change, remove; the sharing rules of the server are switches that show in the
     // capabilities AND are enforced with statuses that do not name the rule in text (the wording of meta.message is another switch).
@@ -611,6 +703,10 @@ private:
         if ((route == "/remote.php/dav/" || route == "/remote.php/dav") && r.method == "SEARCH") return search(r);
         const std::string uploads = "/remote.php/dav/uploads/";
         if (route.compare(0, uploads.size(), uploads) == 0) return uploads_area(r, route);
+        const std::string trashbin = "/remote.php/dav/trashbin/";
+        if (route.compare(0, trashbin.size(), trashbin) == 0) return trashbin_area(r, route);
+        const std::string versions = "/remote.php/dav/versions/";
+        if (route.compare(0, versions.size(), versions) == 0) return versions_area(r, route);
         return reply(404, "{\"message\":\"not found\"}");
     }
 
@@ -663,6 +759,7 @@ private:
         if (!authorized(r)) return reply(401, "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":997,\"message\":\"Current user is not logged in\"},\"data\":[]}}");
         const std::string ok = "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":100,\"message\":\"OK\"},\"data\":";
         if (route.find("/cloud/capabilities") != std::string::npos) {
+            if (caps_failing_) return reply(500, "{\"message\":\"capabilities failed\"}");
             std::vector<std::string> parts;
             std::string v = version_;
             for (size_t p; (p = v.find('.')) != std::string::npos; v = v.substr(p + 1)) parts.push_back(v.substr(0, p));
@@ -1346,6 +1443,7 @@ private:
             if (locked.size() == 1 && locked[0] == p && !it->second.folder) return sabre_error(423, "FileLocked");
             return partial_207(locked);
         }
+        if (trash_enabled_) trash_subtree(p);   // one item of the trash for the whole subtree (specs/006-trash-and-versions)
         for (const std::string& sp : subtree(p)) {
             const Node& n = tree_.at(sp);
             if (trash_enabled_) trash_.push_back({sp, n.folder, n.size()});
@@ -1498,6 +1596,221 @@ private:
         return written(exists ? 204 : 201, tree_.at(dst));
     }
 
+    // =================================================================================================================================
+    // The trash and the versions (specs/006-trash-and-versions, contracts/trash-requests.md T2, T4, T5, T6, T7, T8). UNVERIFIED (LV-T*).
+    // =================================================================================================================================
+    TrashEntry make_entry(const std::string& original_path, int64_t deleted_at, bool folder) {
+        TrashEntry e;
+        const std::string p = pbc::normalize_remote_path(original_path);
+        e.name = p.substr(p.rfind('/') + 1);
+        e.original = p.substr(1);
+        e.folder = folder;
+        e.deleted_at = deleted_at;
+        return e;
+    }
+    std::string store_entry(TrashEntry e) {
+        while (trashbin_has(e.name + ".d" + std::to_string(e.deleted_at))) ++e.deleted_at;   // the identity is unique per deletion
+        e.trash_name = e.name + ".d" + std::to_string(e.deleted_at);
+        e.fileid = ++next_id_;
+        const std::string name = e.trash_name;
+        trashbin_.push_back(std::move(e));
+        return name;
+    }
+    // a delete through the files endpoint while the trash is on: the whole subtree goes into one trash item
+    void trash_subtree(const std::string& p) {
+        TrashEntry e = make_entry(p, server_time_, tree_.at(p).folder);
+        for (const std::string& sp : subtree(p)) e.nodes[sp.substr(p.size())] = tree_.at(sp);
+        store_entry(std::move(e));
+    }
+    static std::vector<std::string> split_route(const std::string& s) {
+        std::vector<std::string> out;
+        size_t start = 0;
+        for (;;) {
+            const size_t q = s.find('/', start);
+            if (q == std::string::npos) {
+                out.push_back(s.substr(start));
+                return out;
+            }
+            out.push_back(s.substr(start, q - start));
+            start = q + 1;
+        }
+    }
+    // "<base>/remote.php/dav/<area>/<uid>/<collection>[/<name>]" -> the segments after the area, decoded; empty when the address is not that
+    std::vector<std::string> area_segments(const std::string& address, const std::string& area) const {
+        const std::string prefix = base_url() + "/remote.php/dav/" + area + "/";
+        std::string path = address;
+        if (path.compare(0, prefix.size(), prefix) == 0) path = path.substr(prefix.size());
+        else if (path.compare(0, 16 + area.size() + 1, "/remote.php/dav/" + area + "/") == 0) path = path.substr(16 + area.size() + 1);
+        else return {};
+        std::vector<std::string> segs = split_route(path.substr(0, path.find('?')));
+        for (std::string& seg : segs) seg = pct_decode(seg);
+        return segs;
+    }
+    const std::string trashbin_base() const { return "/remote.php/dav/trashbin" + pbc::encode_path("/" + user_id_) + "/"; }
+    std::string trash_response_xml(const TrashEntry& e) const {
+        const std::string href = trashbin_base() + "trash/" + pbc::encode_path("/" + e.trash_name).substr(1) + (e.folder ? "/" : "");
+        std::string x = "<d:response><d:href>" + href + "</d:href><d:propstat><d:prop>";
+        x += "<nc:trashbin-filename>" + pbc::dav::escape(e.name) + "</nc:trashbin-filename>";
+        x += "<nc:trashbin-original-location>" + pbc::dav::escape(e.original) + "</nc:trashbin-original-location>";
+        x += "<nc:trashbin-deletion-time>" + std::to_string(e.deleted_at) + "</nc:trashbin-deletion-time>";
+        if (!e.folder) x += "<d:getcontentlength>" + std::to_string(e.nodes.at("").size()) + "</d:getcontentlength>";
+        if (!e.odd_type.empty()) x += "<d:resourcetype><" + e.odd_type + "/></d:resourcetype>";
+        else x += e.folder ? "<d:resourcetype><d:collection/></d:resourcetype>" : "<d:resourcetype/>";
+        x += "<oc:fileid>" + std::to_string(e.fileid) + "</oc:fileid><oc:permissions>" + e.permissions + "</oc:permissions>";
+        if (e.encrypted) x += "<nc:is-encrypted>1</nc:is-encrypted>";
+        return x + "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+    }
+    Response trashbin_area(const pbc::Request& r, const std::string& route) {
+        if (maintenance_) return reply(503, "", "application/xml");
+        if (!authorized(r)) return reply(401, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");
+        if (!(trash_cap_ && *trash_cap_)) return reply(404, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");   // no trash app: no endpoint
+        const std::vector<std::string> segs = area_segments(route, "trashbin");
+        if (segs.size() < 2 || segs[0] != user_id_) return reply(404, "", "application/xml");
+        const std::string& collection = segs[1];
+        const std::string name = segs.size() > 2 ? segs[2] : std::string();
+        if (segs.size() > 3 || (segs.size() == 3 && false)) return reply(404, "", "application/xml");
+        if (r.method == "PROPFIND" && collection == "trash") {
+            const std::string depth = pbc::header_value(r.headers, "Depth");
+            if (depth != "0" && depth != "1") return reply(403, "", "application/xml");
+            std::string xml = "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:oc=\"http://owncloud.org/ns\" xmlns:nc=\"http://nextcloud.org/ns\">";
+            if (name.empty()) {
+                xml += "<d:response><d:href>" + trashbin_base() + "trash/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>"
+                       "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+                if (depth == "1")
+                    for (const TrashEntry& e : trashbin_) xml += trash_response_xml(e);
+            } else {
+                bool found = false;
+                for (const TrashEntry& e : trashbin_)
+                    if (e.trash_name == name) {
+                        xml += trash_response_xml(e);
+                        found = true;
+                    }
+                if (!found) return reply(404, "", "application/xml");
+            }
+            return reply(207, xml + "</d:multistatus>", "application/xml; charset=utf-8");
+        }
+        if (r.method == "DELETE" && collection == "trash") {
+            if (name.empty()) {   // "empty the trash": every item, also those the user never saw (the app never sends this)
+                trashbin_.clear();
+                return reply(204, "", "application/xml");
+            }
+            for (auto it = trashbin_.begin(); it != trashbin_.end(); ++it)
+                if (it->trash_name == name) {
+                    if (it->locked) return sabre_error(423, "FileLocked");
+                    trashbin_.erase(it);
+                    return reply(204, "", "application/xml");
+                }
+            return reply(404, "", "application/xml");
+        }
+        if (r.method == "MOVE" && collection == "trash" && !name.empty()) return trash_move(r, name);
+        return reply(405, "", "application/xml");
+    }
+    // the unique name "name (restored).ext" a server may choose when the place is taken
+    static std::string restored_name(const std::string& name) {
+        const size_t dot = name.rfind('.');
+        if (dot == std::string::npos || dot == 0) return name + " (restored)";
+        return name.substr(0, dot) + " (restored)" + name.substr(dot);
+    }
+    Response trash_move(const pbc::Request& r, const std::string& name) {
+        TrashEntry* e = nullptr;
+        for (auto& t : trashbin_)
+            if (t.trash_name == name) e = &t;
+        if (!e) return reply(404, "", "application/xml");
+        if (e->locked) return sabre_error(423, "FileLocked");
+        const std::string destination = pbc::header_value(r.headers, "Destination");
+        std::string target;
+        bool exists_means_refuse = true;
+        const std::vector<std::string> restore = area_segments(destination, "trashbin");
+        if (restore.size() >= 2 && restore[0] == user_id_ && restore[1] == "restore") {   // T4: to the original place
+            if (e->original.empty()) return reply(409, "", "application/xml");
+            target = "/" + e->original;
+        } else {                                                                            // T5: to a path of the files
+            if (restore_to_files_status_ != 0) return sabre_error(restore_to_files_status_, "Forbidden");
+            if (!destination_path(destination, &target)) return reply(400, "", "application/xml");
+            exists_means_refuse = pbc::header_value(r.headers, "Overwrite") == "F";
+        }
+        const std::string parent = pbc::parent_of(target);
+        if (parent != "/" && !tree_.count(parent)) return reply(409, "", "application/xml");
+        if (tree_.count(target)) {
+            if (restore.size() >= 2 && restore_renames_) target = parent + (parent == "/" ? "" : "/") + restored_name(target.substr(target.rfind('/') + 1));
+            else if (exists_means_refuse) return reply(412, "", "application/xml");
+            else for (const std::string& sp : subtree(target)) tree_.erase(sp);
+        }
+        if (tree_.count(target)) return reply(412, "", "application/xml");
+        std::vector<std::pair<std::string, Node>> placed(e->nodes.begin(), e->nodes.end());
+        for (auto& kv : placed) put(target + kv.first, kv.second);
+        for (auto it = trashbin_.begin(); it != trashbin_.end(); ++it)
+            if (it->trash_name == name) {
+                trashbin_.erase(it);
+                break;
+            }
+        return written(201, tree_.at(target));
+    }
+
+    const std::string versions_base() const { return "/remote.php/dav/versions" + pbc::encode_path("/" + user_id_) + "/"; }
+    const std::string* path_of_fileid(int64_t id) const {
+        for (const auto& kv : tree_)
+            if (!kv.second.folder && kv.second.fileid == id) return &kv.first;
+        return nullptr;
+    }
+    Response versions_area(const pbc::Request& r, const std::string& route) {
+        if (maintenance_) return reply(503, "", "application/xml");
+        if (!authorized(r)) return reply(401, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");
+        if (!(versions_cap_ && *versions_cap_)) return reply(404, "<?xml version=\"1.0\"?><d:error xmlns:d=\"DAV:\"/>", "application/xml");   // no versions app
+        const std::vector<std::string> segs = area_segments(route, "versions");
+        if (segs.size() < 2 || segs[0] != user_id_ || segs[1] != "versions" || segs.size() > 4) return reply(404, "", "application/xml");
+        if (segs.size() < 3 || segs[2].empty()) return reply(405, "", "application/xml");
+        int64_t fileid = 0;
+        for (char c : segs[2]) {
+            if (c < '0' || c > '9' || segs[2].size() > 18) return reply(404, "", "application/xml");
+            fileid = fileid * 10 + (c - '0');
+        }
+        const std::string* path = path_of_fileid(fileid);
+        if (!path) return reply(404, "", "application/xml");
+        const std::string vid = segs.size() > 3 ? segs[3] : std::string();
+        const std::vector<Version>& vs = versions_[fileid];
+        if (r.method == "PROPFIND") {
+            const std::string depth = pbc::header_value(r.headers, "Depth");
+            if (depth != "0" && depth != "1") return reply(403, "", "application/xml");
+            if (!vid.empty()) return reply(404, "", "application/xml");
+            const std::string base = versions_base() + "versions/" + std::to_string(fileid) + "/";
+            std::string xml = "<?xml version=\"1.0\"?>\n<d:multistatus xmlns:d=\"DAV:\" xmlns:nc=\"http://nextcloud.org/ns\">";
+            xml += "<d:response><d:href>" + base + "</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>"
+                   "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+            if (depth == "1")
+                for (auto it = vs.rbegin(); it != vs.rend(); ++it)
+                    xml += "<d:response><d:href>" + base + it->id + "</d:href><d:propstat><d:prop><d:getlastmodified>" + http_date(it->mtime) +
+                           "</d:getlastmodified><d:getcontentlength>" + std::to_string(it->content.size()) +
+                           "</d:getcontentlength><d:getcontenttype>application/octet-stream</d:getcontenttype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>";
+            return reply(207, xml + "</d:multistatus>", "application/xml; charset=utf-8");
+        }
+        if (r.method == "MOVE" && !vid.empty()) {
+            const auto dst = area_segments(pbc::header_value(r.headers, "Destination"), "versions");
+            if (dst.size() < 3 || dst[0] != user_id_ || dst[1] != "restore") return reply(400, "", "application/xml");
+            const Version* chosen = nullptr;
+            for (const Version& v : vs)
+                if (v.id == vid) chosen = &v;
+            if (!chosen) return reply(404, "", "application/xml");
+            Node& n = tree_.at(*path);
+            if (n.locked) return sabre_error(423, "FileLocked");
+            const Version picked = *chosen;
+            std::vector<Version>& mine = versions_[fileid];
+            if (versions_keep_current_) {
+                Version cur;
+                cur.id = std::to_string(n.mtime);
+                cur.content = n.synthetic_size >= 0 ? n.bytes(0, n.size()) : n.content;
+                cur.mtime = n.mtime;
+                mine.push_back(cur);
+            }
+            n.content = picked.content;
+            n.synthetic_size = -1;
+            n.mtime = picked.mtime;
+            touch(*path);
+            return reply(201, "", "application/xml");
+        }
+        return reply(405, "", "application/xml");
+    }
+
     std::string dav_and_files_caps() const {
         auto array = [](const std::vector<std::string>& v) {
             std::string out = "[";
@@ -1510,6 +1823,7 @@ private:
             files += piece;
         };
         if (trash_cap_) add(std::string("\"undelete\":") + (*trash_cap_ ? "true" : "false"));
+        if (versions_cap_) add(std::string("\"versioning\":") + (*versions_cap_ ? "true" : "false"));
         if (max_chunk_cap_) add("\"chunked_upload\":{\"max_size\":" + std::to_string(*max_chunk_cap_) + "}");
         if (forbidden_in_caps_) {
             if (!forbidden_chars_.empty()) {
@@ -1521,6 +1835,7 @@ private:
             if (!forbidden_basenames_.empty()) add("\"forbidden_filename_basenames\":" + array(forbidden_basenames_));
             if (!forbidden_extensions_.empty()) add("\"forbidden_filename_extensions\":" + array(forbidden_extensions_));
         }
+        if (caps_without_files_) return std::string("\"dav\":{") + (chunking_cap_ ? "\"chunking\":\"1.0\"" : "") + "}";
         return std::string("\"dav\":{") + (chunking_cap_ ? "\"chunking\":\"1.0\"" : "") + "},\"files\":{" + files + "}";
     }
 
@@ -1610,6 +1925,11 @@ private:
     std::string forbidden_chars_;
     std::vector<std::string> forbidden_names_, forbidden_basenames_, forbidden_extensions_, blocked_ext_;
     std::vector<Trashed> trash_;
+    std::vector<TrashEntry> trashbin_;                       // the trash as the trashbin endpoint shows it (specs/006-trash-and-versions)
+    std::map<int64_t, std::vector<Version>> versions_;       // by file id, the newest last
+    std::optional<bool> versions_cap_ = true;
+    bool caps_failing_ = false, caps_without_files_ = false, restore_renames_ = false, versions_keep_current_ = true;
+    long restore_to_files_status_ = 0;
     int permanent_deletes_ = 0, overwrites_ = 0;
     long long bytes_uploaded_ = 0, bytes_downloaded_ = 0;
     std::map<std::string, Session> sessions_;

@@ -126,11 +126,11 @@ PB_TEST(a_failing_upgrade_is_rolled_back_and_keeps_the_backup) {
     sqlite3_close(db);
 }
 
-PB_TEST(a_schema_6_database_is_refused_and_left_byte_identical) {
+PB_TEST(a_schema_7_database_is_refused_and_left_byte_identical) {
     pbtest::TmpDir d;
     {
         auto s = open_current(d);
-        PB_CHECK(s->debug_exec("PRAGMA user_version = 6").empty());
+        PB_CHECK(s->debug_exec("PRAGMA user_version = 7").empty());
     }
     const std::string path = d.file("data/pbcloud.db");
     const std::string before = read_file(path);

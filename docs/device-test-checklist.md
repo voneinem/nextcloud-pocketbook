@@ -125,6 +125,18 @@ returns 1 and takes nothing; observed with the hand-off probe on 2026-10-24, `do
 | DT-M3 | After DT-M1 and DT-M2 mount the reader and search `system/pbcloud/` (logs, database, probe files) for the link text and the item name in the logs | nothing found | O | 2026-10-24 | Searched PB Cloud's `pbcloud.log`, `pbcloud.log.prev` and `pbcloud.db` after the run: no link address (`/s/`), no subject, no `pbo-mail` marker. The item name was not searched by name (the listing cache holds names by design); PB Office's log holds no link either. Only the cold, accepted case was run |
 | DT-M4 | After DT-M1 press Back in PB Office, then Home | PB Office's main screen, then PB Cloud with its list (the link screen is gone); record whether the link screen was already gone when PB Cloud came back | O | 2026-10-24 | Owner: Back and Home after the hand-off behaved as expected ("everything fine"); whether the link screen was already gone on return was not noted separately |
 
+## Trash and versions (feature 006)
+
+Added by `specs/006-trash-and-versions/`. Same legend and rules as above. Prerequisite: a Nextcloud account whose server has the trash app and the versions app on, with a
+few deleted items and a file with older versions. Nothing below has been run on the reader yet.
+
+| ID | Item | Expected | Status | Date | Build/result |
+|----|------|----------|--------|------|--------------|
+| DT-T1 | The new tools: Trash on the Home page (eight tools) and in the folder page's normal panel (seven tools), Versions in the details panel of a file (up to seven tools), Restore, Delete for good, Empty trash and Refresh on the trash screen | all fit at the usual touch size and are legible at reading distance; if a panel is too tight, Trash moves to the top bar (plan, owner point 3); note which panel | U | | |
+| DT-T2 | The restore flow and the two-dialog flow of Empty trash and of a folder deleted for good on the e-ink panel | the proposal, the chooser (server folders only), the confirmations and the result are readable; Cancel is first in every confirmation; the second confirmation needs a deliberate tap; note the number of full refreshes | U | | |
+| DT-T3 | A trash of 1,000 items (and 300 for a first check): the time from the Trash tap to the first page, paging, peak memory | first page <= 6 s on Wi-Fi; paging without delay; peak `VmHWM` <= 150 MB; note the three values | U | | |
+| DT-T4 | Empty trash of 50 items with the screen switched off half way, and with Wi-Fi switched off half way | the run goes on with the screen off and stops with a message at the lost connection (removed / not removed / not tried); a refresh shows the truth; progress updates are coarse (about every tenth item); note what a lost answer shows | U | | |
+
 ## Recording
 
 For each measured value write the build version (About) and the date. Findings that change a design decision

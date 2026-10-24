@@ -171,4 +171,22 @@ PB_TEST(folders_are_paged) {
     PB_CHECK_EQ(e.chooser->page(), 1);
 }
 
+PB_TEST(a_chooser_that_serves_the_server_only_lists_no_folder_that_is_merely_queued) {
+    Env e;
+    pbc::ServerCaps caps;
+    PB_CHECK(e.store->save_server_caps(caps).ok());
+    e.cache("/Docs");
+    pbc::QueueActions act(*e.store, pbc::SourceRules());
+    PB_CHECK(act.new_folder("/Docs", "Fresh").error.ok());   // queued, not yet on the server
+    e.chooser->setServerOnly(true);
+    PB_CHECK(e.chooser->serverOnly());
+    e.chooser->open("/Docs");
+    QStringList n = names(*e.chooser);
+    PB_CHECK(!n.contains("Fresh"));   // a restore cannot go to a folder the server does not have
+    PB_CHECK(n.contains("A") && n.contains("B"));
+    e.chooser->setServerOnly(false);   // the other callers (Move, Copy) still see it
+    n = names(*e.chooser);
+    PB_CHECK(n.contains("Fresh"));
+}
+
 PB_TEST_MAIN()

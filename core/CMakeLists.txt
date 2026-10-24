@@ -29,6 +29,10 @@ set(PBC_CORE_SOURCES
     src/share_diagnose.cpp
     src/share_api.cpp
     src/mail_handoff.cpp
+    src/trash_types.cpp
+    src/trash_parse.cpp
+    src/trash_rules.cpp
+    src/trash_api.cpp
     src/store_state.cpp
     src/store_util.cpp
     src/log.cpp
@@ -41,6 +45,7 @@ set(PBC_CORE_SOURCES
     src/json_min.cpp
     src/nc_server.cpp
     src/store_files.cpp
+    src/store_trash.cpp
     src/auth_guard.cpp
     src/nc_login.cpp
     src/qr_code.cpp

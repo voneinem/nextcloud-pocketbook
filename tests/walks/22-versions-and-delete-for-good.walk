@@ -1,0 +1,114 @@
+# Older versions of a file (specs/006-trash-and-versions, Story 3): the versions are listed with date and size, a restore asks for a confirmation that names the
+# file and the version and says that the current content is kept as one more version, and afterwards the list holds that content as a version. Run after
+# 21-trash-restore.walk with the same server; the folder 0-walk sorts first in the root and holds the one file with versions.
+# server add-file /0-walk/doc.txt the current text
+# server versions-add /0-walk/doc.txt first older text
+# server versions-add /0-walk/doc.txt second older text
+# server trash-add /Misc/w22-file.txt
+# server trash-add /Misc/w22-folder folder
+size 1404 1872
+waitfor homeState Connected to Example Cloud
+tap homeFiles
+waitfor folderRow
+tap folderUp
+wait 400
+tap folderUp
+wait 400
+tap folderRefresh
+wait 1500
+waitfor folderRow
+tap folderRow 0
+waitfor folderPath 0-walk
+waitfor folderRow
+tap folderRow 0
+waitfor detailsVersions
+# US3: the Versions tool of the details of a file
+tap detailsVersions
+waitfor versionsRow
+shot @OUT@/220-versions-list.png
+expect versionsFile doc.txt
+expect versionsRowSize B
+expect_absent versionsExplain
+tap versionsRow 0
+tap versionsRestore
+waitfor dialogText one more version
+expect dialogText doc.txt
+shot @OUT@/221-version-confirm.png
+# Cancel: nothing happens
+tap footerButton 0
+wait 400
+expect_absent dialogText
+tap versionsRestore
+waitfor dialogText one more version
+tap footerButton 1
+waitfor versionsResult Restored.
+expect versionsResult previous content is kept as a version
+shot @OUT@/222-version-restored.png
+# the list holds the former current content as one more version now (three rows)
+tap versionsRow 2
+tap versionsBack
+waitfor detailsVersions
+tap detailsBack
+waitfor folderRow
+# US4: delete for good, only knowingly. The two items added above are the newest of the trash.
+tap folderTrash
+waitfor trashRow
+expect trashRowName w22-file.txt
+expect trashRowName w22-folder
+tap trashRow 0
+expect trashChosen Chosen: w22-file.txt
+tap trashDelete
+waitfor dialogText for good
+expect dialogText w22-file.txt
+expect dialogText cannot be undone
+shot @OUT@/223-delete-file-confirm.png
+# Cancel: nothing is deleted
+tap footerButton 0
+wait 400
+expect_absent dialogText
+expect trashRowName w22-file.txt
+# one confirmation is enough for a file
+tap trashDelete
+waitfor dialogText cannot be undone
+tap footerButton 1
+waitfor trashResult Deleted for good.
+shot @OUT@/224-file-deleted.png
+# a folder asks twice: the first confirmation says its content goes too, the second is the last step
+tap trashRow 0
+expect trashChosen Chosen: w22-folder
+tap trashDelete
+waitfor dialogText and everything in it
+shot @OUT@/225-delete-folder-first.png
+tap footerButton 1
+waitfor dialogText last step
+expect dialogText w22-folder
+shot @OUT@/226-delete-folder-last.png
+# Cancel at the second confirmation: the folder stays
+tap footerButton 0
+wait 400
+expect_absent dialogText
+expect trashRowName w22-folder
+# Empty trash: the count and the names, then the last step; Cancel there first
+tap trashEmptyAll
+waitfor dialogText cannot be undone
+expect dialogText item(s)
+expect dialogText w22-folder
+shot @OUT@/227-empty-first.png
+tap footerButton 1
+waitfor dialogText last step
+shot @OUT@/228-empty-last.png
+tap footerButton 0
+wait 400
+expect trashRowName w22-folder
+# and now for real
+tap trashEmptyAll
+waitfor dialogText cannot be undone
+tap footerButton 1
+waitfor dialogText last step
+tap footerButton 1
+waitfor trashResult deleted for good
+shot @OUT@/229-trash-emptied.png
+expect trashEmpty The trash is empty.
+tap trashBack
+waitfor folderRow
+quit

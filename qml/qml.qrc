@@ -43,6 +43,8 @@
         <file>pages/SharePage.qml</file>
         <file>pages/ShareFormPage.qml</file>
         <file>pages/ShareLinkPage.qml</file>
+        <file>pages/TrashPage.qml</file>
+        <file>pages/VersionsPage.qml</file>
         <file>pages/FolderChooserPage.qml</file>
         <file>pages/SyncPage.qml</file>
         <file>pages/PairPage.qml</file>
@@ -96,6 +98,7 @@
         <file>icons/slash-table.svg</file>
         <file>icons/slash-underline.svg</file>
         <file>icons/trash.svg</file>
+        <file>icons/versions.svg</file>
         <file>icons/undo.svg</file>
         <file>icons/attach.svg</file>
         <file>icons/info.svg</file>

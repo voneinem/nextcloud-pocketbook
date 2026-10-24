@@ -6,7 +6,7 @@ public links. Built for an
 e-ink screen, offline first, with no background network activity: the app writes to the server only on your action.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)
+![Version](https://img.shields.io/badge/version-0.6.0-informational.svg)
 ![Platform: PocketBook InkPad One](https://img.shields.io/badge/platform-PocketBook%20InkPad%20One-lightgrey.svg)
 ![Status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)
 
@@ -85,6 +85,18 @@ author). It is a separate app with its own binary, launcher and data folder.
   PB Cloud sends nothing. It needs PB Office 0.4.0 or later, installed and **not running**: a running PB Office does not take the link (a short notice says so).
   The text is passed to PB Office and PB Office keeps it as a draft, which later syncs to your Drafts folder on the mail server; PB Cloud does not store it,
   write it to a log or put it on a clipboard, never hands over a password, and overwrites the buffers it controls right after the call.
+- **Trash and versions.** *Trash* (on the Home page and in the folder page) lists what was deleted on the server, newest first, with the folder it came from, the day it
+  was deleted and its size; the list is read only when you open the screen or tap Refresh, and the last one is shown, marked with its age, when there is no connection.
+  Choose **one item** and **Restore** it: it goes back to its original place after a confirmation. If something with that name is there now, or the folder is gone,
+  nothing is overwritten, renamed or created: you choose another folder (server folders only) and, if the name is taken there too, another name. Restoring to a chosen
+  place needs the server to allow it; a server that does not says so and changes nothing. A restore whose answer was lost is shown as **outcome unknown** and is never
+  repeated by the app. **Delete for good** and **Empty trash** are irreversible and exist **only on this screen**: a file asks once, a folder and Empty trash ask twice,
+  every confirmation names what will be lost (the item, or the number of items and folders and some of their names), says it cannot be undone and has Cancel first; only
+  the items it named are removed, one request at a time, and an item that reached the trash meanwhile stays. In a file's details, **Versions** lists the older versions
+  (date and size) and **Restore** makes one the current content after a confirmation that names the file and the version; the content that was current is kept by the
+  server as one more version, and a file that changed after the list was read is refused. When the server's trash app or versions app is off, the screen says so in
+  plain words and offers no action; an unclear answer gets a generic message with a short code, never the claim that an app is off. Nothing here is queued: every action
+  is one request on a live connection, and none is made at start, by a timer, by Auto Sync, by a sync or by an update.
 - **Clear refusals.** A full account, a name the server does not accept, a file that is too large or of a type the server refuses, a
   locked file and a revoked password each have their own message and a next step; the item stays in the queue.
 - **Storage.** Lists everything the app downloaded with sizes, removes local copies (the server is never touched), shows free space
@@ -94,7 +106,7 @@ The interface is English with a German translation (Settings > Language; texts i
 
 ## Not in this version
 
-Creating shares with users or groups, sharing by mail through the server (Mail link above uses PB Office instead), notes to the recipient, QR codes for links, screens for the trash and for file versions, permanent deletion, photo auto-upload, live watching of folders, any
+Creating shares with users or groups, sharing by mail through the server (Mail link above uses PB Office instead), notes to the recipient, QR codes for links, retention settings of the trash and of the versions, comments, the activity feed, deleting a single version, downloading an old version, permanent deletion anywhere but on the trash screen, photo auto-upload, live watching of folders, any
 background activity, several accounts, end-to-end encrypted folders (they are shown as such and cannot be opened), Talk, photo upload,
 editing documents, notifications. PB Cloud writes to the server only when you ask it to: through the queue, with a condition on
 every request, and never by itself.
@@ -128,6 +140,9 @@ certificate authority, and tap Test in Settings.
   leave it, when the account changes and when the app is no longer the active one. **Copy** puts the link on the system clipboard, where other apps can read
   it until you copy something else; the reader has no system clipboard (a test on 2026-10-23: nothing copied here could be pasted into PB Office), so **Copy is not offered on the reader**
   (build option `PBC_DEVICE_CLIPBOARD`, off) and the link is shown in large letters for typing. On a platform with a clipboard Copy is offered.
+- **The trash list is stored.** The last trash list (names, original folders, dates) is kept in the database so that it can be shown without a connection; it holds only what
+  the trash screen shows, is replaced at every refresh, and is removed when you sign out or connect another account. Restoring and deleting never touch the files on the reader.
+  Everything the app knows about the server's trash and versions is **unverified** against a real server until the items LV-T1 to LV-T10 are run.
 - Nothing is sent in the background. The app asks the server only at start (one check that the login still works, and only when
   Wi-Fi is already on) and when you tap something that needs it.
 

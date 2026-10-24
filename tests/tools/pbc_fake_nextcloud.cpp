@@ -10,6 +10,10 @@
 //   drop-after <bytes>   cut the next upload body longer than that; quota <bytes>; lock <path>; no-trash; ignore-conditions
 //   remove <path>  delete a file or a folder on the server (feature 003: a deletion the sync must only propose)
 //   partial <folder> [mode]   from now on the listing of that folder fails: partial (default), truncated, timeout, error; "partial <folder> off" clears
+//   trash-add <path> [folder]   put a deleted file (or folder) of that original path into the trash; trash-list prints the trash (feature 006)
+//   trash-disable|trash-enable   the trash app is off / on (the capability and the endpoint); versions-disable|versions-enable the same for the versions app
+//   add-file <path> [text]   a new file on the server (the folders above are created), for a walk that needs a file of its own
+//   versions-add <path> [text]   add an older version to a file; versions-list <path> prints them; restore-to-files off|on  refuse / allow a restore to a chosen place
 //   ls-etag [path]  print the ETag of a path (default: the root) and of its children
 //   drop           the next download loses its connection after half of the file
 //   offline|online switch the server off and on
@@ -104,6 +108,13 @@ void fill_tree(pbtest::FakeNextcloud& s) {
     s.set_encrypted("/Vault", true);
     s.add_folder("/Restricted");
     s.set_permissions("/Restricted", "RDNVCK");   // no read permission
+    // trash and versions (feature 006): a few deleted items and the older versions of one file
+    const int64_t now = static_cast<int64_t>(std::time(nullptr));
+    s.add_trash_file("/Books/Old story.epub", "A story that was deleted.\n", now - 3600);
+    s.add_trash_file("/Documents/Draft.txt", "A draft.\n", now - 2 * 86400);
+    s.add_trash_folder("/Documents/Old Notes", now - 5 * 86400, {{"/a.txt", "Note a.\n"}, {"/sub/b.txt", "Note b.\n"}});
+    s.add_version("/Documents/notes.txt", "Meeting notes, first draft.\n", 1790100000);
+    s.add_version("/Documents/notes.txt", "Meeting notes, second draft.\n", 1790150000);
     s.set_favorite("/Books/Moby Dick.epub", true);
     s.set_favorite("/Documents/notes.txt", true);
     s.set_quota(1500ll * 1024 * 1024, 8ll * 1024 * 1024 * 1024);
@@ -289,12 +300,56 @@ int main(int argc, char** argv) {
         } else if (cmd == "unshare" && !arg.empty()) {   // removes a share behind the app's back
             fake->remove_share(std::atoll(arg.c_str()));
             std::cout << "removed share " << arg << std::endl;
+        } else if (cmd == "trash-add" && !arg.empty()) {
+            std::istringstream a(arg);
+            std::string path, kind;
+            a >> path >> kind;
+            static int added = 0;   // the items added here are the newest of the trash, the first one added the newest of them
+            const int64_t t = static_cast<int64_t>(std::time(nullptr)) - 5 - added++;
+            const std::string name = kind == "folder" ? fake->add_trash_folder(path, t, {{"/inside.txt", "inside\n"}}) : fake->add_trash_file(path, "Deleted: " + path + "\n", t);
+            std::cout << "in the trash: " << name << std::endl;
+        } else if (cmd == "trash-list") {
+            for (const std::string& n : fake->trash_names()) std::cout << "  " << n << std::endl;
+            std::cout << fake->trashbin_count() << " items in the trash" << std::endl;
+        } else if (cmd == "trash-disable" || cmd == "trash-enable") {
+            fake->set_trash(cmd == "trash-enable");
+            std::cout << "the trash app is " << (cmd == "trash-enable" ? "on" : "off") << std::endl;
+        } else if (cmd == "versions-disable" || cmd == "versions-enable") {
+            fake->set_versions(cmd == "versions-enable");
+            std::cout << "the versions app is " << (cmd == "versions-enable" ? "on" : "off") << std::endl;
+        } else if (cmd == "add-file" && !arg.empty()) {
+            std::istringstream a(arg);
+            std::string path, text;
+            a >> path;
+            std::getline(a, text);
+            while (!text.empty() && text.front() == ' ') text.erase(0, 1);
+            fake->add_file(path, (text.empty() ? std::string("A file.") : text) + "\n", static_cast<int64_t>(std::time(nullptr)) - 100000);
+            std::cout << "added " << path << std::endl;
+        } else if (cmd == "versions-add" && !arg.empty()) {
+            std::istringstream a(arg);
+            std::string path, text;
+            a >> path;
+            std::getline(a, text);
+            while (!text.empty() && text.front() == ' ') text.erase(0, 1);
+            if (fake->has(path) && !fake->node(path).folder) {
+                const auto& vs = fake->versions_of(path);
+                fake->add_version(path, (text.empty() ? std::string("An older version.") : text) + "\n", fake->node(path).mtime - 1000 * static_cast<int64_t>(vs.size() + 1));
+                std::cout << "added a version of " << path << std::endl;
+            } else {
+                std::cout << "no such file: " << path << std::endl;
+            }
+        } else if (cmd == "versions-list" && !arg.empty()) {
+            for (const auto& v : fake->versions_of(arg)) std::cout << "  " << v.id << " " << v.content.size() << " bytes" << std::endl;
+        } else if (cmd == "restore-to-files") {
+            fake->set_restore_to_files_status(arg == "off" ? 403 : 0);
+            std::cout << "a restore to a chosen place is " << (arg == "off" ? "refused" : "allowed") << std::endl;
         } else if (cmd == "ignore-conditions") {
             fake->ignore_conditions_on_assemble(true);
             std::cout << "the final MOVE of a chunked upload ignores its conditions" << std::endl;
         } else if (!cmd.empty()) {
             std::cout << "commands: approve, touch <path>, remove <path>, partial <folder> [mode], ls-etag [path], drop, offline, online, lose-next-answer [METHOD [part]], drop-after <bytes>, quota <bytes>, "
-                         "lock <path>, no-trash, trash, ignore-conditions, share-rules <what> <value>, share-list [path], unshare <id>, quit" << std::endl;
+                         "lock <path>, no-trash, trash, ignore-conditions, share-rules <what> <value>, share-list [path], unshare <id>, trash-add <path> [folder], trash-list, "
+                         "trash-disable, trash-enable, versions-disable, versions-enable, add-file <path> [text], versions-add <path> [text], versions-list <path>, restore-to-files off|on, quit" << std::endl;
         }
     }
     return 0;

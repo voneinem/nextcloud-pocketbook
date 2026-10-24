@@ -106,6 +106,24 @@ Added by `specs/004-share-links/`. Same legend and rules as above. The expected 
 | LV-L9 | The host of a link behind a reverse proxy or with a configured public address | note whether it differs from the connected host (the app flags a different address) | U | U |
 | LV-L10 | Form-encoded `POST` and `PUT` bodies on `/ocs/v2.php` and `/ocs/v1.php` | both are accepted; the HTTP status mirrors the OCS status on v2 | U | U |
 
+## Trash and versions (feature 006)
+
+Added by `specs/006-trash-and-versions/`. Same legend and rules as above. The expected behaviour is in `specs/006-trash-and-versions/research.md` (R-1 to R-10) and
+`contracts/trash-requests.md`. Everything below is what the plan assumes from the public documentation of the trashbin and versions endpoints; nothing was seen live.
+
+| ID | Item | Expected | Nextcloud | OpenCloud |
+|----|------|----------|-----------|-----------|
+| LV-T1 | The capabilities with the trash app and the versions app enabled and disabled | `files.undelete` and `files.versioning` are `true` while the app is on and the key is missing or `false` when it is off; note the shapes per version and what a server without the `files` object does | U | U |
+| LV-T2 | `PROPFIND` Depth 1 on `/remote.php/dav/trashbin/<uid>/trash/` with the properties of T2 | `nc:trashbin-filename`, `nc:trashbin-original-location` (a path relative to the files, with the name), `nc:trashbin-deletion-time` (epoch seconds), size, resource type, `oc:fileid`, permissions and `nc:is-encrypted` come back; note the shape of the location of an item deleted from a shared folder or from the root, the href of a folder (trailing slash) and the permission letters | U | U |
+| LV-T3 | `MOVE` of a trash item to `.../trashbin/<uid>/restore/<name>` | the item returns to its recorded place; a taken name and a missing folder are refused (note the status and body) and nothing existing is replaced; what the server does when the name appears between a probe and the request (refuse or rename) | U | U |
+| LV-T4 | Restore of a folder | the folder returns with its whole content as one item | U | U |
+| LV-T5 | `MOVE` of a trash item to a files path with `Overwrite: F` (restore to a chosen place) | accepted (201/204) with a free name; 412 for a taken name; 409 for a missing folder; note the status and body of a server that does not allow it (the plan degrades to a message) | U | U |
+| LV-T6 | `DELETE` of one trash item by its name, and of an item that is gone | 204; 404 for a gone item; a folder goes with its content; the collection is never deleted by the app (Empty trash is single deletes of 50 items: time and any rate limit, note both) | U | U |
+| LV-T7 | `PROPFIND` Depth 1 on `/remote.php/dav/versions/<uid>/versions/<fileid>/` | the older versions with `d:getlastmodified` and `d:getcontentlength`; the version id is the modification time in digits; the current content is not listed; note the answer for a file without versions (207 with the collection only, or 404) | U | U |
+| LV-T8 | `MOVE` of a version to `.../versions/<uid>/restore/target` | the file's content becomes the version's and the content that was current is listed as a version afterwards (the plan relies on it and reports a server that does not); note whether the restored version stays in the list | U | U |
+| LV-T9 | A version restore while the file changed meanwhile | the app refuses before sending (the ETag of the file is read first); note what the server does with a stale restore and whether it keeps the newer content as a version | U | U |
+| LV-T10 | A server with the trash app disabled and one with the versions app disabled | the capabilities say so; the endpoints answer 404 (note); the app explains in plain words and offers no action; deleting on such a server is permanent (feature 002) | U | U |
+
 ## Recording
 
 For every `V` or `F` add the date and one line (no addresses, no host names that identify the owner). Put

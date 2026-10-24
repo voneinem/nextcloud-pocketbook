@@ -43,12 +43,28 @@ sleep, battery death, app kill) or the server.
   keeps both versions, and the user decides; neither version may be discarded automatically.
 - Every server write and delete MUST be conditional: `If-Match` with the stored ETag, and
   `If-None-Match: *` for creation. An HTTP 412 or any other detected conflict is a conflict.
+  Where the server gives the object no ETag (shares, items of the server trash, versions of a
+  file), the write MUST instead be bound to what the user saw, by the strongest check the
+  interface allows, and the plan MUST record it: an identity that cannot denote another object
+  (the unique trash name), a re-read and comparison immediately before the write (a share
+  setting, the current ETag of a file before a version restore), or a probe of the target before
+  and after the write together with `Overwrite: F` where the destination is a files path
+  (restoring from the trash). A write that cannot be made conditional MUST NOT replace, merge
+  into or rename an existing entry, and an unknown outcome MUST be kept as unknown and never
+  repeated automatically.
 - Pending uploads, renames and deletes MUST be persisted before any network operation, MUST NOT be
   discarded, evicted or overwritten until the server has confirmed them, and MUST be idempotent and
   resumable: repeating an interrupted sync produces the same result as an uninterrupted one. An
   upload whose outcome is unknown (for example a timeout after the body was sent) MUST be kept and
   marked uncertain, and MUST NOT be repeated silently.
 - Deleting on the server MUST require explicit user confirmation and goes to the server trash.
+  The one exception is the trash screen: removing an item from the trash, or emptying the trash,
+  is irreversible. It MUST be offered nowhere else. It MUST be preceded by a confirmation that
+  names what will be lost (the item, or the number of items and folders with their content),
+  states that it cannot be undone and has Cancel as its default; deleting a folder for good and
+  emptying the trash require two successive confirmations. It MUST affect only the items the
+  confirmation named, MUST be an explicit action on a connected device, and MUST NOT be
+  performed by Auto Sync, folder sync, update, start or any background activity, nor queued.
   Removing the local copy MUST NOT touch the server, and a server deletion MUST NOT remove local
   files that carry unconfirmed local changes.
 - Free space MUST be checked before a download. A full or read-only storage MUST be reported to
@@ -277,4 +293,4 @@ Compliance is reviewed in every pull request and in a mandatory Constitution Che
 which lists each principle with pass, justified deviation or not applicable. Unjustified violations
 block the merge.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-24
+**Version**: 1.3.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-24

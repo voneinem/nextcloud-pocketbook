@@ -15,6 +15,13 @@ FolderChooserBridge::~FolderChooserBridge() {
     if (c_.worker) c_.worker->wait_idle();   // no job may call back into a bridge that is gone
 }
 
+void FolderChooserBridge::setServerOnly(bool on) {
+    if (on == server_only_) return;
+    server_only_ = on;
+    reload();
+    emit changed();
+}
+
 void FolderChooserBridge::setPageSize(int n) {
     n = std::max(1, std::min(n, 100));
     if (n == page_size_) return;
@@ -55,6 +62,7 @@ void FolderChooserBridge::reload() {
     for (const pbc::OverlayRow& r : p.rows) {
         if (r.entry.kind != pbc::Kind::Folder || r.entry.availability != pbc::Availability::Ok) continue;
         if (r.pending == "deleting" || r.pending == "moving") continue;   // not a place to go to any more
+        if (server_only_ && r.pending_row) continue;                        // a folder that only the queue knows is not on the server
         QVariantMap m;
         m["name"] = display_safe(r.entry.name, 120);
         m["remotePath"] = QString::fromStdString(r.pending_row || r.item_id != 0 ? pbc::join_remote(path_, r.entry.name) : r.entry.path);

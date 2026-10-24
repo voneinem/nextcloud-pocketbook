@@ -70,11 +70,11 @@ std::string file_row(const std::string& rel, const std::string& local_rel, const
 
 }  // namespace
 
-PB_TEST(a_fresh_database_is_schema_5_with_the_sync_tables) {
+PB_TEST(a_fresh_database_has_the_sync_tables_of_schema_5_and_later) {
     pbtest::TmpDir d;
     auto s = open_current(d);
-    PB_CHECK_EQ(pbc::Store::kSchemaVersion, 5);
-    PB_CHECK_EQ(s->schema_version(), 5);
+    PB_CHECK_EQ(pbc::Store::kSchemaVersion, 6);   // schema 6 (feature 006) adds the trash table on top
+    PB_CHECK_EQ(s->schema_version(), 6);
     for (const char* t : {"settings", "sync_state", "account", "folders", "entries", "local_files", "offline_marks", "favorites", "downloads", "queue_items",
                           "server_caps", "sync_pairs", "sync_files", "sync_plans", "sync_plan_entries"})
         PB_CHECK(table_exists(*s, t));
@@ -99,7 +99,7 @@ PB_TEST(a_schema_4_database_upgrades_after_a_backup_and_loses_nothing) {
         PB_CHECK(s->set_setting("ui_language", "de").ok());
     }
     auto s = open_current(d);
-    PB_CHECK_EQ(s->schema_version(), 5);
+    PB_CHECK_EQ(s->schema_version(), 6);   // 4 -> 5 -> 6
     for (const char* t : {"sync_pairs", "sync_files", "sync_plans", "sync_plan_entries"}) PB_CHECK(table_exists(*s, t));
     PB_CHECK_EQ(s->debug_query("SELECT count(*) FROM account"), std::string("1"));
     PB_CHECK_EQ(s->debug_query("SELECT count(*) FROM entries"), std::string("1"));
@@ -141,11 +141,11 @@ PB_TEST(a_failing_upgrade_is_rolled_back_and_keeps_the_backup) {
     sqlite3_close(db);
 }
 
-PB_TEST(a_schema_6_database_is_refused_and_left_byte_identical) {
+PB_TEST(a_schema_7_database_is_refused_and_left_byte_identical) {
     pbtest::TmpDir d;
     {
         auto s = open_current(d);
-        PB_CHECK(s->debug_exec("PRAGMA user_version = 6").empty());
+        PB_CHECK(s->debug_exec("PRAGMA user_version = 7").empty());
     }
     const std::string path = d.file("data/pbcloud.db");
     const std::string before = read_file(path);
