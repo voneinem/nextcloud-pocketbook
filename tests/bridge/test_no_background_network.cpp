@@ -129,6 +129,8 @@ struct App {
     }
     // The share bridge as main.cpp wires it: a tap may ask the system for Wi-Fi (counted in network_requests), the clipboard on. /Docs/Reports is listed and cached.
     int network_requests = 0;
+    int hand_offs = 0;           // the hand-off to the mail app (feature 005): counted, never a network request
+    int hand_off_answer = 0;
     void make_share() {
         ShareBridge::Config c;
         c.store = store.get();
@@ -141,6 +143,10 @@ struct App {
             done(wifi);
         };
         c.clipboard_available = true;
+        c.hand_off = [this](const std::vector<std::string>&) {
+            ++hand_offs;
+            return hand_off_answer;
+        };
         share = std::make_unique<ShareBridge>(c);
         server.add_folder("/Docs");
         server.add_folder("/Docs/Reports");
@@ -578,6 +584,35 @@ PB_TEST(sharing_asks_the_system_for_wifi_only_after_a_tap_and_sends_nothing_when
     idle(400);
     PB_CHECK_EQ(a.server.request_count(), size_t(0));
     PB_CHECK_EQ(a.network_requests, 1);
+}
+
+PB_TEST(mailing_a_link_sends_no_request_and_does_not_ask_for_wifi_also_when_the_reader_is_offline_and_nothing_follows_by_itself) {
+    for (int answer : {0, 1}) {
+        App a;
+        a.sign_in();
+        a.make_share();
+        a.hand_off_answer = answer;
+        pbc::ShareDetail d;
+        d.row.id = 7;
+        d.row.kind = pbc::ShareKind::PublicLink;
+        d.row.owned_by_me = true;
+        d.link = "https://cloud.example.org/s/TOKENforTheTest0123456789";
+        d.link_state = pbc::LinkState::Ok;
+        a.share->setDetail(d);
+        a.wifi = false;
+        idle(300);
+        PB_CHECK_EQ(a.hand_offs, 0);   // nothing at start and nothing while idle
+        a.share->mailLink(true);
+        idle(400);
+        PB_CHECK_EQ(a.hand_offs, 1);                         // the user's tap is the only trigger
+        PB_CHECK_EQ(a.network_requests, 0);                  // no Wi-Fi is asked for: the hand-off needs none
+        PB_CHECK_EQ(a.server.request_count(), size_t(0));    // no request, not even when Wi-Fi comes back
+        a.wifi = true;
+        idle(400);
+        PB_CHECK_EQ(a.hand_offs, 1);
+        PB_CHECK_EQ(a.server.request_count(), size_t(0));
+        PB_CHECK_EQ(a.server.link_hits(), size_t(0));
+    }
 }
 
 PB_TEST(the_auto_sync_timers_of_the_queue_and_the_pairs_never_start_a_sharing_request) {

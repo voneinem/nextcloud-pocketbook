@@ -4,7 +4,7 @@
 file(GLOB PBC_QML_FILES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/qml/*.qml ${CMAKE_SOURCE_DIR}/qml/pages/*.qml
     ${CMAKE_SOURCE_DIR}/qml/qmldir ${CMAKE_SOURCE_DIR}/qml/icons/*.svg)
-set(PBC_APP_SOURCES main.cpp device_bridge.cpp)
+set(PBC_APP_SOURCES main.cpp device_bridge.cpp mail_handoff.cpp)
 
 # Copy of a share link to the system clipboard on the reader (specs/004-share-links R-11): OFF. DT-L2 (2026-10-23) showed that text copied in this app cannot be
 # pasted into another app (PB Office): the reader has no system clipboard. Switch it ON only for a platform that has one. The host build always has the Copy tool (the tests and the demo exercise it).
@@ -78,7 +78,8 @@ else()
                 ${CMAKE_SOURCE_DIR}/tests/walks/16-sync-stopped.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/17-sync-interrupted.walk
                 ${CMAKE_SOURCE_DIR}/tests/walks/18-share-links.walk
-                ${CMAKE_SOURCE_DIR}/tests/walks/19-share-limits.walk)
+                ${CMAKE_SOURCE_DIR}/tests/walks/19-share-limits.walk
+                ${CMAKE_SOURCE_DIR}/tests/walks/20-mail-link.walk)
             set_tests_properties(ui_walk PROPERTIES LABELS "bridge" TIMEOUT 900)
             if(PBC_SANITIZE)
                 set_property(TEST ui_walk APPEND PROPERTY ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tests/lsan.supp:print_suppressions=0")

@@ -10,6 +10,7 @@
 #include "pbc/credentials_file.h"
 #include "pbc/error_keys.h"
 #include "pbc/remote_path.h"
+#include "pbc/mail_handoff.h"
 #include "pbc/secure_wipe.h"
 #include "pbc/share_api.h"
 #include "pbc/share_date.h"
@@ -145,10 +146,76 @@ void ShareBridge::clearSecrets() {
     page_count_ = 1;
     busy_ = false;
     waiting_network_ = false;
+    mail_in_flight_ = false;   // mail_notice_ stays: it holds a key only and is shown when the app is shown again
     state_ = QStringLiteral("closed");
     if (!was_open) return;
     emit changed();
     emit closed();
+}
+
+// ---- Mail link (specs/005-mail-link) ----
+
+namespace {
+
+// Wipes what a hand-off built, on every way out of mailLink() (FR-015): the temporaries that held the link and the argument list.
+struct MailScope {
+    std::string link;
+    std::string subject;
+    pbc::MailBuild built;
+    ~MailScope() {
+        pbc::secure_wipe(link);
+        pbc::secure_wipe(subject);
+        built.handoff.wipe();
+    }
+};
+
+}  // namespace
+
+QVariantMap ShareBridge::mailLink(bool confirmed) {
+    QVariantMap r;
+    const auto refuse = [&](const char* key) {
+        r.insert(QStringLiteral("errorKey"), QString::fromLatin1(key));
+        return r;
+    };
+    if (mail_in_flight_ || busy_) return refuse("busy");
+    if (state_ == QLatin1String("closed") || (detail_.row.id == 0 && link_text_.isEmpty())) return refuse("share_item_gone");
+    if (detail_.link_state == pbc::LinkState::Unreadable || detail_.link_state == pbc::LinkState::DifferentAddress || detail_.link.empty())
+        return refuse("mail_link_unavailable");
+    if (detail_.link.size() > pbc::kMailTextLimit) return refuse("mail_too_long");
+    if (!confirmed) {
+        r.insert(QStringLiteral("needsConfirm"), true);
+        r.insert(QStringLiteral("text"), detail_.row.has_password
+                     ? bridge_tr("The link will be passed to PB Office as a new mail draft. A password is not included: tell it to the recipient separately. The draft is saved to your Drafts folder on the mail server later.")
+                     : bridge_tr("The link will be passed to PB Office as a new mail draft. The draft is saved to your Drafts folder on the mail server later."));
+        return r;
+    }
+    mail_in_flight_ = true;
+    MailScope scope;
+    scope.link = detail_.link;
+    scope.subject = pbc::clean_subject(bridge_tr("Link to %1").arg(item_name_).toStdString());
+    scope.built = pbc::build_mail_handoff(std::move(scope.link), scope.subject);
+    if (scope.built.error != pbc::MailError::None) {
+        mail_in_flight_ = false;
+        return refuse(scope.built.error == pbc::MailError::LinkTooLong ? "mail_too_long" : "mail_link_unavailable");
+    }
+    const int answer = c_.hand_off ? c_.hand_off(scope.built.handoff.argv()) : -1;
+    scope.built.handoff.wipe();
+    mail_in_flight_ = false;
+    if (answer == 0) {
+        leaveLink();
+        emit mailHandedOver();
+        r.insert(QStringLiteral("ok"), true);
+        return r;
+    }
+    mail_notice_ = QStringLiteral("mail_not_accepted");
+    emit mailNoticeChanged();
+    return refuse("mail_not_accepted");
+}
+
+void ShareBridge::dismissMailNotice() {
+    if (mail_notice_.isEmpty()) return;
+    mail_notice_.clear();
+    emit mailNoticeChanged();
 }
 
 void ShareBridge::onApplicationStateChanged(Qt::ApplicationState state) {

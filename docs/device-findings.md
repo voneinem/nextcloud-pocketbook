@@ -99,3 +99,5 @@ Box D calls `OpenBook2("/mnt/ext1/applications/pboffice.app", 5, {"pbo-mail-v1",
 - **Not measured:** a running PB Office that has a request listener (the listener probe of PB Office, `run-listener-probe`). The probe runs that were meant for it ended
   without data: in two of them the listener instance was not the one running at the time of the call (the flag is used up by the first start), and in the last one
   the reader restarted (uptime 0 min in the next launch's log) before the call. A reader restart while the listener probe was active may be a finding for PB Office.
+
+DT-M2 of feature 005 records the value that the call returns when PB Office is not installed: it is not known yet (open item O-1 of `specs/005-mail-link/research.md`).

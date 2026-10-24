@@ -48,6 +48,7 @@ class ShareBridge : public QObject {
     Q_PROPERTY(QString inheritedNote READ inheritedNote NOTIFY changed) // "" | inherited_failed
     Q_PROPERTY(bool staleNote READ staleNote NOTIFY changed)            // the rows may be out of date (an unknown outcome, or the connection was lost)
     Q_PROPERTY(bool hasExistingLink READ hasExistingLink NOTIFY changed)   // the listed shares contain a public link: a new one is a second link
+    Q_PROPERTY(QString mailNotice READ mailNotice NOTIFY mailNoticeChanged)   // "" or a key (mail_not_accepted) of a hand-off that failed; no secret, no name
 
 public:
     struct Config {
@@ -63,6 +64,9 @@ public:
         std::function<void(const QString&)> set_clipboard;
         std::function<void(const QString&)> clear_clipboard_if_equal;
         bool clipboard_available = false;                               // a constant of the build (app/main.cpp), not a probe of the platform
+        // Mail link (specs/005-mail-link): hands the argument list to the mail app with ONE system call and returns the system's answer, 0 = passed on.
+        // Empty = no hand-off possible (answered like a refusal). Called only after the user's confirmation; keeps nothing, logs nothing.
+        std::function<int(const std::vector<std::string>&)> hand_off;
     };
 
     explicit ShareBridge(Config config, QObject* parent = nullptr);
@@ -89,6 +93,7 @@ public:
     QString inheritedNote() const { return inherited_note_; }
     bool staleNote() const { return stale_; }
     bool hasExistingLink() const { return has_link_; }
+    QString mailNotice() const { return mail_notice_; }
 
     // The Share tap for an entry of a stored listing: reads the rules and the shares of the item (three requests, on the worker). {ok: true}, or
     // {errorKey}: busy (a request is running), share_item_gone (the entry is not in a stored listing), share_item_not_shareable (nothing is
@@ -131,6 +136,16 @@ public:
     Q_INVOKABLE QVariantMap showLink(qlonglong id);
     // Leaving the link screen: drops the link only (overwritten in place, the clipboard asked to drop it); the list stays.
     Q_INVOKABLE void leaveLink();
+    // Mail link (specs/005-mail-link): hands the open link to the mail app. Without `confirmed` it answers {needsConfirm: true, text} - where the link goes,
+    // that a password is not included (only when the link has one) and that the draft is saved to the Drafts folder later - and calls nothing. With
+    // `confirmed` it builds the argument list (the link, its length and a one-line subject naming the item; no recipient, never a password), calls
+    // Config::hand_off ONCE, overwrites every buffer that held the link and the arguments, and answers {ok: true} after an accepted call (the link is then
+    // dropped and mailHandedOver follows) or {errorKey: mail_not_accepted} (mailNotice is set; no retry). Answered without a call: {errorKey}: busy (a
+    // sharing request or a hand-off is running), share_item_gone (no link is open), mail_link_unavailable (unreadable or foreign link), mail_too_long.
+    // Nothing is requested from the server, nothing is logged, nothing is stored.
+    Q_INVOKABLE QVariantMap mailLink(bool confirmed);
+    // Drops mailNotice (the user saw it).
+    Q_INVOKABLE void dismissMailNotice();
     // Drops the link, the rows, the rules and the message, overwrites every QString that held a link, asks the clipboard to drop the link when it still
     // holds exactly that text, and closes the bridge. Called when a screen is left, when the account changes and when the application is not active.
     Q_INVOKABLE void clearSecrets();
@@ -148,6 +163,8 @@ signals:
     void linkOpened(qlonglong id);   // showLink() delivered the link: `detail` holds it
     void createFinished(bool ok, const QString& errorKey);   // the answer of create(): on success `detail` holds the new link
     void closed();   // clearSecrets() closed an open screen: pages still on the stack pop themselves
+    void mailHandedOver();       // the hand-off was passed on: the link is gone and the link page pops
+    void mailNoticeChanged();    // mailNotice was set or dismissed
 
 private:
     struct Loaded;
@@ -194,4 +211,6 @@ private:
     pbc::ShareDetail detail_;
     QString link_text_;
     QString opened_key_;
+    QString mail_notice_;           // a key only; survives clearSecrets() so that it can be shown when the app is shown again
+    bool mail_in_flight_ = false;   // the hand-off call is running (refuses a second one from inside)
 };
