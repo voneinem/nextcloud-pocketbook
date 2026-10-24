@@ -28,8 +28,9 @@
 #        under docs/reference/, in NOTICE and under licenses/ (the planning documents in specs/ and .specify/
 #        describe the rename, tests/templates/ holds the old perf tests until they are rewritten).
 #   R11 The identifier pboffice (PB Office, the application this one was bootstrapped from) appears in no tracked file
-#        except under docs/reference/, in NOTICE and under licenses/ (specs/ and .specify/ describe the origin). The two
-#        apps must never share a binary name, a launcher entry or a data directory.
+#        except under docs/reference/, in NOTICE and under licenses/ (specs/ and .specify/ describe the origin), and in two
+#        files that address its launcher for the one permitted hand-off call (constitution 1.1.0): app/probe/pbc_handoff.cpp
+#        and docs/device-findings.md. The two apps must never share a binary name, a launcher entry or a data directory.
 #   N1 No plaintext http:// URL literal in core/, bridge/, app/ or qml/*.qml (comments excepted). XML namespace URIs of the DAV
 #        vocabularies (owncloud.org, nextcloud.org, calendarserver.org, sabredav.org, www.w3.org) are protocol identifiers, not endpoints,
 #        and are on an explicit exempt list.
@@ -155,7 +156,7 @@ scan() {
         esac
         # R11: PB Office's identifier (any file type, minus the allowed places)
         case "$f" in
-            docs/reference/*|NOTICE|licenses/*|specs/*|.specify/*) ;;
+            docs/reference/*|NOTICE|licenses/*|specs/*|.specify/*|app/probe/pbc_handoff.cpp|docs/device-findings.md) ;;
             *) report R11 "$f" "$p" 'pboffice' && bad=1 ;;
         esac
         case "$f" in
@@ -404,6 +405,13 @@ if [ "${1:-}" = "--self-test" ]; then
     rm -rf "$tmp/docs/reference" "$tmp/NOTICE" "$tmp/licenses/a.txt"
     printf 'PB Office and PBC are fine\n' > "$tmp/docs/b.md"
     expect pass "R11: only the identifier pboffice is matched"; rm "$tmp/docs/b.md"
+    mkdir -p "$tmp/app/probe"
+    printf 'const char* k = "/mnt/ext1/applications/pboffice.app";\n' > "$tmp/app/probe/pbc_handoff.cpp"
+    printf 'the launcher pboffice.app returned 0\n' > "$tmp/docs/device-findings.md"
+    expect pass "R11: pboffice is allowed in the hand-off probe and docs/device-findings.md"
+    rm -f "$tmp/app/probe/pbc_handoff.cpp" "$tmp/docs/device-findings.md"
+    violate app/probe/other.cpp 'const char* k = "/mnt/ext1/applications/pboffice.app";' "R11: pboffice in another probe file"
+    violate docs/other.md 'the launcher pboffice.app' "R11: pboffice in another document"
     # R10: libcurl tracing would write LOGIN / AUTH PLAIN passwords to the log
     violate core/src/a.cpp 'curl_easy_setopt(c, CURLOPT_VERBOSE, 1L);' "R10: CURLOPT_VERBOSE"
     violate core/src/a.cpp 'curl_easy_setopt(c, CURLOPT_DEBUGFUNCTION, cb);' "R10: CURLOPT_DEBUGFUNCTION"
