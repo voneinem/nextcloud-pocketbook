@@ -1,0 +1,24 @@
+# Files under applications/ of the 0.6.0 package (the baseline of spec 007), sorted with LC_ALL=C sort.
+# The 599 files under applications/pbcloud-zoneinfo/ are not listed: the test derives them from third_party/tzdata.
+applications/icons/pbcloud.bmp
+applications/icons/pbcloud_f.bmp
+applications/pbc-probe.bin
+applications/pbcloud-cacert.pem
+applications/pbcloud-emoji-OFL.txt
+applications/pbcloud-emoji.ttf
+applications/pbcloud-licenses/LICENSE
+applications/pbcloud-licenses/licenses/Apache-2.0.txt
+applications/pbcloud-licenses/licenses/CC-BY-4.0.txt
+applications/pbcloud-licenses/licenses/GPL-3.0.txt
+applications/pbcloud-licenses/licenses/LGPL-2.1.txt
+applications/pbcloud-licenses/licenses/LGPL-3.0.txt
+applications/pbcloud-licenses/licenses/MPL-2.0.txt
+applications/pbcloud-licenses/licenses/curl.txt
+applications/pbcloud-licenses/licenses/inkfeed-MIT.txt
+applications/pbcloud-licenses/licenses/manifest.txt
+applications/pbcloud-licenses/third_party/noto-emoji/OFL.txt
+applications/pbcloud-plugins/imageformats/libqgif.so
+applications/pbcloud-plugins/imageformats/libqjpeg.so
+applications/pbcloud-probe.sh
+applications/pbcloud.app
+applications/pbcloud.bin

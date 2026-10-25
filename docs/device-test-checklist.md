@@ -24,6 +24,7 @@ value) · **F** failed (what happened).
 | DT-INS-3 | Package size | at most 25 MB (`scripts/package-device.sh` refuses more) | U | | |
 | DT-INS-4 | Upgrade over an older build keeps the data folder `system/pbcloud/` | Settings and account are still there; a newer database is refused with a clear message and left untouched | U | | Schema upgrades are covered on the host by `test_store_migrations` |
 | DT-INS-5 | PB Notes, PB Office and InkFeed are untouched by installing and starting PB Cloud: PB Cloud shares no binary name, launcher entry or data folder with them | Their files and data folders are unchanged; both icons are in the launcher | U | | |
+| DT-PKG-1 | Read the firmware version on the reader; install the 0.6.1 package by hand over 0.6.0 (copy `applications/`) and start the app | The firmware is `6.11.1437` (otherwise change `min_firmware` in `packaging/manifest.template.json` to the observed value and rebuild); the app starts as with 0.6.0 | U (firmware read; install not run) | 2026-10-25 | Firmware `6.11.1437`, reported by the owner (`docs/device-findings.md`); it is the value in the PB Store manifest. The install and start of the 0.6.1 package by hand is still to do |
 
 ## Security and storage
 

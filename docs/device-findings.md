@@ -116,3 +116,10 @@ to seven with Versions. If a panel is too tight at the usual touch size, Trash m
 details list; the pages and bridges stay as they are. DT-T2 to DT-T4 record how the confirmations read on the panel, the time and memory of a 1,000-item trash and the
 behavior of Empty trash with the screen and Wi-Fi switched off. LV-T1 to LV-T10 in `docs/live-server-checklist.md` hold what only a real server can show; until they are run
 the plan's restore to a chosen place may degrade to the message "This server can restore only to the original place".
+
+## PB Store package (feature 007, version 0.6.1)
+
+| Observation | Evidence | Status |
+|---|---|---|
+| The firmware of the owner's InkPad One is `6.11.1437`; this is the `min_firmware` of the PB Store manifest | Reported by the owner on 2026-10-25 after reading it on the reader (the reader on which PB Cloud ran on 2026-10-20 and PB Notes was checked on 2026-10-25). PB Cloud itself does not print the firmware | Observed (reported). It is the only firmware PB Cloud has been run on; older firmware is not claimed |
+| Manual install of the 0.6.1 package over 0.6.0 and a start of the app | Not run | **Unverified** (DT-PKG-1, second part). The files under `applications/` are those of 0.6.0 apart from `pbcloud.bin` (checked on the host), so the route is expected to work as before |
