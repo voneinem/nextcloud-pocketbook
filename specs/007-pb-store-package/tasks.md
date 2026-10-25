@@ -295,7 +295,7 @@ to `INSTALL.md`.
   `docs/device-findings.md`; install the new package by hand as `INSTALL.md` describes and start the app; record "works like
   0.6.0" (or what differs) in `research.md` under "Device check" and fill DT-PKG-1. If the firmware is not `6.11.1437`, change
   `min_firmware`, repeat T034 and T033. Mention the file-mode note of R-1
-- [ ] T036 [MANUAL] After the merge to `main` and only when the maintainer says so: quickstart section 5 - tag `v0.6.1`,
+- [x] T036 [MANUAL] After the merge to `main` and only when the maintainer says so: quickstart section 5 - tag `v0.6.1`,
   `scripts/check-release.sh`, push the tag, create the GitHub release with the ZIP and the notes, download the asset and run
   `check-package` on it, then **give the owner the URL of the release and of the ZIP asset** for the store entry (SC-007).
   Outward-facing: do not do this unprompted

@@ -235,3 +235,10 @@ Date 2026-10-25. Firmware of the owner's InkPad One: `6.11.1437`, reported by th
 The manual install of the 0.6.1 package over 0.6.0 and the start of the app were **not run** before the release; the 0.6.1 package
 differs from the 0.6.0 one only in `applications/pbcloud.bin` (the version string; build check above). DT-PKG-1 stays open for the
 install part. The file-mode note of R-1 applies (`pack` writes 0644; the reader's FAT volume has no modes).
+
+## Release (0.6.1)
+
+2026-10-25: merged to `main` (5f42b5b), tag `v0.6.1`, `scripts/check-release.sh` passed, GitHub release published with
+`pbcloud-inkpad-one-0.6.1.zip` (SHA-256 `94e07092335ad83bcf1c7ec1be8e13f26fe2fe6e6f29803f5d000b0b93767c87`). The asset downloaded
+from the release passed `pbstore-catalog check-package` (0.1.4) with the same hash. Release URL:
+https://github.com/voneinem/nextcloud-pocketbook/releases/tag/v0.6.1
