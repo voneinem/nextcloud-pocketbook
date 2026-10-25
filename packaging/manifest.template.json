@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "id": "pbcloud",
+  "name": "PB Cloud",
+  "version": "@VERSION@",
+  "min_firmware": "6.11.1437",
+  "target_device": "InkPad One",
+  "menu_entry": {
+    "id": "U_PbCloud",
+    "title": "PB Cloud",
+    "path": "applications/pbcloud.app",
+    "icon": "applications/icons/pbcloud.bmp",
+    "focused_icon": "applications/icons/pbcloud_f.bmp",
+    "group": "@General"
+  },
+  "data_dir": "system/pbcloud"
+}

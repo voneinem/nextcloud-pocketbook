@@ -3,6 +3,21 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.6.1 - 2026-10-25
+
+The release package follows the PB Store package contract (specs/007-pb-store-package). **No change to the app, to the data or to the server behavior**: the files
+under `applications/` are the ones of 0.6.0 apart from the program itself, which carries the new version string.
+
+### Package
+- The ZIP has a `manifest.json` at its top level, made at build time from `packaging/manifest.template.json` and the `VERSION` file, and the `applications/` tree; nothing else.
+  `INSTALL.md` is no longer inside the package: it stays in the repository (linked from the README and from each GitHub release). The manual route is unchanged: copy `applications/`.
+- `scripts/package-device.sh` builds it with the store's `pbstore-catalog pack` (tag v0.1.4 or newer of appstore-pocketbook; older ones refuse the `+` in the time zone file names),
+  packs twice and requires identical results, runs `pbstore-catalog check-package` and the size budget, and writes the ZIP only when all of that passes. The tool is found through
+  `PBSTORE_CATALOG` or `PATH`; without it the script stops with a message. The ZIP name is unchanged (`pbcloud-inkpad-one-<version>.zip`).
+- `scripts/check-release.sh` checks that the tag, `VERSION`, the package name and the manifest version agree before a release is published.
+- The minimum firmware in the manifest is `6.11.1437`, the firmware of the owner's InkPad One (reported by the owner). **Unverified** on the reader: the manual install of this
+  package (`docs/device-test-checklist.md` DT-PKG-1); the files under `applications/` are the same as in 0.6.0 apart from the program.
+
 ## 0.6.0 - 2026-10-24
 
 Trash and file versions (specs/006-trash-and-versions). Tested on the host against a fake Nextcloud server; nothing is verified against a real server or on a reader

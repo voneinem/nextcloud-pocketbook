@@ -3,6 +3,9 @@
 These steps install the app from the release zip. They are written for the InkPad One (RK3566); other models are untested. PB Cloud is
 a separate app from PB Notes and PB Office: it uses its own files and its own data folder and never touches theirs.
 
+These steps live in the repository (linked from each GitHub release); they are not inside the package. The package also holds a
+`manifest.json` at its top level, which the PB Store reads. For the steps below ignore it and copy only the `applications/` folder.
+
 ## 1. Copy the files
 
 1. Connect the reader over USB so its storage appears as a drive.

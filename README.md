@@ -118,8 +118,9 @@ every request, and never by itself.
 
 ## Installation
 
-See [INSTALL.md](INSTALL.md): copy the package to the reader, register the app in the Applications menu, optionally add a private
-certificate authority, and tap Test in Settings.
+See [INSTALL.md](INSTALL.md) (it lives in the repository and is linked from each GitHub release; it is not inside the package): copy
+the package to the reader, register the app in the Applications menu, optionally add a private certificate authority, and tap Test
+in Settings.
 
 ## Credentials and privacy
 
@@ -166,8 +167,36 @@ Device build: set `POCKETBOOK_SDK` to the PocketBook SDK (or pass `-DSDK_PATH`);
 
 ```sh
 POCKETBOOK_SDK=<sdk> scripts/build-curl-arm.sh     # once: a static libcurl for the reader
-POCKETBOOK_SDK=<sdk> scripts/package-device.sh     # the zip with INSTALL.md
+POCKETBOOK_SDK=<sdk> cmake -S . -B build-arm -DTARGET_TYPE=ARM -DCMAKE_BUILD_TYPE=Release -DPBC_CURL_PREFIX=$PWD/build-curl-arm
+POCKETBOOK_SDK=<sdk> cmake --build build-arm
+POCKETBOOK_SDK=<sdk> scripts/package-device.sh build-arm/app/pbcloud.app "" dist build-arm/app/probe/pbc-probe.bin
 ```
+
+The package follows the PB Store package contract: `manifest.json` (made from
+[packaging/manifest.template.json](packaging/manifest.template.json) and the `VERSION` file; change the fixed values there) and the
+`applications/` tree, nothing else at the top level. The script packs twice with `pbstore-catalog pack`, requires both zips to be
+identical, runs `pbstore-catalog check-package`, applies the size budget and only then writes
+`dist/pbcloud-inkpad-one-<version>.zip`. It stops with a message when the tool is missing. The install steps are not inside the
+package: they are [INSTALL.md](INSTALL.md) in the repository.
+
+For the package you need `pbstore-catalog` from the appstore-pocketbook repository (tag v0.1.4 or newer; older tags refuse the `+` in
+the time zone file names), on `PATH` or named by the environment variable `PBSTORE_CATALOG` (the tool's path; there is no default
+location), and `unzip` and `python3` for the release check and the packaging tests.
+
+### Releasing
+
+The release version is the file [VERSION](VERSION); the app, the About screen, the manifest and the package name all use it. After the
+merge, with the package built into `dist/`: tag, check that the tag, `VERSION`, the package name and the version inside the package
+agree, push the tag and publish the GitHub release with the package. The steps are chained so that a mismatch stops them:
+
+```sh
+git tag "v$(cat VERSION)" &&
+scripts/check-release.sh &&
+git push origin "v$(cat VERSION)" &&
+gh release create "v$(cat VERSION)" "dist/pbcloud-inkpad-one-$(cat VERSION).zip" --notes-file <notes>
+```
+
+`<notes>` is the `CHANGELOG.md` entry of the version plus a link to `INSTALL.md` at that tag.
 
 ## Testing
 
@@ -186,6 +215,7 @@ What is checked and what is not:
 
 ## Documentation
 
+- [specs/007-pb-store-package/spec.md](specs/007-pb-store-package/spec.md): the release package for the PB Store (spec, plan, research, contracts).
 - [specs/004-share-links/spec.md](specs/004-share-links/spec.md): share links (spec, plan, research, contracts, acceptance).
 - [specs/005-mail-link/spec.md](specs/005-mail-link/spec.md): mailing a share link to PB Office (spec, plan, research, contracts, acceptance).
 - [specs/001-nextcloud-files-client/spec.md](specs/001-nextcloud-files-client/spec.md): what the app does and why.
