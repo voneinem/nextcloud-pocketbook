@@ -42,6 +42,7 @@ struct Env {
     Worker worker;
     bool wifi = true;
     QStringList opened;
+    bool open_ok = true;   // what the reader's hand-off answers
     std::unique_ptr<TransferBridge> bridge;
 
     Env() {
@@ -84,7 +85,7 @@ struct Env {
         cfg.format_date_time = [](qint64 t) { return QStringLiteral("T%1").arg(t); };
         cfg.open_file = [this](const QString& path) {
             opened << path;
-            return true;
+            return open_ok;
         };
         cfg.options.sleep_ms = [](int) {};
         cfg.options.delays_s = {1, 1};
@@ -280,13 +281,15 @@ PB_TEST(open_hands_only_a_regular_file_inside_the_download_folder_to_the_reader)
     Env e;
     e.bridge->download("/Books/story.epub", true);
     e.settle();
-    e.bridge->open("/Books/story.epub");
+    PB_CHECK(e.bridge->open("/Books/story.epub").value("ok").toBool());
     PB_CHECK_EQ(e.opened.size(), 1);
     PB_CHECK_EQ(e.opened.at(0).toStdString(), e.root + "/Books/story.epub");
 
     e.opened.clear();
-    e.bridge->open("/Books/never-downloaded.epub");   // an unknown remote path
+    const QVariantMap unknown = e.bridge->open("/Books/never-downloaded.epub");   // an unknown remote path
     PB_CHECK(e.opened.isEmpty());
+    PB_CHECK(!unknown.value("ok").toBool());
+    PB_CHECK_EQ(unknown.value("reason").toString().toStdString(), std::string("cannot_open"));
 
     // rows that point outside the folder, at a directory, or at a link are not opened
     const std::string outside = e.dir.file("outside.txt");
@@ -314,6 +317,38 @@ PB_TEST(open_hands_only_a_regular_file_inside_the_download_folder_to_the_reader)
     PB_CHECK(e.store->commit_download(bad, 0).ok());
     for (const char* p : {"/h1", "/h2", "/h3", "/h4"}) e.bridge->open(p);
     PB_CHECK(e.opened.isEmpty());
+}
+
+PB_TEST(open_says_why_it_did_not_hand_the_file_over) {
+    Env e;
+    // a file whose name has no ending is not handed to the reader (it picks the viewer by the ending); the answer names the file in full
+    {
+        std::ofstream f(e.root + "/Baguette magique");
+        f << "%PDF-1.4";
+    }
+    pbc::LocalFile noext;
+    noext.size = 8;
+    noext.mtime = 1;
+    noext.remote_etag = "\"e\"";
+    noext.downloaded_at = 1;
+    noext.remote_path = "/Rezepte/Baguette magique";
+    noext.local_path = "Baguette magique";
+    PB_CHECK(e.store->commit_download(noext, 0).ok());
+    const QVariantMap r = e.bridge->open("/Rezepte/Baguette magique");
+    PB_CHECK(!r.value("ok").toBool());
+    PB_CHECK_EQ(r.value("reason").toString().toStdString(), std::string("no_extension"));
+    PB_CHECK_EQ(r.value("name").toString().toStdString(), std::string("Baguette magique"));
+    PB_CHECK(e.opened.isEmpty());
+
+    // the reader refused the hand-off: reported, not silent
+    e.bridge->download("/Books/story.epub", true);
+    e.settle();
+    e.open_ok = false;
+    const QVariantMap refused = e.bridge->open("/Books/story.epub");
+    PB_CHECK_EQ(e.opened.size(), 1);
+    PB_CHECK(!refused.value("ok").toBool());
+    PB_CHECK_EQ(refused.value("reason").toString().toStdString(), std::string("cannot_open"));
+    PB_CHECK_EQ(refused.value("name").toString().toStdString(), std::string("story.epub"));
 }
 
 PB_TEST(a_favorite_the_user_may_not_read_is_never_downloaded) {

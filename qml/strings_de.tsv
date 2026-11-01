@@ -173,6 +173,7 @@ Newer	Neuer
 Next page	Nächste Seite
 Nextcloud 30 or newer is needed. Ask the administrator to update the server.	Nextcloud 30 oder neuer ist nötig. Bitten Sie den Administrator, den Server zu aktualisieren.
 No	Nein
+No app on the reader can open this file. Its name has no ending (the extension is missing):	Keine App auf dem Reader kann diese Datei öffnen. Ihr Name hat keine Endung (die Dateiendung fehlt):
 No connection. The queue waits until you tap Send with a connection.	Keine Verbindung. Die Warteschlange wartet, bis Sie mit einer Verbindung auf Senden tippen.
 Not added	Nicht hinzugefügt
 Not approved yet. Approve the login on your other device, then tap Check again.	Noch nicht bestätigt. Bestätigen Sie die Anmeldung auf Ihrem anderen Gerät und tippen Sie dann erneut auf Prüfen.
@@ -331,6 +332,7 @@ The login did not finish.	Die Anmeldung wurde nicht abgeschlossen.
 The login ran out of time.	Die Zeit für die Anmeldung ist abgelaufen.
 The login ran out of time. Go back and start it again.	Die Zeit für die Anmeldung ist abgelaufen. Gehen Sie zurück und starten Sie sie erneut.
 The queue is full.	Die Warteschlange ist voll.
+The reader could not open this file:	Der Reader konnte diese Datei nicht öffnen:
 The reader could not tell whether this reached the server.	Der Reader konnte nicht feststellen, ob das den Server erreicht hat.
 The reader does not know yet whether the server has a trash. Tap Test in Settings with a connection, then try again.	Das Lesegerät weiß noch nicht, ob der Server einen Papierkorb hat. Tippen Sie in den Einstellungen mit Verbindung auf Test und versuchen Sie es dann erneut.
 The reader's clock differs from the server's by about %n minute(s). Check the date and time in the reader's settings.	Die Uhr des Readers weicht um etwa %n Minute von der des Servers ab. Prüfen Sie Datum und Uhrzeit in den Einstellungen des Readers.||Die Uhr des Readers weicht um etwa %n Minuten von der des Servers ab. Prüfen Sie Datum und Uhrzeit in den Einstellungen des Readers.

@@ -43,6 +43,10 @@ TakenMap build_taken(const std::vector<std::pair<std::string, std::string>>& rem
 Result<std::string> choose_local_path(const std::string& download_root, std::string_view remote_path, const TakenMap& taken,
                                       const LocalNameOptions& options = {});
 
+// True when a file name ends in an extension the reader can choose a viewer by: after the last dot (not the first character) come 1-15 bytes
+// without a blank ("Baguette magique" and ".hidden" have none, "story.epub" has).
+bool has_file_extension(const std::string& name);
+
 // A name of the form "<base> (<n>)<ext>" for a file ("story.epub" -> "story (2).epub") or "<name> (<n>)" for a folder, within the limit.
 std::string with_suffix(const std::string& component, int n, bool is_file, const LocalNameOptions& options = {});
 

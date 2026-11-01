@@ -21,6 +21,14 @@ Item {
         }
         page.StackView.view.push(Qt.resolvedUrl("SharePage.qml"))
     }
+    function openFile() {
+        var r = transfer.open(page.remotePath)
+        if (r.ok) return
+        openFail.text = (r.reason === "no_extension"
+                         ? qsTr("No app on the reader can open this file. Its name has no ending (the extension is missing):")
+                         : qsTr("The reader could not open this file:")) + "\n\n" + r.name
+        openFail.open()
+    }
     function jobActive() { return mine() && transfer.jobBusy }
     function failedText() {
         var key = transfer.jobError
@@ -160,7 +168,7 @@ Item {
                 text: qsTr("Open")
                 icon: "eye"
                 visible: info.canOpen === true && !page.jobActive()
-                onClicked: transfer.open(page.remotePath)
+                onClicked: page.openFile()
             },
             ToolButton {
                 objectName: "detailsShare"
@@ -204,6 +212,13 @@ Item {
         text: qsTr("This file is %1. Downloading it can take a long time and uses the battery. Download it?").arg(sizeText)
         acceptText: qsTr("Download")
         onAccepted: transfer.download(page.remotePath, true)
+    }
+
+    ConfirmDialog {
+        id: openFail
+        objectName: "openFailDialog"
+        title: qsTr("Open")
+        showCancel: false
     }
 
     ConfirmDialog {

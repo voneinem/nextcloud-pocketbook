@@ -109,6 +109,12 @@ std::string sanitize_component(std::string_view server_name, const LocalNameOpti
     return out;
 }
 
+bool has_file_extension(const std::string& name) {
+    std::string base, ext;
+    split_extension(name, &base, &ext);
+    return ext.size() > 1 && ext.find(' ') == std::string::npos;
+}
+
 std::string with_suffix(const std::string& component, int n, bool is_file, const LocalNameOptions& options) {
     const std::string suffix = " (" + std::to_string(n) + ")";
     std::string base = component, ext;

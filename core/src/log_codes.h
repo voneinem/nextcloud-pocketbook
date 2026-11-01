@@ -35,6 +35,7 @@ inline constexpr const char* kAllowedCodes[] = {
     "font.ui",
     "listing.refresh",
     "network.connect",
+    "open.handoff",
     "queue.send",
     "rotate.begin",
     "rotate.done",
