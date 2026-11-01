@@ -138,6 +138,16 @@ few deleted items and a file with older versions. Nothing below has been run on 
 | DT-T3 | A trash of 1,000 items (and 300 for a first check): the time from the Trash tap to the first page, paging, peak memory | first page <= 6 s on Wi-Fi; paging without delay; peak `VmHWM` <= 150 MB; note the three values | U | | |
 | DT-T4 | Empty trash of 50 items with the screen switched off half way, and with Wi-Fi switched off half way | the run goes on with the screen off and stops with a message at the lost connection (removed / not removed / not tried); a refresh shows the truth; progress updates are coarse (about every tenth item); note what a lost answer shows | U | | |
 
+## Open without a file ending (bug open-synced-file-silent)
+
+Added by `.specify/bugs/open-synced-file-silent/`. Same legend and rules as above. Prerequisite: a PDF on the server whose name has no ending (for example `Baguette magique`).
+
+| ID | Item | Expected | Status | Date | Build/result |
+|----|------|----------|--------|------|--------------|
+| DT-O1 | Download the extension-less PDF, open its details and tap Open | a dialog "No app on the reader can open this file. Its name has no ending (the extension is missing):" with the full name below; the viewer is not started; `pbcloud.log` has `open.handoff result=no_extension` and no file path | O | 2026-11-01 | Owner: the dialog appeared when Open was tapped on the extension-less file. `pbcloud.log` has one `open.handoff result=no_extension` line and no file name or path (searched for the name, the folder and the download root: 0 hits). Build: 0.6.1 version string with the fix, binary of 2026-11-01 11:12 |
+| DT-O2 | Rename the file on the server to `….pdf`, download it again and tap Open | the PDF viewer opens | O | 2026-11-01 | Owner: "worked" (not noted separately from DT-O3); the copies `Baguette magique.pdf` and `Saftiger veganer Schoko-Kirschkuchen vom Blech.pdf` are on the card; a successful hand-off writes no log line, so the log cannot confirm it |
+| DT-O3 | Tap Open on a `….pdf` file | the PDF viewer opens as before | O | 2026-11-01 | Owner: "worked" (see DT-O2) |
+
 ## Recording
 
 For each measured value write the build version (About) and the date. Findings that change a design decision

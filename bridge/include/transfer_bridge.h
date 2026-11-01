@@ -89,7 +89,10 @@ public:
     Q_INVOKABLE void resume(qlonglong jobId);
     // choice: keep_mine | keep_both | replace (the page has asked the second confirmation before it passes replace)
     Q_INVOKABLE void resolveConflict(const QString& remotePath, const QString& choice);
-    Q_INVOKABLE void open(const QString& remotePath);
+    // Hands the downloaded copy to the reader's viewer. {ok, reason, name}: reason is "no_extension" (the reader picks the viewer by the file name's
+    // ending, so a name without one is not handed over) or "cannot_open" (no copy, an unsafe path, or the reader refused); name is the file's
+    // name through display_safe(). The failure is logged as open.handoff (result only, no path).
+    Q_INVOKABLE QVariantMap open(const QString& remotePath);
     // Keep offline: marks the file or folder (kind "file" | "folder"); nothing is fetched by marking.
     Q_INVOKABLE void setKept(const QString& remotePath, const QString& kind, bool on);
     // Checks what is kept against the server and downloads what changed. Ignored while a download or an Update runs.

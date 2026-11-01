@@ -3,6 +3,23 @@
 Versions follow MAJOR.MINOR.PATCH. A branch that changes the product raises VERSION and adds an entry here
 (`scripts/check-version-bump.sh`). The tag `v<version>` is set after the merge.
 
+## 0.6.2 - 2026-11-01
+
+Open tells you why a file did not open. **No change to the data or to the server behavior**; the package is built as in 0.6.1.
+
+### Fixed
+- **Open on a file whose name has no ending did nothing.** The reader chooses the viewer by the ending of the file name, so a PDF stored as `Baguette magique` (no `.pdf`) was handed
+  over and silently ignored. Open now shows a message with the full file name and says that the extension is missing; the file is not handed to the reader. The app does not rename
+  the file or add an ending: a PDF should end with `.pdf` (rename it on the server, with Rename, and download it again).
+- Any other failed hand-off (the copy is gone, the path is not safe, the reader refused) is now reported with "The reader could not open this file:" and the name, instead of nothing.
+- The log has one new line for a failed hand-off, `open.handoff result=no_extension` or `result=cannot_open`; it never holds a file name or a path.
+
+### Verified
+- On the reader (InkPad One, 2026-11-01): the message for an extension-less PDF and the log line (`docs/device-test-checklist.md` DT-O1); a `.pdf` file opens as before
+  (DT-O2, DT-O3: the owner's statement; a successful hand-off writes no log line).
+- Known and not changed: a file of a folder pair whose reader folder is outside `PBCloud` is refused by the hand-off (`DeviceBridge::openFile` accepts only the download folder);
+  it now gets the message "The reader could not open this file:" instead of silence. Not tested on the reader.
+
 ## 0.6.1 - 2026-10-25
 
 The release package follows the PB Store package contract (specs/007-pb-store-package). **No change to the app, to the data or to the server behavior**: the files

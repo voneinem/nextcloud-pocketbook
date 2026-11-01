@@ -5,6 +5,8 @@
 #include "format_util.h"
 #include "pbc/entry_state.h"
 #include "pbc/local_files.h"
+#include "pbc/local_name.h"
+#include "pbc/log.h"
 #include "pbc/remote_path.h"
 #include "worker.h"
 
@@ -227,8 +229,17 @@ void TransferBridge::resolveConflict(const QString& remotePath, const QString& c
     }
 }
 
-void TransferBridge::open(const QString& remotePath) {
+QVariantMap TransferBridge::open(const QString& remotePath) {
     const std::string p = pbc::normalize_remote_path(remotePath.toStdString());
+    auto failed = [&](const char* reason, const std::string& name) {
+        pbc::log::event("open.handoff", {pbc::log::text("result", reason)});
+        QVariantMap m;
+        m["ok"] = false;
+        m["reason"] = QString::fromLatin1(reason);
+        m["name"] = display_safe(name);
+        return m;
+    };
+    const std::string remote_name = p.substr(p.rfind('/') + 1);
     std::string root = c_.download_root, rel;
     if (const auto local = c_.store->local_file(p)) {
         rel = local->local_path;
@@ -236,11 +247,16 @@ void TransferBridge::open(const QString& remotePath) {
         root = sc->root;
         rel = sc->local_rel;
     } else {
-        return;
+        return failed("cannot_open", remote_name);
     }
     const auto abs = pbc::resolve_local_file(root, rel);
-    if (!abs.ok() || !c_.open_file) return;
-    c_.open_file(q(abs.value));
+    if (!abs.ok() || !c_.open_file) return failed("cannot_open", remote_name);
+    const std::string file_name = abs.value.substr(abs.value.rfind('/') + 1);
+    if (!pbc::has_file_extension(file_name)) return failed("no_extension", file_name);   // the reader picks the viewer by the ending
+    if (!c_.open_file(q(abs.value))) return failed("cannot_open", file_name);
+    QVariantMap m;
+    m["ok"] = true;
+    return m;
 }
 
 QString TransferBridge::lastUpdateText() const {

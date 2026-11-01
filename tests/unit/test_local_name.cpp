@@ -154,4 +154,14 @@ PB_TEST(a_path_over_4000_bytes_is_refused_and_not_cut) {
     PB_CHECK_EQ(chosen(root, ok + "/file.epub").substr(0, 6), std::string("dddddd"));
 }
 
+PB_TEST(a_name_has_an_extension_when_a_short_ending_without_blanks_follows_the_last_dot) {
+    PB_CHECK(pbc::has_file_extension("story.epub"));
+    PB_CHECK(pbc::has_file_extension("Zucchini-Nudeln.pdf"));
+    PB_CHECK(pbc::has_file_extension("archive.tar.gz"));
+    PB_CHECK(!pbc::has_file_extension("Baguette magique"));
+    PB_CHECK(!pbc::has_file_extension(".hidden"));
+    PB_CHECK(!pbc::has_file_extension("Pie. Part two"));   // the ending would contain a blank
+    PB_CHECK(!pbc::has_file_extension(""));
+}
+
 PB_TEST_MAIN()
